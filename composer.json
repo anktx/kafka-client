@@ -1,0 +1,38 @@
+{
+  "name": "anktx/kafka-client",
+  "type": "library",
+  "description": "PHP wrapper for RdKafka",
+  "keywords": [
+    "kafka",
+    "redpanda",
+    "client"
+  ],
+  "minimum-stability": "stable",
+  "require": {
+    "php": "^8.1",
+    "ext-rdkafka": "*"
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.59",
+    "phpstan/phpstan": "^1.11",
+    "phpunit/phpunit": "^10.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "Anktx\\Kafka\\Client\\": "src"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Anktx\\Kafka\\Client\\Tests\\": "tests"
+    }
+  },
+  "scripts": {
+    "analyse": "phpstan analyse --memory-limit 300M -v -l 6 -c phpstan.neon ./src ./tests",
+    "cs-fix": "php-cs-fixer fix"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  }
+}
