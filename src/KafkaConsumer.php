@@ -70,7 +70,7 @@ final class KafkaConsumer
         ]);
     }
 
-    public function commitedOffsets(SubscriptionList $subscriptionList, int $timeoutMs = 1000): SubscriptionList
+    private function commitedOffsets(SubscriptionList $subscriptionList, int $timeoutMs = 1000): SubscriptionList
     {
         return SubscriptionList::create(
             ...$this->consumer->getCommittedOffsets(
