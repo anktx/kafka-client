@@ -1,13 +1,13 @@
 {
   "name": "anktx/kafka-client",
   "type": "library",
-  "version": "0.1.0",
   "description": "PHP wrapper for RdKafka",
   "keywords": [
     "kafka",
     "redpanda",
     "client"
   ],
+  "license": "BSD-3-Clause",
   "minimum-stability": "stable",
   "require": {
     "php": "^8.1",
