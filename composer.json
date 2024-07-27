@@ -29,8 +29,10 @@
     }
   },
   "scripts": {
-    "analyse": "phpstan analyse --memory-limit 300M -v -l 6 -c phpstan.neon",
-    "cs-fix": "php-cs-fixer fix"
+    "analyse": "phpstan analyse -v -l 6 ./src ./tests",
+    "cs-fix": "php-cs-fixer fix -v --diff",
+    "tests": "phpunit tests",
+    "infection": "infection --show-mutations"
   },
   "config": {
     "optimize-autoloader": true,
