@@ -16,10 +16,15 @@ final class SubscriptionList
         $this->items = $items;
     }
 
-    public static function create(\RdKafka\TopicPartition ...$items): self
+    public static function create(string ...$topics): self
+    {
+        return new self(...array_map(fn (string $topic) => Subscription::create($topic), $topics));
+    }
+
+    public static function fromKafkaTopicPartition(\RdKafka\TopicPartition ...$items): self
     {
         return new self(
-            ...array_map(fn (\RdKafka\TopicPartition $tp) => Subscription::create($tp), $items)
+            ...array_map(fn (\RdKafka\TopicPartition $tp) => Subscription::fromKafkaTopicPartition($tp), $items)
         );
     }
 

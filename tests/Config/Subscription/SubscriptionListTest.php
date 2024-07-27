@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Config\Subscription;
 
-use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Subscription\Subscription;
 use Anktx\Kafka\Client\Subscription\SubscriptionList;
 use PHPUnit\Framework\TestCase;

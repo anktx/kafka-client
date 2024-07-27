@@ -72,7 +72,7 @@ final class KafkaConsumer
 
     private function commitedOffsets(SubscriptionList $subscriptionList, int $timeoutMs = 1000): SubscriptionList
     {
-        return SubscriptionList::create(
+        return SubscriptionList::fromKafkaTopicPartition(
             ...$this->consumer->getCommittedOffsets(
                 topic_partitions: $subscriptionList->asKafkaTopicPartitionArray(),
                 timeout_ms: $timeoutMs,

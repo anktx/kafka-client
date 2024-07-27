@@ -15,7 +15,12 @@ final class Subscription
     ) {
     }
 
-    public static function create(\RdKafka\TopicPartition $tp): self
+    public static function create(string $topic, ?int $partition = null, ?int $offset = null): self
+    {
+        return new self($topic, $partition, $offset);
+    }
+
+    public static function fromKafkaTopicPartition(\RdKafka\TopicPartition $tp): self
     {
         return new self(
             topic: $tp->getTopic(),
