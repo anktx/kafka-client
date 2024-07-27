@@ -35,4 +35,11 @@ final class SubscriptionListTest extends TestCase
 
         $this->assertSame(['topic1', 'topic2', 'topic3'], $subscriptionList->topicNames());
     }
+
+    public function testStaticCreateSubscription(): void
+    {
+        $subscriptionList = SubscriptionList::create('topic1', 'topic2', 'topic3');
+
+        $this->assertSame(['topic1', 'topic2', 'topic3'], $subscriptionList->topicNames());
+    }
 }
