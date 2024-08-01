@@ -29,6 +29,9 @@ final class KafkaProducer
         $this->producer = new Producer($config->asKafkaConfig());
     }
 
+    /**
+     * @throws KafkaProducerException
+     */
     public function produce(KafkaProducerMessage $message): void
     {
         if ($this->pollStrategy->shouldPoll()) {
@@ -53,6 +56,10 @@ final class KafkaProducer
         }
     }
 
+    /**
+     * @throws KafkaConnectionException
+     * @throws KafkaProducerException
+     */
     public function flush(int $timeoutMs = 1000): void
     {
         $rst = $this->producer->flush($timeoutMs);

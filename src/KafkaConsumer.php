@@ -18,6 +18,9 @@ final class KafkaConsumer
 {
     private readonly \RdKafka\KafkaConsumer $consumer;
 
+    /**
+     * @throws KafkaConnectionException
+     */
     public function __construct(
         ConsumerConfig $config,
         int $timeoutMs = 5000,
@@ -37,6 +40,11 @@ final class KafkaConsumer
         $this->consumer->assign($this->commitedOffsets($subscriptionList)->asKafkaTopicPartitionArray());
     }
 
+    /**
+     * @throws KafkaPartitionEofException
+     * @throws KafkaPartitionTimeoutException
+     * @throws KafkaConsumerException
+     */
     public function consume(int $timeoutMs = 1000): KafkaConsumerMessage
     {
         $message = $this->consumer->consume($timeoutMs);
