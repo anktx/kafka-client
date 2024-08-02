@@ -64,11 +64,11 @@ final class KafkaProducer
     {
         $rst = $this->producer->flush($timeoutMs);
 
-        if ($rst === RD_KAFKA_RESP_ERR_NO_ERROR) {
+        if ($rst === \RD_KAFKA_RESP_ERR_NO_ERROR) {
             return;
         }
 
-        if ($rst === RD_KAFKA_RESP_ERR__TIMED_OUT) {
+        if ($rst === \RD_KAFKA_RESP_ERR__TIMED_OUT) {
             throw new KafkaConnectionException('Flush timed out in ' . $timeoutMs . 'ms');
         }
 

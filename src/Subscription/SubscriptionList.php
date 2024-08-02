@@ -53,7 +53,7 @@ final class SubscriptionList
 
     public function isEmpty(): bool
     {
-        return count($this->items) === 0;
+        return \count($this->items) === 0;
     }
 
     private function havingPartitions(): self

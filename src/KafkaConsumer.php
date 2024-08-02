@@ -50,11 +50,11 @@ final class KafkaConsumer
         $message = $this->consumer->consume($timeoutMs);
 
         switch ($message->err) {
-            case RD_KAFKA_RESP_ERR_NO_ERROR:
+            case \RD_KAFKA_RESP_ERR_NO_ERROR:
                 break;
-            case RD_KAFKA_RESP_ERR__PARTITION_EOF:
+            case \RD_KAFKA_RESP_ERR__PARTITION_EOF:
                 throw KafkaPartitionEofException::create($message);
-            case RD_KAFKA_RESP_ERR__TIMED_OUT:
+            case \RD_KAFKA_RESP_ERR__TIMED_OUT:
                 throw KafkaPartitionTimeoutException::create($message);
             default:
                 throw KafkaConsumerException::create($message);
@@ -96,7 +96,7 @@ final class KafkaConsumer
                 timeout_ms: $timeoutMs,
             );
         } catch (\RdKafka\Exception $e) {
-            throw ($e->getCode() === RD_KAFKA_RESP_ERR__TRANSPORT) ? new KafkaConnectionException($e->getMessage(), $e->getCode(), $e->getPrevious()) : $e;
+            throw ($e->getCode() === \RD_KAFKA_RESP_ERR__TRANSPORT) ? new KafkaConnectionException($e->getMessage(), $e->getCode(), $e->getPrevious()) : $e;
         }
     }
 }

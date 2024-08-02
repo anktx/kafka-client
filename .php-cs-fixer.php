@@ -2,10 +2,15 @@
 
 declare(strict_types=1);
 
-return (new PhpCsFixer\Config())
+use PhpCsFixer\Config;
+use PhpCsFixer\Finder;
+use PhpCsFixer\Runner\Parallel\ParallelConfigFactory;
+
+return (new Config())
+    ->setParallelConfig(ParallelConfigFactory::detect())
     ->setRiskyAllowed(true)
     ->setRules([
-        '@PER-CS' => true,
+        '@PER-CS2.0' => true,
         '@Symfony' => true,
         'concat_space' => [
             'spacing' => 'one',
@@ -20,9 +25,13 @@ return (new PhpCsFixer\Config())
         'not_operator_with_successor_space' => true,
         'not_operator_with_space' => false,
         'multiline_comment_opening_closing' => true,
+        'native_function_invocation' => [
+            'include' => ['@compiler_optimized'],
+        ],
+        'native_constant_invocation' => true,
     ])
     ->setFinder(
-        PhpCsFixer\Finder::create()
+        Finder::create()
             ->exclude('vendor')
             ->in(__DIR__)
     )

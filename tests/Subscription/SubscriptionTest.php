@@ -1,13 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Anktx\Kafka\Client\Tests\Subscription;
 
 use Anktx\Kafka\Client\Subscription\Subscription;
 use PHPUnit\Framework\TestCase;
 
-class SubscriptionTest extends TestCase
+final class SubscriptionTest extends TestCase
 {
-
     public function testStaticCreate(): void
     {
         $subscription = Subscription::create('topic1');
