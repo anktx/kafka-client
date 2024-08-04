@@ -78,6 +78,11 @@ final class KafkaConsumer
         ]);
     }
 
+    public function close(): void
+    {
+        $this->consumer->close();
+    }
+
     private function commitedOffsets(SubscriptionList $subscriptionList, int $timeoutMs = 1000): SubscriptionList
     {
         return SubscriptionList::fromKafkaTopicPartition(
