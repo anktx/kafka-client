@@ -8,6 +8,7 @@ use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
+use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\Exception\Logic\PartitionEofException;
 use Anktx\Kafka\Client\Exception\Logic\PartitionTimeoutException;
 use Anktx\Kafka\Client\Message\KafkaConsumerMessage;
@@ -18,6 +19,7 @@ use RdKafka\TopicPartition;
 final class KafkaConsumer
 {
     private readonly \RdKafka\KafkaConsumer $consumer;
+    private bool $isSubscribed = false;
 
     /**
      * @throws KafkaConnectionException
@@ -52,6 +54,8 @@ final class KafkaConsumer
         } catch (RdKafkaException $e) {
             throw KafkaConsumerException::fromKafkaException($e);
         }
+
+        $this->isSubscribed = true;
     }
 
     /**
@@ -64,15 +68,22 @@ final class KafkaConsumer
         } catch (RdKafkaException $e) {
             throw KafkaConsumerException::fromKafkaException($e);
         }
+
+        $this->isSubscribed = false;
     }
 
     /**
+     * @throws NotSubscribedException
      * @throws PartitionEofException
      * @throws PartitionTimeoutException
      * @throws KafkaConsumerException
      */
     public function consume(int $timeoutMs = 1000): KafkaConsumerMessage
     {
+        if (! $this->isSubscribed) {
+            throw new NotSubscribedException();
+        }
+
         try {
             $message = $this->consumer->consume($timeoutMs);
         } catch (RdKafkaException $e) {
