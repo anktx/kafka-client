@@ -52,7 +52,7 @@ final class KafkaProducer
                 timestamp_ms: $message->timestampMs,
             );
         } catch (\RdKafka\Exception $e) {
-            throw new KafkaProducerException($e->getMessage(), $e->getCode(), $e->getPrevious());
+            throw KafkaProducerException::fromKafkaException($e);
         }
     }
 

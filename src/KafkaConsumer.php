@@ -8,10 +8,11 @@ use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
-use Anktx\Kafka\Client\Exception\Kafka\KafkaPartitionEofException;
-use Anktx\Kafka\Client\Exception\Kafka\KafkaPartitionTimeoutException;
+use Anktx\Kafka\Client\Exception\Logic\PartitionEofException;
+use Anktx\Kafka\Client\Exception\Logic\PartitionTimeoutException;
 use Anktx\Kafka\Client\Message\KafkaConsumerMessage;
 use Anktx\Kafka\Client\Subscription\SubscriptionList;
+use RdKafka\Exception as RdKafkaException;
 use RdKafka\TopicPartition;
 
 final class KafkaConsumer
@@ -20,6 +21,7 @@ final class KafkaConsumer
 
     /**
      * @throws KafkaConnectionException
+     * @throws KafkaConsumerException
      */
     public function __construct(
         ConsumerConfig $config,
@@ -29,35 +31,51 @@ final class KafkaConsumer
         $this->assertBrokersAreAlive($timeoutMs);
     }
 
+    /**
+     * @throws EmptySubscriptionsException
+     * @throws KafkaConsumerException
+     */
     public function subscribe(SubscriptionList $subscriptionList): void
     {
         if ($subscriptionList->isEmpty()) {
             throw new EmptySubscriptionsException('At least one subscription is required');
         }
 
-        $this->consumer->subscribe($subscriptionList->topicNames());
+        try {
+            $this->consumer->subscribe($subscriptionList->topicNames());
+        } catch (RdKafkaException $e) {
+            throw KafkaConsumerException::fromKafkaException($e);
+        }
 
-        $this->consumer->assign($this->commitedOffsets($subscriptionList)->asKafkaTopicPartitionArray());
+        try {
+            $this->consumer->assign($this->commitedOffsets($subscriptionList)->asKafkaTopicPartitionArray());
+        } catch (RdKafkaException $e) {
+            throw KafkaConsumerException::fromKafkaException($e);
+        }
     }
 
     /**
-     * @throws KafkaPartitionEofException
-     * @throws KafkaPartitionTimeoutException
+     * @throws PartitionEofException
+     * @throws PartitionTimeoutException
      * @throws KafkaConsumerException
      */
     public function consume(int $timeoutMs = 1000): KafkaConsumerMessage
     {
-        $message = $this->consumer->consume($timeoutMs);
+        try {
+            $message = $this->consumer->consume($timeoutMs);
+        } catch (RdKafkaException $e) {
+            throw KafkaConsumerException::fromKafkaException($e);
+        }
 
         switch ($message->err) {
             case \RD_KAFKA_RESP_ERR_NO_ERROR:
                 break;
             case \RD_KAFKA_RESP_ERR__PARTITION_EOF:
-                throw KafkaPartitionEofException::create($message);
+                throw PartitionEofException::create($message->errstr());
             case \RD_KAFKA_RESP_ERR__TIMED_OUT:
-                throw KafkaPartitionTimeoutException::create($message);
+                throw PartitionTimeoutException::create($message->errstr());
             default:
-                throw KafkaConsumerException::create($message);
+                throw new KafkaConsumerException($message->errstr());
         }
 
         return new KafkaConsumerMessage(
@@ -71,11 +89,18 @@ final class KafkaConsumer
         );
     }
 
+    /**
+     * @throws KafkaConsumerException
+     */
     public function commit(KafkaConsumerMessage $message): void
     {
-        $this->consumer->commit([
-            new TopicPartition($message->topic, $message->partition, $message->offset + 1),
-        ]);
+        try {
+            $this->consumer->commit([
+                new TopicPartition($message->topic, $message->partition, $message->offset + 1),
+            ]);
+        } catch (RdKafkaException $e) {
+            throw KafkaConsumerException::fromKafkaException($e);
+        }
     }
 
     public function close(): void
@@ -92,6 +117,10 @@ final class KafkaConsumer
             ));
     }
 
+    /**
+     * @throws KafkaConsumerException
+     * @throws KafkaConnectionException
+     */
     private function assertBrokersAreAlive(int $timeoutMs): void
     {
         try {
@@ -100,8 +129,11 @@ final class KafkaConsumer
                 only_topic: null,
                 timeout_ms: $timeoutMs,
             );
-        } catch (\RdKafka\Exception $e) {
-            throw ($e->getCode() === \RD_KAFKA_RESP_ERR__TRANSPORT) ? new KafkaConnectionException($e->getMessage(), $e->getCode(), $e->getPrevious()) : $e;
+        } catch (RdKafkaException $e) {
+            throw match ($e->getCode()) {
+                \RD_KAFKA_RESP_ERR__TRANSPORT => KafkaConnectionException::fromKafkaException($e),
+                default => KafkaConsumerException::fromKafkaException($e),
+            };
         }
     }
 }
