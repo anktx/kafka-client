@@ -55,6 +55,18 @@ final class KafkaConsumer
     }
 
     /**
+     * @throws KafkaConsumerException
+     */
+    public function unsubscribe(): void
+    {
+        try {
+            $this->consumer->unsubscribe();
+        } catch (RdKafkaException $e) {
+            throw KafkaConsumerException::fromKafkaException($e);
+        }
+    }
+
+    /**
      * @throws PartitionEofException
      * @throws PartitionTimeoutException
      * @throws KafkaConsumerException
