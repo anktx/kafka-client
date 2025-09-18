@@ -7,7 +7,7 @@ namespace Anktx\Kafka\Client\Message;
 abstract class AbstractMessage
 {
     /**
-     * @param array<string, int|string>|null $headers
+     * @param null|array<string, int|string> $headers
      */
     public function __construct(
         public readonly string $topic,
@@ -17,6 +17,5 @@ abstract class AbstractMessage
         public readonly ?string $key = null,
         public readonly ?array $headers = null,
         public readonly int $timestampMs = 0,
-    ) {
-    }
+    ) {}
 }

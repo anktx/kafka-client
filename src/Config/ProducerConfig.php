@@ -20,8 +20,7 @@ final class ProducerConfig
         public readonly CompressionType $compressionType = CompressionType::snappy,
         public readonly bool $isDebug = false,
         public readonly LoggerInterface $logger = new NullLogger(),
-    ) {
-    }
+    ) {}
 
     public function asKafkaConfig(): Conf
     {

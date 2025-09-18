@@ -93,10 +93,13 @@ final class KafkaConsumer
         switch ($message->err) {
             case \RD_KAFKA_RESP_ERR_NO_ERROR:
                 break;
+
             case \RD_KAFKA_RESP_ERR__PARTITION_EOF:
                 throw PartitionEofException::create($message->errstr());
+
             case \RD_KAFKA_RESP_ERR__TIMED_OUT:
                 throw PartitionTimeoutException::create($message->errstr());
+
             default:
                 throw new KafkaConsumerException($message->errstr());
         }
@@ -137,7 +140,8 @@ final class KafkaConsumer
             ...$this->consumer->getCommittedOffsets(
                 topic_partitions: $subscriptionList->asKafkaTopicPartitionArray(),
                 timeout_ms: $timeoutMs,
-            ));
+            ),
+        );
     }
 
     /**

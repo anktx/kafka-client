@@ -7,26 +7,27 @@ namespace Anktx\Kafka\Client\Config;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RdKafka\Conf;
+use RdKafka\KafkaConsumer;
 
-final class ConsumerConfig
+final readonly class ConsumerConfig
 {
     public function __construct(
-        public readonly string $brokers,
-        public readonly string $groupId,
-        public readonly string $instanceId,
-        public readonly OffsetReset $offsetReset = OffsetReset::earliest,
-        public readonly ?int $autoCommitMs = null,
-        public readonly ?int $sessionTimeoutMs = null,
-        public readonly bool $isDebug = false,
-        public readonly LoggerInterface $logger = new NullLogger(),
-    ) {
-    }
+        public string $brokers,
+        public string $groupId,
+        public string $instanceId,
+        public OffsetReset $offsetReset = OffsetReset::earliest,
+        public ?int $autoCommitMs = null,
+        public ?int $sessionTimeoutMs = null,
+        public bool $isDebug = false,
+        public LoggerInterface $logger = new NullLogger(),
+    ) {}
 
-    public function asKafkaConfig(): \RdKafka\Conf
+    public function asKafkaConfig(): Conf
     {
-        $conf = new \RdKafka\Conf();
+        $conf = new Conf();
 
-        $conf->setLogCb(function (\RdKafka\KafkaConsumer $consumer, int $level, string $facility, string $message) {
+        $conf->setLogCb(function (KafkaConsumer $consumer, int $level, string $facility, string $message) {
             $this->logger->log($level, $message);
         });
         if ($this->isDebug) {

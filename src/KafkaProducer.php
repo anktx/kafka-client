@@ -10,6 +10,7 @@ use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\Message\KafkaProducerMessage;
 use Anktx\Kafka\Client\PollStrategy\NeverPoolStrategy;
 use Anktx\Kafka\Client\PollStrategy\PollStrategy;
+use RdKafka\Exception;
 use RdKafka\Producer;
 use RdKafka\ProducerTopic;
 
@@ -51,7 +52,7 @@ final class KafkaProducer
                 headers: $message->headers,
                 timestamp_ms: $message->timestampMs,
             );
-        } catch (\RdKafka\Exception $e) {
+        } catch (Exception $e) {
             throw KafkaProducerException::fromKafkaException($e);
         }
     }

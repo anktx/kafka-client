@@ -10,8 +10,7 @@ final class TimeoutPollStrategy implements PollStrategy
 
     public function __construct(
         public readonly int $pollIntervalSec,
-    ) {
-    }
+    ) {}
 
     public function shouldPoll(): bool
     {

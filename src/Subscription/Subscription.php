@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\Subscription;
 
 use Anktx\Kafka\Client\Exception\Business\TopicHasNoPartitionException;
+use RdKafka\TopicPartition;
 
-final class Subscription
+final readonly class Subscription
 {
     public function __construct(
-        public readonly string $topic,
-        public readonly ?int $partition = null,
-        public readonly ?int $offset = null,
-    ) {
-    }
+        public string $topic,
+        public ?int $partition = null,
+        public ?int $offset = null,
+    ) {}
 
     public static function create(string $topic, ?int $partition = null, ?int $offset = null): self
     {
         return new self($topic, $partition, $offset);
     }
 
-    public static function fromKafkaTopicPartition(\RdKafka\TopicPartition $tp): self
+    public static function fromKafkaTopicPartition(TopicPartition $tp): self
     {
         return new self(
             topic: $tp->getTopic(),
@@ -29,16 +29,16 @@ final class Subscription
         );
     }
 
-    public function asKafkaTopicPartition(): \RdKafka\TopicPartition
+    public function asKafkaTopicPartition(): TopicPartition
     {
         if ($this->partition === null) {
             throw new TopicHasNoPartitionException('Topic "' . $this->topic . '" has no partition');
         }
 
         if ($this->offset === null) {
-            return new \RdKafka\TopicPartition($this->topic, $this->partition);
+            return new TopicPartition($this->topic, $this->partition);
         }
 
-        return new \RdKafka\TopicPartition($this->topic, $this->partition, $this->offset);
+        return new TopicPartition($this->topic, $this->partition, $this->offset);
     }
 }

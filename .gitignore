@@ -1,6 +1,7 @@
 
 /.idea/
 /.run/
+/.cache/
 
 /vendor/
 /composer.lock
