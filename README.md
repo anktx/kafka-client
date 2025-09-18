@@ -21,7 +21,7 @@ composer require anktx/kafka-client
 ```php
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\KafkaProducer;
-use Anktx\Kafka\Client\Message\KafkaProducerMessage;
+use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 
 $kafkaProducer = new KafkaProducer(
     new ProducerConfig(
@@ -59,8 +59,8 @@ $kafkaProducer->flush();
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\KafkaConsumer;
-use Anktx\Kafka\Client\Subscription\Subscription;
-use Anktx\Kafka\Client\Subscription\SubscriptionList;
+use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
+use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 
 $kafkaConsumer = new KafkaConsumer(
     new ConsumerConfig(
@@ -78,8 +78,8 @@ $kafkaConsumer = new KafkaConsumer(
 );
 
 $kafkaConsumer->subscribe(
-    new SubscriptionList(
-        new Subscription(topic: 'topic1'),
+    new TopicSubscriptionList(
+        new TopicSubscription(topic: 'topic1'),
         // new Subscription(topic: 'topic2', partition: 1),
     ),
 );

@@ -2,31 +2,33 @@
 
 declare(strict_types=1);
 
-namespace Anktx\Kafka\Client\Subscription;
+namespace Anktx\Kafka\Client\TopicSubscription;
 
 use RdKafka\TopicPartition;
 
-final readonly class SubscriptionList
+final readonly class TopicSubscriptionList
 {
     /**
-     * @var Subscription[]
+     * @var TopicSubscription[]
      */
     public array $items;
 
-    public function __construct(Subscription ...$items)
+    public function __construct(TopicSubscription ...$items)
     {
         $this->items = $items;
     }
 
     public static function create(string ...$topics): self
     {
-        return new self(...array_map(static fn(string $topic) => Subscription::create($topic), $topics));
+        return new self(
+            ...array_map(static fn(string $topic) => TopicSubscription::create($topic), $topics),
+        );
     }
 
     public static function fromKafkaTopicPartition(TopicPartition ...$items): self
     {
         return new self(
-            ...array_map(static fn(TopicPartition $tp) => Subscription::fromKafkaTopicPartition($tp), $items),
+            ...array_map(static fn(TopicPartition $tp) => TopicSubscription::fromKafkaTopicPartition($tp), $items),
         );
     }
 
@@ -37,7 +39,7 @@ final readonly class SubscriptionList
     {
         return array_values(
             array_unique(
-                array_map(static fn(Subscription $s) => $s->topic, $this->items),
+                array_map(static fn(TopicSubscription $s) => $s->topic, $this->items),
             ),
         );
     }
@@ -48,7 +50,7 @@ final readonly class SubscriptionList
     public function asKafkaTopicPartitionArray(): array
     {
         return array_map(
-            static fn(Subscription $s) => $s->asKafkaTopicPartition(),
+            static fn(TopicSubscription $s) => $s->asKafkaTopicPartition(),
             $this->havingPartitions()->items,
         );
     }
@@ -61,7 +63,7 @@ final readonly class SubscriptionList
     private function havingPartitions(): self
     {
         return new self(
-            ...array_filter($this->items, static fn(Subscription $s) => $s->partition !== null),
+            ...array_filter($this->items, static fn(TopicSubscription $s) => $s->partition !== null),
         );
     }
 }

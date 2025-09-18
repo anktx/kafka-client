@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client;
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
+use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
+use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionTimeout;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
-use Anktx\Kafka\Client\Exception\Logic\PartitionEofException;
-use Anktx\Kafka\Client\Exception\Logic\PartitionTimeoutException;
-use Anktx\Kafka\Client\Message\KafkaConsumerMessage;
-use Anktx\Kafka\Client\Result\KafkaPartitionEof;
-use Anktx\Kafka\Client\Result\KafkaPartitionTimeout;
-use Anktx\Kafka\Client\Subscription\SubscriptionList;
+use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
+use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use RdKafka\Exception as RdKafkaException;
 use RdKafka\TopicPartition;
 
@@ -39,7 +37,7 @@ final class KafkaConsumer
      * @throws EmptySubscriptionsException
      * @throws KafkaConsumerException
      */
-    public function subscribe(SubscriptionList $subscriptionList): void
+    public function subscribe(TopicSubscriptionList $subscriptionList): void
     {
         if ($subscriptionList->isEmpty()) {
             throw new EmptySubscriptionsException('At least one subscription is required');
@@ -136,9 +134,9 @@ final class KafkaConsumer
         $this->consumer->close();
     }
 
-    private function commitedOffsets(SubscriptionList $subscriptionList, int $timeoutMs = 1000): SubscriptionList
+    private function commitedOffsets(TopicSubscriptionList $subscriptionList, int $timeoutMs = 1000): TopicSubscriptionList
     {
-        return SubscriptionList::fromKafkaTopicPartition(
+        return TopicSubscriptionList::fromKafkaTopicPartition(
             ...$this->consumer->getCommittedOffsets(
                 topic_partitions: $subscriptionList->asKafkaTopicPartitionArray(),
                 timeout_ms: $timeoutMs,

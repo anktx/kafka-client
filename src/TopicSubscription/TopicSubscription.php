@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Anktx\Kafka\Client\Subscription;
+namespace Anktx\Kafka\Client\TopicSubscription;
 
 use Anktx\Kafka\Client\Exception\Business\TopicHasNoPartitionException;
 use RdKafka\TopicPartition;
 
-final readonly class Subscription
+final readonly class TopicSubscription
 {
     public function __construct(
         public string $topic,

@@ -7,7 +7,7 @@ namespace Anktx\Kafka\Client;
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
-use Anktx\Kafka\Client\Message\KafkaProducerMessage;
+use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\PollStrategy\NeverPoolStrategy;
 use Anktx\Kafka\Client\PollStrategy\PollStrategy;
 use RdKafka\Exception;
