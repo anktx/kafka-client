@@ -27,27 +27,53 @@ final readonly class ConsumerConfig
     {
         $conf = new Conf();
 
+        $this->configureLogging($conf);
+        $this->configureDebug($conf);
+        $this->configureEssentials($conf);
+        $this->configureCommit($conf);
+        $this->configureTimeouts($conf);
+
+        return $conf;
+    }
+
+    private function configureLogging(Conf $conf): void
+    {
         $conf->setLogCb(function (KafkaConsumer $consumer, int $level, string $facility, string $message) {
-            $this->logger->log($level, $message);
+            $this->logger->log($level, $message, ['facility' => $facility]);
         });
+    }
+
+    private function configureDebug(Conf $conf): void
+    {
         if ($this->isDebug) {
             $conf->set('debug', 'all');
         }
+    }
 
+    private function configureEssentials(Conf $conf): void
+    {
         $conf->set('metadata.broker.list', $this->brokers);
         $conf->set('group.id', $this->groupId);
         $conf->set('group.instance.id', $this->instanceId);
         $conf->set('auto.offset.reset', $this->offsetReset->name);
         $conf->set('enable.partition.eof', 'true');
+    }
+
+    private function configureCommit(Conf $conf): void
+    {
+        if ($this->autoCommitMs !== null) {
+            $conf->set('enable.auto.commit', 'true');
+            $conf->set('auto.commit.interval.ms', (string) $this->autoCommitMs);
+        } else {
+            $conf->set('enable.auto.commit', 'false');
+        }
+    }
+
+    private function configureTimeouts(Conf $conf): void
+    {
         if ($this->sessionTimeoutMs) {
             $conf->set('session.timeout.ms', (string) $this->sessionTimeoutMs);
         }
-        if ($this->autoCommitMs) {
-            $conf->set('auto.commit.interval.ms', (string) $this->autoCommitMs);
-        } else {
-            $conf->set('enable.auto.commit', 'false'); // default: true
-        }
-
-        return $conf;
+        // Можно добавить heartbeat.interval.ms, max.poll.interval.ms и т.д.
     }
 }
