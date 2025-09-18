@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\ConsumeResult;
 
-final readonly class KafkaPartitionTimeout
+final readonly class KafkaConsumeTimeout
 {
     public function __construct(
         public string $topic,

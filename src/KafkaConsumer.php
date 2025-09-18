@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client;
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
+use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
-use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionTimeout;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -76,7 +76,7 @@ final class KafkaConsumer
      * @throws NotSubscribedException
      * @throws KafkaConsumerException
      */
-    public function consume(int $timeoutMs = 1000): KafkaConsumerMessage|KafkaPartitionEof|KafkaPartitionTimeout
+    public function consume(int $timeoutMs = 1000): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
     {
         if (!$this->isSubscribed) {
             throw new NotSubscribedException();
@@ -105,7 +105,7 @@ final class KafkaConsumer
                 offset: $message->offset,
             ),
 
-            \RD_KAFKA_RESP_ERR__TIMED_OUT => new KafkaPartitionTimeout(
+            \RD_KAFKA_RESP_ERR__TIMED_OUT => new KafkaConsumeTimeout(
                 topic: $message->topic_name,
                 partition: $message->partition,
                 offset: $message->offset,
