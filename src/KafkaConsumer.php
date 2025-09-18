@@ -12,6 +12,8 @@ use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\Exception\Logic\PartitionEofException;
 use Anktx\Kafka\Client\Exception\Logic\PartitionTimeoutException;
 use Anktx\Kafka\Client\Message\KafkaConsumerMessage;
+use Anktx\Kafka\Client\Result\KafkaPartitionEof;
+use Anktx\Kafka\Client\Result\KafkaPartitionTimeout;
 use Anktx\Kafka\Client\Subscription\SubscriptionList;
 use RdKafka\Exception as RdKafkaException;
 use RdKafka\TopicPartition;
@@ -74,13 +76,11 @@ final class KafkaConsumer
 
     /**
      * @throws NotSubscribedException
-     * @throws PartitionEofException
-     * @throws PartitionTimeoutException
      * @throws KafkaConsumerException
      */
-    public function consume(int $timeoutMs = 1000): KafkaConsumerMessage
+    public function consume(int $timeoutMs = 1000): KafkaConsumerMessage|KafkaPartitionEof|KafkaPartitionTimeout
     {
-        if (! $this->isSubscribed) {
+        if (!$this->isSubscribed) {
             throw new NotSubscribedException();
         }
 
@@ -90,29 +90,31 @@ final class KafkaConsumer
             throw KafkaConsumerException::fromKafkaException($e);
         }
 
-        switch ($message->err) {
-            case \RD_KAFKA_RESP_ERR_NO_ERROR:
-                break;
+        return match ($message->err) {
+            \RD_KAFKA_RESP_ERR_NO_ERROR => new KafkaConsumerMessage(
+                topic: $message->topic_name,
+                body: $message->payload,
+                partition: $message->partition,
+                offset: $message->offset,
+                key: $message->key,
+                headers: $message->headers,
+                timestampMs: $message->timestamp,
+            ),
 
-            case \RD_KAFKA_RESP_ERR__PARTITION_EOF:
-                throw PartitionEofException::create($message->errstr());
+            \RD_KAFKA_RESP_ERR__PARTITION_EOF => new KafkaPartitionEof(
+                topic: $message->topic_name,
+                partition: $message->partition,
+                offset: $message->offset,
+            ),
 
-            case \RD_KAFKA_RESP_ERR__TIMED_OUT:
-                throw PartitionTimeoutException::create($message->errstr());
+            \RD_KAFKA_RESP_ERR__TIMED_OUT => new KafkaPartitionTimeout(
+                topic: $message->topic_name,
+                partition: $message->partition,
+                offset: $message->offset,
+            ),
 
-            default:
-                throw new KafkaConsumerException($message->errstr());
-        }
-
-        return new KafkaConsumerMessage(
-            topic: $message->topic_name,
-            body: $message->payload,
-            partition: $message->partition,
-            offset: $message->offset,
-            key: $message->key,
-            headers: $message->headers,
-            timestampMs: $message->timestamp,
-        );
+            default => throw new KafkaConsumerException($message->errstr()),
+        };
     }
 
     /**
