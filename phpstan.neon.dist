@@ -1,0 +1,8 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+
+    ignoreErrors:
+        # Можно добавить исключения по мере необходимости
