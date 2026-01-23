@@ -15,6 +15,11 @@ use RdKafka\Exception;
 use RdKafka\Producer;
 use RdKafka\ProducerTopic;
 
+/**
+ * Kafka Producer для отправки сообщений в Kafka.
+ *
+ * @see https://github.com/edenhill/librdkafka/blob/master/README.md
+ */
 final class KafkaProducer
 {
     private readonly Producer $producer;
@@ -25,6 +30,12 @@ final class KafkaProducer
      */
     private array $topics = [];
 
+    /**
+     * Создаёт новый экземпляр Kafka Producer.
+     *
+     * @param ProducerConfig $config       Конфигурация продюсера
+     * @param PollStrategy   $pollStrategy Стратегия опроса очереди (по умолчанию NeverPoolStrategy)
+     */
     public function __construct(
         ProducerConfig $config,
         private readonly PollStrategy $pollStrategy = new NeverPoolStrategy(),
@@ -40,7 +51,14 @@ final class KafkaProducer
     }
 
     /**
-     * @throws KafkaProducerException
+     * Отправляет сообщение в Kafka.
+     *
+     * Сообщение помещается в локальную очередь и отправляется асинхронно.
+     * Для гарантированной отправки вызовите метод {@see flush()}.
+     *
+     * @param KafkaProducerMessage $message Сообщение для отправки
+     *
+     * @throws KafkaProducerException Если не удалось отправить сообщение
      */
     public function produce(KafkaProducerMessage $message): void
     {
@@ -75,8 +93,15 @@ final class KafkaProducer
     }
 
     /**
-     * @throws KafkaConnectionException
-     * @throws KafkaProducerException
+     * Блокирует до тех пор, пока все сообщения не будут отправлены.
+     *
+     * Метод гарантирует, что все накопленные в очереди сообщения отправлены в Kafka.
+     * Рекомендуется вызывать перед завершением работы приложения.
+     *
+     * @param int $timeoutMs Таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
+     *
+     * @throws KafkaConnectionException Если истёк таймаут ожидания
+     * @throws KafkaProducerException   Если произошла ошибка при отправке
      */
     public function flush(int $timeoutMs = 1000): void
     {
@@ -107,6 +132,15 @@ final class KafkaProducer
         throw new KafkaProducerException('Flush failed, error ' . $rst);
     }
 
+    /**
+     * Получает или создаёт объект топика для Kafka.
+     *
+     * Топики кэшируются для повторного использования.
+     *
+     * @param string $name Имя топика
+     *
+     * @return ProducerTopic Объект топика RdKafka
+     */
     private function topic(string $name): ProducerTopic
     {
         if (! isset($this->topics[$name])) {

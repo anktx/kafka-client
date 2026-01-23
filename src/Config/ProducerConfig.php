@@ -10,16 +10,16 @@ use Psr\Log\NullLogger;
 use RdKafka\Conf;
 use RdKafka\Producer;
 
-final class ProducerConfig
+final readonly class ProducerConfig
 {
     public function __construct(
-        public readonly string $brokers,
-        public readonly int $queueBufferingMaxKBytes = 20480,
-        public readonly int $batchSize = 102400,
-        public readonly int $lingerMs = 10,
-        public readonly CompressionType $compressionType = CompressionType::snappy,
-        public readonly bool $isDebug = false,
-        public readonly LoggerInterface $logger = new NullLogger(),
+        public string $brokers,
+        public int $queueBufferingMaxKBytes = 20480,
+        public int $batchSize = 102400,
+        public int $lingerMs = 10,
+        public CompressionType $compressionType = CompressionType::snappy,
+        public bool $isDebug = false,
+        public LoggerInterface $logger = new NullLogger(),
     ) {}
 
     public function asKafkaConfig(): Conf

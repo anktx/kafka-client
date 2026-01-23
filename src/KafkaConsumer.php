@@ -17,6 +17,14 @@ use Psr\Log\LoggerInterface;
 use RdKafka\Exception as RdKafkaException;
 use RdKafka\TopicPartition;
 
+/**
+ * Kafka Consumer для чтения сообщений из Kafka.
+ *
+ * Потребитель работает в группе (consumer group), что позволяет распределять
+ * нагрузку между несколькими экземплярами консьюмера.
+ *
+ * @see https://github.com/edenhill/librdkafka/blob/master/README.md
+ */
 final class KafkaConsumer
 {
     private readonly \RdKafka\KafkaConsumer $consumer;
@@ -24,8 +32,15 @@ final class KafkaConsumer
     private bool $isSubscribed = false;
 
     /**
-     * @throws KafkaConnectionException
-     * @throws KafkaConsumerException
+     * Создаёт новый экземпляр Kafka Consumer.
+     *
+     * При создании проверяется доступность брокеров Kafka.
+     *
+     * @param ConsumerConfig $config    Конфигурация консьюмера
+     * @param int            $timeoutMs Таймаут проверки соединения с брокерами (по умолчанию 5000 мс)
+     *
+     * @throws KafkaConnectionException Если не удалось подключиться к брокерам
+     * @throws KafkaConsumerException   Если произошла ошибка при создании консьюмера
      */
     public function __construct(
         ConsumerConfig $config,
@@ -47,8 +62,15 @@ final class KafkaConsumer
     }
 
     /**
-     * @throws EmptySubscriptionsException
-     * @throws KafkaConsumerException
+     * Подписывается на топики для потребления сообщений.
+     *
+     * Метод автоматически восстанавливает ранее закоммиченные смещения (offsets).
+     * При необходимости можно подписаться на конкретные партиции.
+     *
+     * @param TopicSubscriptionList $subscriptionList Список подписок на топики/партиции
+     *
+     * @throws EmptySubscriptionsException Если список подписок пуст
+     * @throws KafkaConsumerException      Если не удалось подписаться на топики
      */
     public function subscribe(TopicSubscriptionList $subscriptionList): void
     {
@@ -91,7 +113,9 @@ final class KafkaConsumer
     }
 
     /**
-     * @throws KafkaConsumerException
+     * Отписывается от всех топиков.
+     *
+     * @throws KafkaConsumerException Если не удалось отписаться
      */
     public function unsubscribe(): void
     {
@@ -111,8 +135,20 @@ final class KafkaConsumer
     }
 
     /**
-     * @throws NotSubscribedException
-     * @throws KafkaConsumerException
+     * Читает одно сообщение из Kafka.
+     *
+     * Метод блокирует выполнение до получения сообщения или истечения таймаута.
+     * В зависимости от результата может вернуть:
+     * - {@see KafkaConsumerMessage} - успешно полученное сообщение
+     * - {@see KafkaConsumeTimeout} - таймаут (нет новых сообщений)
+     * - {@see KafkaPartitionEof} - достигнут конец партиции
+     *
+     * @param int $timeoutMs Таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
+     *
+     * @return KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат потребления
+     *
+     * @throws NotSubscribedException Если консьюмер не подписан на топики
+     * @throws KafkaConsumerException Если произошла ошибка при чтении
      */
     public function consume(int $timeoutMs = 1000): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
     {
@@ -163,14 +199,19 @@ final class KafkaConsumer
     }
 
     /**
-     * @param \Closure(KafkaConsumerMessage): mixed $onMessage
-     * @param \Closure(KafkaConsumeTimeout): mixed  $onTimeout
-     * @param \Closure(KafkaPartitionEof): mixed    $onEof
+     * Читает сообщение и обрабатывает результат через pattern matching.
      *
-     * @return mixed Возвращает значение из выполненного callback'а
+     * Удобный метод для обработки результатов {@see consume()} через callback'и.
      *
-     * @throws NotSubscribedException
-     * @throws KafkaConsumerException
+     * @param \Closure(KafkaConsumerMessage): mixed $onMessage Callback для обработки сообщения
+     * @param \Closure(KafkaConsumeTimeout): mixed  $onTimeout Callback для обработки таймаута
+     * @param \Closure(KafkaPartitionEof): mixed    $onEof     Callback для обработки конца партиции
+     * @param int                                   $timeoutMs Таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
+     *
+     * @return mixed Значение, возвращённое выполненным callback'ом
+     *
+     * @throws NotSubscribedException Если консьюмер не подписан на топики
+     * @throws KafkaConsumerException Если произошла ошибка при чтении
      */
     public function consumeMatch(
         \Closure $onMessage,
@@ -188,7 +229,14 @@ final class KafkaConsumer
     }
 
     /**
-     * @throws KafkaConsumerException
+     * Подтверждает успешную обработку сообщения.
+     *
+     * Фиксирует смещение (offset) в Kafka, после которого сообщение не будет повторно доставлено.
+     * Вызывайте этот метод после успешной обработки сообщения.
+     *
+     * @param KafkaConsumerMessage $message Сообщение для коммита
+     *
+     * @throws KafkaConsumerException Если не закоммитить сообщение
      */
     public function commit(KafkaConsumerMessage $message): void
     {
@@ -208,6 +256,11 @@ final class KafkaConsumer
         }
     }
 
+    /**
+     * Закрывает консьюмер и освобождает ресурсы.
+     *
+     * Рекомендуется вызывать перед завершением работы приложения.
+     */
     public function close(): void
     {
         $this->logger->info('Closing KafkaConsumer');
@@ -217,6 +270,14 @@ final class KafkaConsumer
         $this->logger->info('KafkaConsumer closed');
     }
 
+    /**
+     * Получает закоммиченные смещения для списка подписок.
+     *
+     * @param TopicSubscriptionList $subscriptionList Список подписок
+     * @param int                   $timeoutMs        Таймаут ожидания (по умолчанию 1000 мс)
+     *
+     * @return TopicSubscriptionList Список подписок с сохранёнными смещениями
+     */
     private function commitedOffsets(TopicSubscriptionList $subscriptionList, int $timeoutMs = 1000): TopicSubscriptionList
     {
         return TopicSubscriptionList::fromKafkaTopicPartition(
@@ -228,8 +289,12 @@ final class KafkaConsumer
     }
 
     /**
-     * @throws KafkaConsumerException
-     * @throws KafkaConnectionException
+     * Проверяет доступность брокеров Kafka.
+     *
+     * @param int $timeoutMs Таймаут ожидания (по умолчанию из конструктора)
+     *
+     * @throws KafkaConnectionException Если не удалось подключиться к брокерам
+     * @throws KafkaConsumerException   Если произошла ошибка при получении метаданных
      */
     private function assertBrokersAreAlive(int $timeoutMs): void
     {
