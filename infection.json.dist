@@ -1,0 +1,24 @@
+{
+    "$schema": "https://raw.githubusercontent.com/infection/infection/0.31.9/resources/schema.json",
+    "source": {
+        "directories": [
+            "src"
+        ]
+    },
+    "logs": {
+        "text": ".infection/log.txt",
+        "summary": ".infection/summary.log",
+        "debug": ".infection/debug.log",
+        "perMutator": ".infection/per-mutator.md"
+    },
+    "mutators": {
+        "@default": true,
+        "MethodCallRemoval": false
+    },
+    "testFramework": "phpunit",
+    "phpUnit": {
+        "configDir": "."
+    },
+    "minMsi": 70,
+    "minCoveredMsi": 80
+}
