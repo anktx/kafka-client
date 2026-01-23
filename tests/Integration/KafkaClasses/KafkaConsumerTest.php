@@ -9,7 +9,6 @@ use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
-use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
@@ -17,10 +16,6 @@ use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\TestCase;
-use RdKafka\Exception as RdKafkaException;
-use RdKafka\KafkaConsumer as RdKafkaConsumer;
-use RdKafka\Message;
-use RdKafka\TopicPartition;
 
 final class KafkaConsumerTest extends TestCase
 {
@@ -54,7 +49,7 @@ final class KafkaConsumerTest extends TestCase
         $consumer->unsubscribe();
         $consumer->close();
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testSubscribeWithEmptyListThrowsException(): void
@@ -93,7 +88,7 @@ final class KafkaConsumerTest extends TestCase
         $consumer->unsubscribe();
         $consumer->close();
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testConsumeWithoutSubscriptionThrowsException(): void
@@ -139,7 +134,7 @@ final class KafkaConsumerTest extends TestCase
 
         $consumer->close();
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testConsumeMatch(): void
@@ -161,13 +156,13 @@ final class KafkaConsumerTest extends TestCase
 
         try {
             $consumer->consumeMatch(
-                onMessage: function (KafkaConsumerMessage $msg) use (&$messageCalled) {
+                onMessage: static function (KafkaConsumerMessage $msg) use (&$messageCalled) {
                     $messageCalled = true;
                 },
-                onTimeout: function (KafkaConsumeTimeout $timeout) use (&$timeoutCalled) {
+                onTimeout: static function (KafkaConsumeTimeout $timeout) use (&$timeoutCalled) {
                     $timeoutCalled = true;
                 },
-                onEof: function (KafkaPartitionEof $eof) use (&$eofCalled) {
+                onEof: static function (KafkaPartitionEof $eof) use (&$eofCalled) {
                     $eofCalled = true;
                 },
                 timeoutMs: 100,
@@ -268,7 +263,7 @@ final class KafkaConsumerTest extends TestCase
 
         $consumer->close();
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testSubscribeWithPartition(): void
@@ -289,6 +284,6 @@ final class KafkaConsumerTest extends TestCase
         $consumer->unsubscribe();
         $consumer->close();
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 }

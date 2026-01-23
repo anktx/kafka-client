@@ -15,8 +15,7 @@ final class KafkaExceptionTest extends TestCase
 {
     public function testKafkaExceptionConstructor(): void
     {
-        $exception = new class ('Test message', 123, null) extends KafkaException {
-        };
+        $exception = new class ('Test message', 123, null) extends KafkaException {};
 
         $this->assertSame('Test message', $exception->getMessage());
         $this->assertSame(123, $exception->getCode());
@@ -25,8 +24,7 @@ final class KafkaExceptionTest extends TestCase
     public function testKafkaExceptionFromKafkaException(): void
     {
         $previous = new RdKafkaException('Original error', 456);
-        $exception = new class extends KafkaException {
-        };
+        $exception = new class extends KafkaException {};
 
         $result = $exception::fromKafkaException($previous);
 
@@ -39,8 +37,7 @@ final class KafkaExceptionTest extends TestCase
         $originalPrevious = new \Exception('Original previous');
         $rdKafkaException = new RdKafkaException('Kafka error', 789, $originalPrevious);
 
-        $exception = new class extends KafkaException {
-        };
+        $exception = new class extends KafkaException {};
         $result = $exception::fromKafkaException($rdKafkaException);
 
         $this->assertSame('Kafka error', $result->getMessage());

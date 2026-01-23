@@ -51,7 +51,7 @@ final class KafkaProducerTest extends TestCase
             // Ошибки могут возникать, если Kafka недоступен
         }
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testProduceWithAllParameters(): void
@@ -75,7 +75,7 @@ final class KafkaProducerTest extends TestCase
             // Ошибки могут возникать, если Kafka недоступен
         }
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testProduceWithUnassignedPartition(): void
@@ -95,7 +95,7 @@ final class KafkaProducerTest extends TestCase
             // Ошибки могут возникать, если Kafka недоступен
         }
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testFlush(): void
@@ -110,7 +110,7 @@ final class KafkaProducerTest extends TestCase
             // Ошибки могут возникать, если Kafka недоступна
         }
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testFlushWithCustomTimeout(): void
@@ -125,7 +125,7 @@ final class KafkaProducerTest extends TestCase
             // Ошибки могут возникать, если Kafka недоступна
         }
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testProduceMultipleMessages(): void
@@ -134,7 +134,7 @@ final class KafkaProducerTest extends TestCase
 
         $producer = new KafkaProducer($config);
 
-        for ($i = 0; $i < 10; $i++) {
+        for ($i = 0; $i < 10; ++$i) {
             $message = new KafkaProducerMessage(
                 topic: 'test-topic',
                 body: "message {$i}",
@@ -148,7 +148,7 @@ final class KafkaProducerTest extends TestCase
             }
         }
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testConstructorWithDebugEnabled(): void
@@ -193,7 +193,7 @@ final class KafkaProducerTest extends TestCase
             // Ошибки могут возникать, если Kafka недоступна
         }
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testProduceWithNullBody(): void
@@ -212,7 +212,7 @@ final class KafkaProducerTest extends TestCase
             // Ошибки могут возникать, если Kafka недоступен
         }
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 
     public function testProduceWithEmptyHeaders(): void
@@ -233,6 +233,6 @@ final class KafkaProducerTest extends TestCase
             // Ошибки могут возникать, если Kafka недоступен
         }
 
-        $this->assertTrue(true);
+        // Test passes if no exception is thrown
     }
 }

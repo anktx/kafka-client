@@ -13,8 +13,7 @@ final class BusinessExceptionTest extends TestCase
 {
     public function testBusinessExceptionExtendsDomainException(): void
     {
-        $exception = new class ('Test message') extends BusinessException {
-        };
+        $exception = new class ('Test message') extends BusinessException {};
 
         $this->assertInstanceOf(\DomainException::class, $exception);
         $this->assertSame('Test message', $exception->getMessage());
@@ -55,8 +54,7 @@ final class BusinessExceptionTest extends TestCase
     public function testBusinessExceptionWithPrevious(): void
     {
         $previous = new \Exception('Previous error');
-        $exception = new class ('Test message', 0, $previous) extends BusinessException {
-        };
+        $exception = new class ('Test message', 0, $previous) extends BusinessException {};
 
         $this->assertSame($previous, $exception->getPrevious());
     }

@@ -187,6 +187,7 @@ final class ProbabilityPollStrategyTest extends TestCase
         for ($i = 0; $i < 100000; ++$i) {
             if ($strategy->shouldPoll()) {
                 $hasTrue = true;
+
                 break;
             }
         }
@@ -319,6 +320,7 @@ final class ProbabilityPollStrategyTest extends TestCase
         for ($i = 0; $i < 100000; ++$i) {
             if (!$strategy->shouldPoll()) {
                 $foundFalse = true;
+
                 break;
             }
         }
@@ -326,6 +328,6 @@ final class ProbabilityPollStrategyTest extends TestCase
         // Если false не найден за 100000 итераций, возможно есть мутант
         // Но это не гарантия из-за случайности
         // Этот тест скорее проверяет, что код может вернуть false
-        $this->assertTrue($foundFalse || true, 'Note: Unable to definitively detect mutation due to randomness');
+        $this->assertTrue($foundFalse, 'Strategy should return false at least once in 100000 iterations with probability 0.9999');
     }
 }
