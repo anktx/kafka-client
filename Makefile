@@ -1,4 +1,4 @@
-.PHONY: test test-coverage infection infection-coverage clean help
+.PHONY: test test-coverage infection infection-coverage clean help cs-fix cs-dry analyse analyse-baseline qa ci
 
 # Docker configuration
 DOCKER_IMAGE = local-php-cli:8.4-dev
@@ -74,15 +74,23 @@ cs-dry: ## Run PHP CS Fixer in dry-run mode
 	@echo '$(BLUE)Running PHP CS Fixer (dry-run)...$(NC)'
 	$(DOCKER_RUN) vendor/bin/php-cs-fixer fix --dry-run -v --diff --show-progress=dots
 
-analyse: ## Run PHPStan static analysis
-	@echo '$(BLUE)Running PHPStan analysis...$(NC)'
-	$(DOCKER_RUN) vendor/bin/phpstan analyse --memory-limit=256M -v --level 6 --no-progress ./src
+analyse: ## Run PHPStan static analysis (level 8)
+	@echo '$(BLUE)Running PHPStan analysis (level 8)...$(NC)'
+	$(DOCKER_RUN) vendor/bin/phpstan analyse --memory-limit=512M --no-progress
+
+analyse-baseline: ## Generate PHPStan baseline
+	@echo '$(BLUE)Generating PHPStan baseline...$(NC)'
+	$(DOCKER_RUN) vendor/bin/phpstan analyse --memory-limit=512M --generate-baseline
+
+qa: cs-dry analyse test ## Run full QA pipeline (style check + static analysis + tests)
+	@echo '$(GREEN)QA pipeline completed successfully!$(NC)'
 
 clean: ## Clean up generated files
 	@echo '$(BLUE)Cleaning up...$(NC)'
 	rm -rf .infection
 	rm -rf .phpunit.cache
+	rm -rf phpstan-baseline.neon
 	@echo '$(GREEN)Cleaned up!$(NC)'
 
-ci: test-coverage infection ## Run full CI pipeline (tests + mutation testing)
+ci: cs-dry analyse test-coverage infection ## Run full CI pipeline (style + static analysis + tests + mutation testing)
 	@echo '$(GREEN)CI pipeline completed successfully!$(NC)'

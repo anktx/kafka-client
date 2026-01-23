@@ -10,8 +10,8 @@ return new Config()
     ->setRules([
         '@PhpCsFixer' => true,
         '@PhpCsFixer:risky' => true,
-        '@PER-CS2.0' => true,
-        '@PER-CS2.0:risky' => true,
+        '@PER-CS2x0' => true,
+        '@PER-CS2x0:risky' => true,
         'declare_strict_types' => true,
         'ordered_imports' => ['sort_algorithm' => 'alpha'],
         'ordered_class_elements' => true,
