@@ -8,3 +8,5 @@
 
 /phpunit.xml
 /.phpunit.cache
+
+/.infection/
