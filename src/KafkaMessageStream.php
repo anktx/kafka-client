@@ -19,22 +19,24 @@ final readonly class KafkaMessageStream
 
     /**
      * @return \Generator<int, KafkaConsumerMessage>
+     *
      * @throws KafkaConsumerException
      * @throws NotSubscribedException
      */
     public function stream(): \Generator
     {
-        // @phpstan-ignore-next-line
+        // @phpstan-ignore while.alwaysTrue
         while (true) {
-            $result = $this->consumer->consume($this->pollTimeoutMs);
+            $message = $this->consumer->consumeMatch(
+                onMessage: static fn (KafkaConsumerMessage $msg): KafkaConsumerMessage => $msg,
+                onTimeout: static fn (): null => null,
+                onEof: static fn (): null => null,
+                timeoutMs: $this->pollTimeoutMs,
+            );
 
-            // Пропускаем служебные ответы
-            if ($result instanceof KafkaConsumeTimeout || $result instanceof KafkaPartitionEof) {
-                continue;
+            if ($message !== null) {
+                yield $message;
             }
-
-            // Возвращаем только реальные сообщения
-            yield $result;
         }
     }
 }

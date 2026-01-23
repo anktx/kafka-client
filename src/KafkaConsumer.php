@@ -116,6 +116,30 @@ final class KafkaConsumer
     }
 
     /**
+     * @param \Closure(KafkaConsumerMessage): mixed $onMessage
+     * @param \Closure(KafkaConsumeTimeout): mixed  $onTimeout
+     * @param \Closure(KafkaPartitionEof): mixed    $onEof
+     * @return mixed Возвращает значение из выполненного callback'а
+     *
+     * @throws NotSubscribedException
+     * @throws KafkaConsumerException
+     */
+    public function consumeMatch(
+        \Closure $onMessage,
+        \Closure $onTimeout,
+        \Closure $onEof,
+        int $timeoutMs = 1000,
+    ): mixed {
+        $result = $this->consume($timeoutMs);
+
+        return match ($result::class) {
+            KafkaConsumerMessage::class => $onMessage($result),
+            KafkaConsumeTimeout::class => $onTimeout($result),
+            KafkaPartitionEof::class => $onEof($result),
+        };
+    }
+
+    /**
      * @throws KafkaConsumerException
      */
     public function commit(KafkaConsumerMessage $message): void
