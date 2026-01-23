@@ -121,7 +121,7 @@ final class KafkaProducer
                 'error_code' => $rst,
             ]);
 
-            throw new KafkaConnectionException('Flush timed out in ' . $timeoutMs . 'ms');
+            throw KafkaConnectionException::flushTimeout($timeoutMs);
         }
 
         $this->logger->error('Flush failed', [
@@ -129,7 +129,7 @@ final class KafkaProducer
             'error_code' => $rst,
         ]);
 
-        throw new KafkaProducerException('Flush failed, error ' . $rst);
+        throw KafkaProducerException::flushFailed($rst);
     }
 
     /**

@@ -72,4 +72,22 @@ final class BusinessExceptionTest extends TestCase
 
         $this->assertInstanceOf(\DomainException::class, $exception);
     }
+
+    public function testEmptySubscriptionsExceptionCreate(): void
+    {
+        $exception = EmptySubscriptionsException::create();
+
+        $this->assertInstanceOf(BusinessException::class, $exception);
+        $this->assertInstanceOf(EmptySubscriptionsException::class, $exception);
+        $this->assertSame('At least one subscription is required', $exception->getMessage());
+    }
+
+    public function testTopicHasNoPartitionExceptionCreate(): void
+    {
+        $exception = TopicHasNoPartitionException::create('test-topic');
+
+        $this->assertInstanceOf(BusinessException::class, $exception);
+        $this->assertInstanceOf(TopicHasNoPartitionException::class, $exception);
+        $this->assertSame('Topic "test-topic" has no partition', $exception->getMessage());
+    }
 }

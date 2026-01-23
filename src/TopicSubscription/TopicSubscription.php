@@ -32,7 +32,7 @@ final readonly class TopicSubscription
     public function asKafkaTopicPartition(): TopicPartition
     {
         if ($this->partition === null) {
-            throw new TopicHasNoPartitionException('Topic "' . $this->topic . '" has no partition');
+            throw TopicHasNoPartitionException::create($this->topic);
         }
 
         if ($this->offset === null) {

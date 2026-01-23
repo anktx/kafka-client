@@ -10,9 +10,4 @@ abstract class LogicException extends \LogicException
     {
         parent::__construct($message, $code, $previous);
     }
-
-    final public static function create(string $message): static
-    {
-        return new static($message);
-    }
 }

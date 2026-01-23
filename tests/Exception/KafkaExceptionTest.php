@@ -104,4 +104,31 @@ final class KafkaExceptionTest extends TestCase
         $this->assertSame('Test message', $exception->getMessage());
         $this->assertSame(456, $exception->getCode());
     }
+
+    public function testKafkaConsumerExceptionCreate(): void
+    {
+        $exception = KafkaConsumerException::create('Kafka error message');
+
+        $this->assertInstanceOf(KafkaException::class, $exception);
+        $this->assertInstanceOf(KafkaConsumerException::class, $exception);
+        $this->assertSame('Kafka error message', $exception->getMessage());
+    }
+
+    public function testKafkaConnectionExceptionFlushTimeout(): void
+    {
+        $exception = KafkaConnectionException::flushTimeout(5000);
+
+        $this->assertInstanceOf(KafkaException::class, $exception);
+        $this->assertInstanceOf(KafkaConnectionException::class, $exception);
+        $this->assertSame('Flush timed out in 5000ms', $exception->getMessage());
+    }
+
+    public function testKafkaProducerExceptionFlushFailed(): void
+    {
+        $exception = KafkaProducerException::flushFailed(123);
+
+        $this->assertInstanceOf(KafkaException::class, $exception);
+        $this->assertInstanceOf(KafkaProducerException::class, $exception);
+        $this->assertSame('Flush failed, error 123', $exception->getMessage());
+    }
 }

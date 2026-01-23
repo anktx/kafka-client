@@ -10,41 +10,6 @@ use PHPUnit\Framework\TestCase;
 
 final class LogicExceptionTest extends TestCase
 {
-    public function testLogicExceptionExtendsLogicException(): void
-    {
-        $exception = new class ('Test message') extends LogicException {};
-
-        $this->assertInstanceOf(\LogicException::class, $exception);
-        $this->assertSame('Test message', $exception->getMessage());
-    }
-
-    public function testLogicExceptionConstructorIsFinal(): void
-    {
-        $exception = new class ('Test message', 123) extends LogicException {};
-
-        $this->assertSame('Test message', $exception->getMessage());
-        $this->assertSame(123, $exception->getCode());
-    }
-
-    public function testLogicExceptionCreate(): void
-    {
-        $exception = new class extends LogicException {};
-
-        $result = $exception::create('Test message');
-
-        $this->assertSame('Test message', $result->getMessage());
-        $this->assertSame(0, $result->getCode());
-    }
-
-    public function testLogicExceptionCreateReturnsCorrectType(): void
-    {
-        $exception = new class extends LogicException {};
-
-        $result = $exception::create('Test');
-
-        $this->assertInstanceOf(\get_class($exception), $result);
-    }
-
     public function testNotSubscribedException(): void
     {
         $exception = new NotSubscribedException('Not subscribed');
@@ -70,18 +35,10 @@ final class LogicExceptionTest extends TestCase
 
     public function testNotSubscribedExceptionCreate(): void
     {
-        $exception = NotSubscribedException::create('Not subscribed');
+        $exception = NotSubscribedException::create();
 
-        $this->assertSame('Not subscribed', $exception->getMessage());
+        $this->assertSame('Consumer is not subscribed to any topics', $exception->getMessage());
         $this->assertInstanceOf(NotSubscribedException::class, $exception);
-    }
-
-    public function testLogicExceptionWithPrevious(): void
-    {
-        $previous = new \Exception('Previous error');
-        $exception = new class ('Test message', 0, $previous) extends LogicException {};
-
-        $this->assertSame($previous, $exception->getPrevious());
     }
 
     public function testNotSubscribedExceptionWithPrevious(): void

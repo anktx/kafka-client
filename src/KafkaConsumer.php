@@ -75,7 +75,7 @@ final class KafkaConsumer
     public function subscribe(TopicSubscriptionList $subscriptionList): void
     {
         if ($subscriptionList->isEmpty()) {
-            throw new EmptySubscriptionsException('At least one subscription is required');
+            throw EmptySubscriptionsException::create();
         }
 
         try {
@@ -155,7 +155,7 @@ final class KafkaConsumer
         if (!$this->isSubscribed) {
             $this->logger->warning('Attempted to consume without subscription');
 
-            throw new NotSubscribedException();
+            throw NotSubscribedException::create();
         }
 
         try {
@@ -192,7 +192,7 @@ final class KafkaConsumer
                 offset: $message->offset,
             ),
 
-            default => throw new KafkaConsumerException($message->errstr()),
+            default => throw KafkaConsumerException::create($message->errstr()),
         };
 
         return $result;
