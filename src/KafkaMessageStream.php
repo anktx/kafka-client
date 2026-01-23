@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client;
 
-use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
-use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
@@ -28,9 +26,9 @@ final readonly class KafkaMessageStream
         // @phpstan-ignore while.alwaysTrue
         while (true) {
             $message = $this->consumer->consumeMatch(
-                onMessage: static fn (KafkaConsumerMessage $msg): KafkaConsumerMessage => $msg,
-                onTimeout: static fn (): null => null,
-                onEof: static fn (): null => null,
+                onMessage: static fn(KafkaConsumerMessage $msg): KafkaConsumerMessage => $msg,
+                onTimeout: static fn(): null => null,
+                onEof: static fn(): null => null,
                 timeoutMs: $this->pollTimeoutMs,
             );
 

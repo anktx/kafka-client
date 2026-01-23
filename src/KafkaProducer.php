@@ -10,6 +10,7 @@ use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\PollStrategy\NeverPoolStrategy;
 use Anktx\Kafka\Client\PollStrategy\PollStrategy;
+use Psr\Log\LoggerInterface;
 use RdKafka\Exception;
 use RdKafka\Producer;
 use RdKafka\ProducerTopic;
@@ -17,6 +18,7 @@ use RdKafka\ProducerTopic;
 final class KafkaProducer
 {
     private readonly Producer $producer;
+    private readonly LoggerInterface $logger;
 
     /**
      * @var ProducerTopic[]
@@ -27,7 +29,14 @@ final class KafkaProducer
         ProducerConfig $config,
         private readonly PollStrategy $pollStrategy = new NeverPoolStrategy(),
     ) {
+        $this->logger = $config->logger;
         $this->producer = new Producer($config->asKafkaConfig());
+
+        $this->logger->info('KafkaProducer created', [
+            'brokers' => $config->brokers,
+            'compression' => $config->compressionType->name,
+            'poll_strategy' => $pollStrategy::class,
+        ]);
     }
 
     /**
@@ -53,6 +62,14 @@ final class KafkaProducer
                 timestamp_ms: $message->timestampMs,
             );
         } catch (Exception $e) {
+            $this->logger->error('Failed to produce message', [
+                'topic' => $message->topic,
+                'partition' => $message->partition,
+                'key' => $message->key,
+                'error' => $e->getMessage(),
+                'error_code' => $e->getCode(),
+            ]);
+
             throw KafkaProducerException::fromKafkaException($e);
         }
     }
@@ -66,12 +83,26 @@ final class KafkaProducer
         $rst = $this->producer->flush($timeoutMs);
 
         if ($rst === \RD_KAFKA_RESP_ERR_NO_ERROR) {
+            $this->logger->info('Producer flushed successfully', [
+                'timeout_ms' => $timeoutMs,
+            ]);
+
             return;
         }
 
         if ($rst === \RD_KAFKA_RESP_ERR__TIMED_OUT) {
+            $this->logger->warning('Flush timed out', [
+                'timeout_ms' => $timeoutMs,
+                'error_code' => $rst,
+            ]);
+
             throw new KafkaConnectionException('Flush timed out in ' . $timeoutMs . 'ms');
         }
+
+        $this->logger->error('Flush failed', [
+            'timeout_ms' => $timeoutMs,
+            'error_code' => $rst,
+        ]);
 
         throw new KafkaProducerException('Flush failed, error ' . $rst);
     }
