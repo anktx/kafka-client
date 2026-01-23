@@ -10,13 +10,15 @@ final class TimeoutPollStrategy implements PollStrategy
 
     public function __construct(
         public readonly int $pollIntervalSec,
-    ) {}
+    ) {
+        $this->lastPollTimestamp = 0;
+    }
 
     public function shouldPoll(): bool
     {
         $timestamp = (int) date('U');
 
-        $rst = $timestamp > $this->lastPollTimestamp + $this->pollIntervalSec;
+        $rst = $timestamp >= $this->lastPollTimestamp + $this->pollIntervalSec;
 
         if ($rst === true) {
             $this->lastPollTimestamp = $timestamp;
