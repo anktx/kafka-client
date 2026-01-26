@@ -7,7 +7,6 @@ namespace Anktx\Kafka\Client\ConsumeResult;
 final readonly class KafkaConsumeTimeout
 {
     public function __construct(
-        public string $topic,
         public int $partition,
         public int $offset,
     ) {}

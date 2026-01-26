@@ -187,7 +187,6 @@ final class KafkaConsumer
             ),
 
             \RD_KAFKA_RESP_ERR__TIMED_OUT => new KafkaConsumeTimeout(
-                topic: $message->topic_name,
                 partition: $message->partition,
                 offset: $message->offset,
             ),
