@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Config\Enum;
 
-enum CompressionType
+enum CompressionType: string
 {
-    case snappy;
-    case gzip;
-    case lz4;
-    case zstd;
+    case snappy = 'snappy';
+    case gzip = 'gzip';
+    case lz4 = 'lz4';
+    case zstd = 'zstd';
 }
