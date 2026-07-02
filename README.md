@@ -146,7 +146,7 @@ $config = new ProducerConfig(
 $config = new ConsumerConfig(
     brokers: string,                    // Обязательно
     groupId: string,                    // Обязательно
-    instanceId: string,                 // Обязательно
+    instanceId: ?string,                // По умолчанию: null
     offsetReset: OffsetReset,           // По умолчанию: earliest
     autoCommitMs: ?int,                 // По умолчанию: null (ручной коммит)
     sessionTimeoutMs: ?int,             // По умолчанию: null

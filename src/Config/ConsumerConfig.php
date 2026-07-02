@@ -15,7 +15,7 @@ final readonly class ConsumerConfig
     public function __construct(
         public string $brokers,
         public string $groupId,
-        public string $instanceId,
+        public ?string $instanceId = null,
         public OffsetReset $offsetReset = OffsetReset::earliest,
         public ?int $autoCommitMs = null,
         public ?int $sessionTimeoutMs = null,
@@ -54,7 +54,11 @@ final readonly class ConsumerConfig
     {
         $conf->set('metadata.broker.list', $this->brokers);
         $conf->set('group.id', $this->groupId);
-        $conf->set('group.instance.id', $this->instanceId);
+
+        if ($this->instanceId !== null) {
+            $conf->set('group.instance.id', $this->instanceId);
+        }
+
         $conf->set('auto.offset.reset', $this->offsetReset->name);
         $conf->set('enable.partition.eof', 'true');
     }

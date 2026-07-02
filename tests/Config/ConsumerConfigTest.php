@@ -52,6 +52,17 @@ final class ConsumerConfigTest extends TestCase
         $this->assertInstanceOf(NullLogger::class, $config->logger);
     }
 
+    public function testInstanceIdIsOptional(): void
+    {
+        $config = new ConsumerConfig(
+            brokers: 'kafka:9092',
+            groupId: 'test-group',
+        );
+
+        $this->assertNull($config->instanceId);
+        $this->assertInstanceOf(Conf::class, $config->asKafkaConfig());
+    }
+
     public function testWithDebugEnabled(): void
     {
         $config = new ConsumerConfig(
