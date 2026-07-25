@@ -19,6 +19,7 @@ final readonly class ConsumerConfig
         public OffsetReset $offsetReset = OffsetReset::earliest,
         public ?int $autoCommitMs = null,
         public ?int $sessionTimeoutMs = null,
+        public int $unavailableThresholdSec = 30,
         public bool $isDebug = false,
         public LoggerInterface $logger = new NullLogger(),
     ) {}
@@ -38,7 +39,7 @@ final readonly class ConsumerConfig
 
     private function configureLogging(Conf $conf): void
     {
-        $conf->setLogCb(function (KafkaConsumer $consumer, int $level, string $facility, string $message) {
+        $conf->setLogCb(function (KafkaConsumer $consumer, int $level, string $facility, string $message): void {
             $this->logger->log($level, $message, ['facility' => $facility]);
         });
     }

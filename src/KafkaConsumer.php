@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client;
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
+use Anktx\Kafka\Client\Connection\BrokerHealthState;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
+use Anktx\Kafka\Client\Exception\Kafka\KafkaUnavailableException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
@@ -29,6 +31,8 @@ final class KafkaConsumer
 {
     private readonly \RdKafka\KafkaConsumer $consumer;
     private readonly LoggerInterface $logger;
+    private readonly BrokerHealthState $brokerHealth;
+    private readonly int $unavailableThresholdSec;
     private bool $isSubscribed = false;
 
     /**
@@ -47,7 +51,12 @@ final class KafkaConsumer
         int $timeoutMs = 5000,
     ) {
         $this->logger = $config->logger;
-        $this->consumer = new \RdKafka\KafkaConsumer($config->asKafkaConfig());
+        $this->brokerHealth = new BrokerHealthState();
+        $this->unavailableThresholdSec = $config->unavailableThresholdSec;
+
+        $conf = $config->asKafkaConfig();
+        $conf->setErrorCb($this->onBrokerError(...));
+        $this->consumer = new \RdKafka\KafkaConsumer($conf);
 
         $this->logger->info('KafkaConsumer created', [
             'brokers' => $config->brokers,
@@ -56,6 +65,7 @@ final class KafkaConsumer
             'offset_reset' => $config->offsetReset->name,
             'auto_commit_ms' => $config->autoCommitMs,
             'session_timeout_ms' => $config->sessionTimeoutMs,
+            'unavailable_threshold_sec' => $config->unavailableThresholdSec,
         ]);
 
         $this->assertBrokersAreAlive($timeoutMs);
@@ -147,8 +157,9 @@ final class KafkaConsumer
      *
      * @return KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат потребления
      *
-     * @throws NotSubscribedException Если консьюмер не подписан на топики
-     * @throws KafkaConsumerException Если произошла ошибка при чтении
+     * @throws NotSubscribedException    Если консьюмер не подписан на топики
+     * @throws KafkaUnavailableException Если Kafka недоступна дольше заданного порога
+     * @throws KafkaConsumerException    Если произошла ошибка при чтении
      */
     public function consume(int $timeoutMs = 1000): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
     {
@@ -157,6 +168,8 @@ final class KafkaConsumer
 
             throw NotSubscribedException::create();
         }
+
+        $this->assertKafkaAvailable();
 
         try {
             $message = $this->consumer->consume($timeoutMs);
@@ -194,6 +207,12 @@ final class KafkaConsumer
             default => throw KafkaConsumerException::create($message->errstr()),
         };
 
+        // Сообщение или EOF подтверждают, что соединение с брокером работает.
+        // Таймаут такого подтверждения не даёт — он неоднозначен.
+        if (!$result instanceof KafkaConsumeTimeout) {
+            $this->brokerHealth->markAvailable();
+        }
+
         return $result;
     }
 
@@ -209,8 +228,9 @@ final class KafkaConsumer
      *
      * @return mixed Значение, возвращённое выполненным callback'ом
      *
-     * @throws NotSubscribedException Если консьюмер не подписан на топики
-     * @throws KafkaConsumerException Если произошла ошибка при чтении
+     * @throws NotSubscribedException    Если консьюмер не подписан на топики
+     * @throws KafkaUnavailableException Если Kafka недоступна дольше заданного порога
+     * @throws KafkaConsumerException    Если произошла ошибка при чтении
      */
     public function consumeMatch(
         \Closure $onMessage,
@@ -309,5 +329,53 @@ final class KafkaConsumer
                 default => KafkaConsumerException::fromKafkaException($e),
             };
         }
+    }
+
+    /**
+     * Проверяет, не превышен ли порог недоступности Kafka.
+     *
+     * Вызывается перед каждой итерацией consume(). Если соединение с брокерами
+     * было потеряно и не восстановилось в течение заданного порога, бросает
+     * исключение, позволяя приложению завершить работу для перезапуска.
+     *
+     * @throws KafkaUnavailableException Если Kafka недоступна дольше порога
+     */
+    private function assertKafkaAvailable(): void
+    {
+        $now = microtime(true);
+
+        if (!$this->brokerHealth->isUnavailableFor($now, $this->unavailableThresholdSec)) {
+            return;
+        }
+
+        throw KafkaUnavailableException::create(
+            thresholdSec: $this->unavailableThresholdSec,
+            actualSec: $this->brokerHealth->unavailableDurationSec($now),
+        );
+    }
+
+    /**
+     * Error callback librdkafka — вызывается при ошибках соединения с брокерами.
+     *
+     * Callback исполняется синхронно внутри C-кода ext-rdkafka, поэтому
+     * бросать исключение отсюда нельзя. Состояние фиксируется здесь, а
+     * исключение выбрасывается из {@see consume()} через {@see assertKafkaAvailable()}.
+     *
+     * @param \RdKafka\KafkaConsumer $kafka  Экземпляр consumer'а (не используется)
+     * @param int                    $err    Код ошибки RD_KAFKA_RESP_ERR__*
+     * @param string                 $reason Текстовое описание ошибки
+     */
+    private function onBrokerError(\RdKafka\KafkaConsumer $kafka, int $err, string $reason): void
+    {
+        if (!BrokerHealthState::isConnectionError($err)) {
+            return;
+        }
+
+        $this->brokerHealth->markUnavailable(microtime(true));
+
+        $this->logger->warning('Kafka broker connection error', [
+            'error_code' => $err,
+            'reason' => $reason,
+        ]);
     }
 }

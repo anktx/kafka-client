@@ -99,6 +99,27 @@ final class ConsumerConfigTest extends TestCase
         $this->assertSame(10000, $config->sessionTimeoutMs);
     }
 
+    public function testDefaultUnavailableThresholdSec(): void
+    {
+        $config = new ConsumerConfig(
+            brokers: 'kafka:9092',
+            groupId: 'test-group',
+        );
+
+        $this->assertSame(30, $config->unavailableThresholdSec);
+    }
+
+    public function testWithCustomUnavailableThresholdSec(): void
+    {
+        $config = new ConsumerConfig(
+            brokers: 'kafka:9092',
+            groupId: 'test-group',
+            unavailableThresholdSec: 60,
+        );
+
+        $this->assertSame(60, $config->unavailableThresholdSec);
+    }
+
     public function testWithLatestOffsetReset(): void
     {
         $config = new ConsumerConfig(
