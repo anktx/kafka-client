@@ -55,7 +55,6 @@ final readonly class KafkaMessageStream
      */
     public function stream(): \Generator
     {
-        // @phpstan-ignore while.alwaysTrue
         while (true) {
             $message = $this->consumer->consumeMatch(
                 onMessage: static fn(KafkaConsumerMessage $msg): KafkaConsumerMessage => $msg,

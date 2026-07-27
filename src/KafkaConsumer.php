@@ -74,8 +74,10 @@ final class KafkaConsumer
     /**
      * Подписывается на топики для потребления сообщений.
      *
-     * Метод автоматически восстанавливает ранее закоммиченные смещения (offsets).
-     * При необходимости можно подписаться на конкретные партиции.
+     * Назначение партиций и восстановление смещений (offsets) выполняет сам
+     * librdkafka через внутренний rebalance-callback: внешний assign() после
+     * subscribe() переключает консьюмер в manual mode и затирает то, что
+     * выставил rebalance, что приводит к рассинхрону partition/offset.
      *
      * @param TopicSubscriptionList $subscriptionList Список подписок на топики/партиции
      *
@@ -97,17 +99,6 @@ final class KafkaConsumer
                     'topic' => $s->topic,
                     'partition' => $s->partition,
                 ], $subscriptionList->items),
-                'error' => $e->getMessage(),
-            ]);
-
-            throw KafkaConsumerException::fromKafkaException($e);
-        }
-
-        try {
-            $this->consumer->assign($this->commitedOffsets($subscriptionList)->asKafkaTopicPartitionArray());
-        } catch (RdKafkaException $e) {
-            $this->logger->error('Failed to assign offsets', [
-                'topics' => $subscriptionList->topicNames(),
                 'error' => $e->getMessage(),
             ]);
 
@@ -287,24 +278,6 @@ final class KafkaConsumer
         $this->consumer->close();
 
         $this->logger->info('KafkaConsumer closed');
-    }
-
-    /**
-     * Получает закоммиченные смещения для списка подписок.
-     *
-     * @param TopicSubscriptionList $subscriptionList Список подписок
-     * @param int                   $timeoutMs        Таймаут ожидания (по умолчанию 1000 мс)
-     *
-     * @return TopicSubscriptionList Список подписок с сохранёнными смещениями
-     */
-    private function commitedOffsets(TopicSubscriptionList $subscriptionList, int $timeoutMs = 1000): TopicSubscriptionList
-    {
-        return TopicSubscriptionList::fromKafkaTopicPartition(
-            ...$this->consumer->getCommittedOffsets(
-                topic_partitions: $subscriptionList->asKafkaTopicPartitionArray(),
-                timeout_ms: $timeoutMs,
-            ),
-        );
     }
 
     /**

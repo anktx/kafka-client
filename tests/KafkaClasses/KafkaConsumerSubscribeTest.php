@@ -1,0 +1,176 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Anktx\Kafka\Client\Tests\KafkaClasses;
+
+use Anktx\Kafka\Client\Connection\BrokerHealthState;
+use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
+use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
+use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
+use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
+use Anktx\Kafka\Client\KafkaConsumer;
+use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
+use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
+use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\TestCase;
+use RdKafka\Exception as RdKafkaException;
+use RdKafka\KafkaConsumer as RdKafkaConsumer;
+use RdKafka\Message as RdKafkaMessage;
+
+/**
+ * Юнит-тесты для {@see KafkaConsumer::subscribe()} на mock'е RdKafka\KafkaConsumer.
+ *
+ * Регрессия для бага: в subscribe() сразу после consumer->subscribe() вызывался
+ * consumer->assign(committedOffsets), что переключало consumer в manual mode и
+ * затирало partition-назначения, выставленные внутренним rebalance-callback'ом
+ * librdkafka. Тесты фиксируют контракт: subscribe() вызывает ровно один
+ * RdKafka\KafkaConsumer::subscribe() и ноль раз assign(), корректно пишет
+ * контекст в лог и выставляет флаг isSubscribed.
+ */
+final class KafkaConsumerSubscribeTest extends TestCase
+{
+    public function testSubscribeCallsRdKafkaSubscribeOnceAndNeverAssigns(): void
+    {
+        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic']);
+        $rdKafka->expects($this->never())->method('assign');
+
+        $this->buildConsumer($rdKafka)->subscribe(TopicSubscriptionList::create('test-topic'));
+    }
+
+    public function testSubscribeWithExplicitPartitionsStillDoesNotAssign(): void
+    {
+        // Через TopicSubscriptionList::create($topic) все partition'ы остаются null,
+        // но consumer может создать список и с явными partition'ами. В обоих случаях
+        // внешний assign() после subscribe() недопустим — назначение partition'ов
+        // остаётся за librdkafka.
+        $list = new TopicSubscriptionList(
+            new TopicSubscription('test-topic', 0),
+            new TopicSubscription('test-topic', 1),
+            new TopicSubscription('test-topic', 2),
+        );
+
+        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic']);
+        $rdKafka->expects($this->never())->method('assign');
+
+        $this->buildConsumer($rdKafka)->subscribe($list);
+    }
+
+    public function testSubscribeWritesInfoLogContextAndEnablesConsumption(): void
+    {
+        // Интеграция трёх контрактов subscribe(): (1) ровно один RdKafka::subscribe(),
+        // (2) info-лог содержит topics + subscriptions_count, (3) флаг isSubscribed
+        // переключается в true — иначе consume() бросит NotSubscribedException.
+        $logger = new InMemoryLogger();
+
+        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic']);
+        $rdKafka->expects($this->never())->method('assign');
+
+        $timeoutMessage = new RdKafkaMessage();
+        $timeoutMessage->err = \RD_KAFKA_RESP_ERR__TIMED_OUT;
+        $timeoutMessage->partition = 0;
+        $timeoutMessage->offset = 0;
+        $rdKafka->method('consume')->willReturn($timeoutMessage);
+
+        $consumer = $this->buildConsumer($rdKafka, $logger);
+
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+
+        // Если isSubscribed не выставился в true, здесь прилетит NotSubscribedException.
+        $result = $consumer->consume(100);
+        self::assertInstanceOf(KafkaConsumeTimeout::class, $result);
+
+        $infoRecords = $logger->findByMessage('Subscribed to topics');
+        self::assertCount(1, $infoRecords);
+        self::assertSame(['test-topic'], $infoRecords[0]['context']['topics']);
+        self::assertSame(1, $infoRecords[0]['context']['subscriptions_count']);
+    }
+
+    public function testSubscribeLogsErrorContextAndRethrowsOnRdKafkaException(): void
+    {
+        $logger = new InMemoryLogger();
+
+        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->method('subscribe')
+            ->willThrowException(new RdKafkaException('broker down'))
+        ;
+        $rdKafka->expects($this->never())->method('assign');
+
+        $list = new TopicSubscriptionList(
+            new TopicSubscription('test-topic', 0),
+            new TopicSubscription('notifications', 4),
+        );
+
+        $consumer = $this->buildConsumer($rdKafka, $logger);
+
+        try {
+            $consumer->subscribe($list);
+            self::fail('Expected KafkaConsumerException');
+        } catch (KafkaConsumerException $e) {
+            self::assertSame('broker down', $e->getMessage());
+        }
+
+        $errorRecords = $logger->findByMessage('Failed to subscribe to topics');
+        self::assertCount(1, $errorRecords);
+        self::assertSame(['test-topic', 'notifications'], $errorRecords[0]['context']['topics']);
+        self::assertSame('broker down', $errorRecords[0]['context']['error']);
+        self::assertSame(
+            [
+                ['topic' => 'test-topic', 'partition' => 0],
+                ['topic' => 'notifications', 'partition' => 4],
+            ],
+            $errorRecords[0]['context']['subscriptions'],
+        );
+    }
+
+    public function testSubscribeWithEmptyListThrowsBeforeAnyConsumerCallAndLogsNothing(): void
+    {
+        $logger = new InMemoryLogger();
+
+        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->expects($this->never())->method('subscribe');
+        $rdKafka->expects($this->never())->method('assign');
+
+        $this->expectException(EmptySubscriptionsException::class);
+
+        try {
+            $this->buildConsumer($rdKafka, $logger)->subscribe(new TopicSubscriptionList());
+        } finally {
+            self::assertSame([], $logger->records);
+        }
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testConsumeBeforeSubscribeThrowsNotSubscribed(): void
+    {
+        $this->expectException(NotSubscribedException::class);
+
+        $this->buildConsumer($this->createMock(RdKafkaConsumer::class))->consume(100);
+    }
+
+    /**
+     * Собирает KafkaConsumer без вызова конструктора (чтобы избежать реального
+     * подключения к брокерам) и инжектит mock RdKafka\KafkaConsumer в приватный
+     * readonly-параметр.
+     */
+    private function buildConsumer(RdKafkaConsumer $rdKafka, ?InMemoryLogger $logger = null): KafkaConsumer
+    {
+        $consumer = (new \ReflectionClass(KafkaConsumer::class))->newInstanceWithoutConstructor();
+
+        $this->setProp($consumer, 'consumer', $rdKafka);
+        $this->setProp($consumer, 'logger', $logger ?? new InMemoryLogger());
+        $this->setProp($consumer, 'brokerHealth', new BrokerHealthState());
+        $this->setProp($consumer, 'unavailableThresholdSec', 30);
+
+        return $consumer;
+    }
+
+    private function setProp(KafkaConsumer $consumer, string $name, mixed $value): void
+    {
+        (new \ReflectionProperty(KafkaConsumer::class, $name))->setValue($consumer, $value);
+    }
+}

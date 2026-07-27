@@ -26,7 +26,7 @@ final readonly class ProducerConfig
     {
         $conf = new Conf();
 
-        $conf->setLogCb(function (Producer $producer, int $level, string $facility, string $message) {
+        $conf->setLogCb(function (Producer $producer, int $level, string $facility, string $message): void {
             $this->logger->log($level, $message);
         });
         if ($this->isDebug) {
