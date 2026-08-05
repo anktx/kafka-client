@@ -19,9 +19,11 @@ final readonly class ConsumerConfig
         public OffsetReset $offsetReset = OffsetReset::earliest,
         public ?int $autoCommitMs = null,
         public ?int $sessionTimeoutMs = null,
-        public int $unavailableThresholdSec = 30,
         public bool $isDebug = false,
         public LoggerInterface $logger = new NullLogger(),
+        public ?int $reconnectBackoffMs = null,
+        public ?int $reconnectBackoffMaxMs = null,
+        public bool $socketKeepaliveEnable = true,
     ) {}
 
     public function asKafkaConfig(): Conf
@@ -33,6 +35,7 @@ final readonly class ConsumerConfig
         $this->configureEssentials($conf);
         $this->configureCommit($conf);
         $this->configureTimeouts($conf);
+        $this->configureReconnect($conf);
 
         return $conf;
     }
@@ -79,6 +82,18 @@ final readonly class ConsumerConfig
         if ($this->sessionTimeoutMs) {
             $conf->set('session.timeout.ms', (string) $this->sessionTimeoutMs);
         }
-        // Можно добавить heartbeat.interval.ms, max.poll.interval.ms и т.д.
+    }
+
+    private function configureReconnect(Conf $conf): void
+    {
+        if ($this->reconnectBackoffMs !== null) {
+            $conf->set('reconnect.backoff.ms', (string) $this->reconnectBackoffMs);
+        }
+
+        if ($this->reconnectBackoffMaxMs !== null) {
+            $conf->set('reconnect.backoff.max.ms', (string) $this->reconnectBackoffMaxMs);
+        }
+
+        $conf->set('socket.keepalive.enable', $this->socketKeepaliveEnable ? 'true' : 'false');
     }
 }

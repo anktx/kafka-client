@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
-use Anktx\Kafka\Client\Connection\BrokerHealthState;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -163,8 +162,6 @@ final class KafkaConsumerSubscribeTest extends TestCase
 
         $this->setProp($consumer, 'consumer', $rdKafka);
         $this->setProp($consumer, 'logger', $logger ?? new InMemoryLogger());
-        $this->setProp($consumer, 'brokerHealth', new BrokerHealthState());
-        $this->setProp($consumer, 'unavailableThresholdSec', 30);
 
         return $consumer;
     }

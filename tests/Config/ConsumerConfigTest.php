@@ -50,6 +50,9 @@ final class ConsumerConfigTest extends TestCase
         $this->assertNull($config->autoCommitMs);
         $this->assertNull($config->sessionTimeoutMs);
         $this->assertInstanceOf(NullLogger::class, $config->logger);
+        $this->assertNull($config->reconnectBackoffMs);
+        $this->assertNull($config->reconnectBackoffMaxMs);
+        $this->assertTrue($config->socketKeepaliveEnable);
     }
 
     public function testInstanceIdIsOptional(): void
@@ -97,27 +100,6 @@ final class ConsumerConfigTest extends TestCase
         );
 
         $this->assertSame(10000, $config->sessionTimeoutMs);
-    }
-
-    public function testDefaultUnavailableThresholdSec(): void
-    {
-        $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
-            groupId: 'test-group',
-        );
-
-        $this->assertSame(30, $config->unavailableThresholdSec);
-    }
-
-    public function testWithCustomUnavailableThresholdSec(): void
-    {
-        $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
-            groupId: 'test-group',
-            unavailableThresholdSec: 60,
-        );
-
-        $this->assertSame(60, $config->unavailableThresholdSec);
     }
 
     public function testWithLatestOffsetReset(): void
@@ -216,5 +198,39 @@ final class ConsumerConfigTest extends TestCase
         $kafkaConfig = $config->asKafkaConfig();
 
         $this->assertInstanceOf(Conf::class, $kafkaConfig);
+    }
+
+    public function testDefaultSocketKeepaliveEnableIsTrue(): void
+    {
+        $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g');
+        $dump = $config->asKafkaConfig()->dump();
+
+        $this->assertSame('true', $dump['socket.keepalive.enable']);
+    }
+
+    public function testSocketKeepaliveDisabled(): void
+    {
+        $config = new ConsumerConfig(
+            brokers: 'kafka:9092',
+            groupId: 'g',
+            socketKeepaliveEnable: false,
+        );
+        $dump = $config->asKafkaConfig()->dump();
+
+        $this->assertSame('false', $dump['socket.keepalive.enable']);
+    }
+
+    public function testReconnectBackoffConfiguredWhenSet(): void
+    {
+        $config = new ConsumerConfig(
+            brokers: 'kafka:9092',
+            groupId: 'g',
+            reconnectBackoffMs: 50,
+            reconnectBackoffMaxMs: 5000,
+        );
+        $dump = $config->asKafkaConfig()->dump();
+
+        $this->assertSame('50', $dump['reconnect.backoff.ms']);
+        $this->assertSame('5000', $dump['reconnect.backoff.max.ms']);
     }
 }

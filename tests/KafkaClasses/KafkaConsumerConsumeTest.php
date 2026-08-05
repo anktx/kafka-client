@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
-use Anktx\Kafka\Client\Connection\BrokerHealthState;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -22,17 +21,15 @@ use RdKafka\Message as RdKafkaMessage;
 /**
  * Юнит-тесты для {@see KafkaConsumer::consume()} на mock'е RdKafka\KafkaConsumer.
  *
- * Регрессионное покрытие для баг-фикса subscribe(): без assign() после subscribe()
- * флаг isSubscribed выставляется корректно и consume() сразу готов читать сообщения
- * всех категорий — NO_ERROR, PARTITION_EOF, TIMED_OUT и неизвестные err-коды.
+ * Покрывают все ветки match: NO_ERROR, PARTITION_EOF, TIMED_OUT,
+ * ALL_BROKERS_DOWN (как таймаут) и default (бросает исключение).
+ * Регрессионный сценарий самовосстановления: consume() продолжает работать
+ * после временной потери связи с брокером без перезапуска процесса.
  */
 final class KafkaConsumerConsumeTest extends TestCase
 {
-    public function testConsumeReturnsMessageForNoErrorAndMarksBrokerAvailable(): void
+    public function testConsumeReturnsMessageForNoError(): void
     {
-        $brokerHealth = new BrokerHealthState();
-        $brokerHealth->markUnavailable(microtime(true));
-
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
         $rdKafka->expects($this->once())->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
@@ -45,7 +42,7 @@ final class KafkaConsumerConsumeTest extends TestCase
             'timestamp' => 1234,
         ]));
 
-        $consumer = $this->buildConsumer($rdKafka, brokerHealth: $brokerHealth);
+        $consumer = $this->buildConsumer($rdKafka);
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
         $result = $consumer->consume(100);
@@ -55,16 +52,11 @@ final class KafkaConsumerConsumeTest extends TestCase
         self::assertSame('hello', $result->body);
         self::assertSame(3, $result->partition);
         self::assertSame(42, $result->offset);
-        // Сообщение подтверждает восстановление соединения.
-        self::assertFalse($brokerHealth->isUnavailable());
     }
 
     #[AllowMockObjectsWithoutExpectations]
-    public function testConsumeReturnsPartitionEofAndMarksBrokerAvailable(): void
+    public function testConsumeReturnsPartitionEof(): void
     {
-        $brokerHealth = new BrokerHealthState();
-        $brokerHealth->markUnavailable(microtime(true));
-
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
         $rdKafka->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,
@@ -73,7 +65,7 @@ final class KafkaConsumerConsumeTest extends TestCase
             'offset' => 7,
         ]));
 
-        $consumer = $this->buildConsumer($rdKafka, brokerHealth: $brokerHealth);
+        $consumer = $this->buildConsumer($rdKafka);
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
         $result = $consumer->consume(100);
@@ -82,20 +74,11 @@ final class KafkaConsumerConsumeTest extends TestCase
         self::assertSame('test-topic', $result->topic);
         self::assertSame(1, $result->partition);
         self::assertSame(7, $result->offset);
-        // EOF тоже подтверждает, что обмен с брокером работает.
-        self::assertFalse($brokerHealth->isUnavailable());
     }
 
     #[AllowMockObjectsWithoutExpectations]
-    public function testConsumeReturnsTimeoutAndDoesNotMarkBrokerAvailable(): void
+    public function testConsumeReturnsTimeout(): void
     {
-        // markUnavailable не вызывается в этом тесте — по умолчанию brokerHealth
-        // доступен. Проверяем, что таймаут не сбрасывает его в "доступен", но
-        // и не маркирует недоступным. Главное — что markAvailable не вызывается
-        // (на мутации if (!$result instanceof Timeout) ↔ if ($result instanceof Timeout)).
-        $brokerHealth = new BrokerHealthState();
-        $brokerHealth->markUnavailable(microtime(true));
-
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
         $rdKafka->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
@@ -103,58 +86,118 @@ final class KafkaConsumerConsumeTest extends TestCase
             'offset' => 0,
         ]));
 
-        $consumer = $this->buildConsumer($rdKafka, brokerHealth: $brokerHealth);
+        $consumer = $this->buildConsumer($rdKafka);
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
         $result = $consumer->consume(100);
 
         self::assertInstanceOf(KafkaConsumeTimeout::class, $result);
-        // На мутации markAvailable был бы вызван и сбросил unavailable.
-        // На корректном коде unavailable сохраняется.
-        self::assertTrue($brokerHealth->isUnavailable());
+    }
+
+    public function testConsumeReturnsTimeoutForAllBrokersDownAndDoesNotThrow(): void
+    {
+        // При полной потере связи librdkafka возвращает RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN.
+        // Раньше это доходило до default arm match и бросало KafkaConsumerException.
+        // Теперь обрабатывается как таймаут, позволяя циклу потребления продолжаться
+        // и давая librdkafka прокачивать rebalance-протокол (JoinGroup/SyncGroup).
+        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->expects($this->once())->method('consume')->willReturn(self::message([
+            'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
+            'partition' => -1,
+            'offset' => -1,
+        ]));
+
+        $consumer = $this->buildConsumer($rdKafka);
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+
+        $result = $consumer->consume(100);
+
+        self::assertInstanceOf(KafkaConsumeTimeout::class, $result);
     }
 
     #[AllowMockObjectsWithoutExpectations]
-    public function testConsumeThrowsOnUnknownErrCodeAndDoesNotMarkBrokerAvailable(): void
+    public function testConsumeSelfHealsAfterBrokerRecovery(): void
     {
-        $brokerHealth = new BrokerHealthState();
-        $brokerHealth->markUnavailable(microtime(true));
+        // Ключевой сценарий самовосстановления:
+        // 1. Брокер недоступен → consume() возвращает ALL_BROKERS_DOWN (как таймаут)
+        // 2. Брокер восстановился → consume() возвращает сообщение
+        // Процесс продолжает работать без перезапуска.
+        $allBrokersDownMessage = self::message([
+            'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
+            'partition' => -1,
+            'offset' => -1,
+        ]);
+        $recoveredMessage = self::message([
+            'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
+            'topic_name' => 'test-topic',
+            'partition' => 2,
+            'offset' => 10,
+            'payload' => 'recovered',
+            'key' => null,
+            'headers' => [],
+            'timestamp' => 9999,
+        ]);
 
+        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->method('consume')
+            ->willReturnOnConsecutiveCalls($allBrokersDownMessage, $recoveredMessage)
+        ;
+
+        $consumer = $this->buildConsumer($rdKafka);
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+
+        // Первая итерация: брокер недоступен — consume() работает, не бросает.
+        $result1 = $consumer->consume(100);
+        self::assertInstanceOf(KafkaConsumeTimeout::class, $result1);
+
+        // Вторая итерация: брокер восстановился — сообщение получено.
+        $result2 = $consumer->consume(100);
+        self::assertInstanceOf(KafkaConsumerMessage::class, $result2);
+        self::assertSame('recovered', $result2->body);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testConsumeThrowsOnUnknownErrCode(): void
+    {
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
         $rdKafka->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__BAD_MSG,
         ]));
 
-        $consumer = $this->buildConsumer($rdKafka, brokerHealth: $brokerHealth);
+        $consumer = $this->buildConsumer($rdKafka);
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
         $this->expectException(KafkaConsumerException::class);
         // errstr() для RD_KAFKA_RESP_ERR__BAD_MSG возвращает 'Local: Bad message format'.
         $this->expectExceptionMessage('Bad message format');
 
-        try {
-            $consumer->consume(100);
-        } finally {
-            // На default arm markAvailable не должен вызываться.
-            self::assertTrue($brokerHealth->isUnavailable());
-        }
+        $consumer->consume(100);
     }
 
     #[AllowMockObjectsWithoutExpectations]
-    public function testConsumePropagatesRdKafkaException(): void
+    public function testConsumePropagatesRdKafkaExceptionAndLogsContext(): void
     {
+        $logger = new InMemoryLogger();
+
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
         $rdKafka->method('consume')
             ->willThrowException(new RdKafkaException('transport failure'))
         ;
 
-        $consumer = $this->buildConsumer($rdKafka);
+        $consumer = $this->buildConsumer($rdKafka, logger: $logger);
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
-        $this->expectException(KafkaConsumerException::class);
-        $this->expectExceptionMessage('transport failure');
+        try {
+            $consumer->consume(100);
+            self::fail('Expected KafkaConsumerException');
+        } catch (KafkaConsumerException $e) {
+            self::assertSame('transport failure', $e->getMessage());
+        }
 
-        $consumer->consume(100);
+        $errorRecords = $logger->findByMessage('Failed to consume message');
+        self::assertCount(1, $errorRecords);
+        self::assertSame(100, $errorRecords[0]['context']['timeout_ms']);
+        self::assertSame('transport failure', $errorRecords[0]['context']['error']);
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -163,6 +206,41 @@ final class KafkaConsumerConsumeTest extends TestCase
         $this->expectException(NotSubscribedException::class);
 
         $this->buildConsumer($this->createMock(RdKafkaConsumer::class))->consume(100);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testOnBrokerErrorLogsConnectionErrors(): void
+    {
+        $logger = new InMemoryLogger();
+        $consumer = $this->buildConsumer($this->createMock(RdKafkaConsumer::class), logger: $logger);
+
+        (new \ReflectionMethod($consumer, 'onBrokerError'))->invoke(
+            $consumer,
+            $this->createMock(RdKafkaConsumer::class),
+            \RD_KAFKA_RESP_ERR__TRANSPORT,
+            'connection refused',
+        );
+
+        $records = $logger->findByMessage('Kafka broker connection error');
+        self::assertCount(1, $records);
+        self::assertSame(\RD_KAFKA_RESP_ERR__TRANSPORT, $records[0]['context']['error_code']);
+        self::assertSame('connection refused', $records[0]['context']['reason']);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testOnBrokerErrorIgnoresNonConnectionErrors(): void
+    {
+        $logger = new InMemoryLogger();
+        $consumer = $this->buildConsumer($this->createMock(RdKafkaConsumer::class), logger: $logger);
+
+        (new \ReflectionMethod($consumer, 'onBrokerError'))->invoke(
+            $consumer,
+            $this->createMock(RdKafkaConsumer::class),
+            \RD_KAFKA_RESP_ERR__BAD_MSG,
+            'bad message format',
+        );
+
+        self::assertSame([], $logger->records);
     }
 
     /**
@@ -180,18 +258,12 @@ final class KafkaConsumerConsumeTest extends TestCase
 
     private function buildConsumer(
         RdKafkaConsumer $rdKafka,
-        ?BrokerHealthState $brokerHealth = null,
+        ?InMemoryLogger $logger = null,
     ): KafkaConsumer {
         $consumer = (new \ReflectionClass(KafkaConsumer::class))->newInstanceWithoutConstructor();
 
         (new \ReflectionProperty(KafkaConsumer::class, 'consumer'))->setValue($consumer, $rdKafka);
-        (new \ReflectionProperty(KafkaConsumer::class, 'logger'))->setValue($consumer, new InMemoryLogger());
-        (new \ReflectionProperty(KafkaConsumer::class, 'brokerHealth'))
-            ->setValue($consumer, $brokerHealth ?? new BrokerHealthState())
-        ;
-        (new \ReflectionProperty(KafkaConsumer::class, 'unavailableThresholdSec'))
-            ->setValue($consumer, 30)
-        ;
+        (new \ReflectionProperty(KafkaConsumer::class, 'logger'))->setValue($consumer, $logger ?? new InMemoryLogger());
 
         return $consumer;
     }
