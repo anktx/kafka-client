@@ -48,6 +48,24 @@ final class ProbabilityPollStrategyTest extends TestCase
         new ProbabilityPollStrategy(probability: 1.1);
     }
 
+    public function testInvalidProbabilityNaN(): void
+    {
+        // NAN проходит сравнения < 0 и > 1 (оба false), поэтому без
+        // отдельной is_nan-проверки тихо деградирует в NeverPoll.
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "probability" must be between 0 and 1, NaN given');
+
+        new ProbabilityPollStrategy(probability: \NAN);
+    }
+
+    public function testInvalidProbabilityInfinite(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "probability" must be between 0 and 1, INF given');
+
+        new ProbabilityPollStrategy(probability: \INF);
+    }
+
     public function testShouldPollUsesInjectedRandomizer(): void
     {
         // seed 42: 0.24864 < 0.5 → true; 0.84845 ≥ 0.5 → false; 0.27109 < 0.5 → true; 0.22885 < 0.5 → true.

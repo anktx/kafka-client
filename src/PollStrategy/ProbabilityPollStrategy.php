@@ -18,7 +18,7 @@ final readonly class ProbabilityPollStrategy implements PollStrategy
         public float $probability,
         private Randomizer $randomizer = new Randomizer(),
     ) {
-        if ($this->probability < 0 || $this->probability > 1) {
+        if (is_nan($this->probability) || $this->probability < 0 || $this->probability > 1) {
             throw InvalidConfigException::probability('probability', $this->probability);
         }
     }
