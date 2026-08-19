@@ -19,11 +19,11 @@ help: ## Show this help message
 
 test: ## Run PHPUnit tests
 	@echo '$(BLUE)Running PHPUnit tests...$(NC)'
-	$(DOCKER_RUN) vendor/bin/phpunit --testsuite="Unit tests" --colors=never
+	$(DOCKER_RUN) vendor/bin/phpunit --testsuite=Unit --colors=never
 
 test-integration: ## Run integration tests (requires Kafka)
 	@echo '$(BLUE)Running integration tests...$(NC)'
-	$(DOCKER_RUN) vendor/bin/phpunit --testsuite="Integration tests" --colors=never
+	$(DOCKER_RUN) vendor/bin/phpunit --testsuite=Integration --colors=never
 
 test-all: ## Run all tests (unit + integration)
 	@echo '$(BLUE)Running all tests...$(NC)'
@@ -35,11 +35,11 @@ test-file: ## Run a single test file (usage: make test-file FILE=tests/Path/ToTe
 
 test-coverage: ## Run PHPUnit tests with coverage (XML for Infection)
 	@echo '$(BLUE)Running PHPUnit tests with coverage (XML)...$(NC)'
-	$(DOCKER_RUN) vendor/bin/phpunit --testsuite="Unit tests" --coverage-xml=.infection/coverage-xml --log-junit=.infection/junit.xml
+	$(DOCKER_RUN) vendor/bin/phpunit --testsuite=Unit --coverage-xml=.infection/coverage-xml --log-junit=.infection/coverage-xml/junit.xml
 
 test-coverage-text: ## Run PHPUnit tests with coverage (text report)
 	@echo '$(BLUE)Running PHPUnit tests with coverage (text)...$(NC)'
-	$(DOCKER_RUN) vendor/bin/phpunit --testsuite="Unit tests" --coverage-text --colors=never
+	$(DOCKER_RUN) vendor/bin/phpunit --testsuite=Unit --coverage-text --colors=never
 
 infection: ## Run Infection mutation testing
 	@echo '$(BLUE)Running Infection mutation testing...$(NC)'

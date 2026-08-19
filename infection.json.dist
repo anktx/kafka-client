@@ -16,6 +16,7 @@
         "MethodCallRemoval": false
     },
     "testFramework": "phpunit",
+    "testFrameworkOptions": "--testsuite=Unit",
     "phpUnit": {
         "configDir": "."
     },

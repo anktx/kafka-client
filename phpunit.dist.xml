@@ -16,11 +16,11 @@
     </php>
 
     <testsuites>
-        <testsuite name="Unit tests">
+        <testsuite name="Unit">
             <directory>./tests</directory>
             <exclude>./tests/Integration</exclude>
         </testsuite>
-        <testsuite name="Integration tests">
+        <testsuite name="Integration">
             <directory>./tests/Integration</directory>
         </testsuite>
     </testsuites>
