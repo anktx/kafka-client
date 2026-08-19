@@ -280,8 +280,8 @@ src/
 ```
 KafkaClientException                 # Маркер: всё, что кидает библиотека (interface, extends \Throwable)
 ├── KafkaException                   # Сбои Kafka/окружения (наследует RdKafka\Exception)
-│   ├── KafkaConnectionException      # Таймаут flush
 │   ├── KafkaConsumerException        # Ошибка консьюмера
+│   ├── KafkaFlushTimeoutException    # Таймаут flush: очередь не отправлена за $timeoutMs
 │   └── KafkaProducerException        # Ошибка продюсера
 └── LogicException                   # Ошибки программиста (наследует \LogicException)
     ├── ClientClosedException         # Операция после close() клиента
@@ -305,8 +305,9 @@ KafkaClientException                 # Маркер: всё, что кидает
 try {
     $producer->produce($message);
     $producer->flush();
-} catch (KafkaConnectionException $e) {
-    // Потеряно соединение с Kafka
+} catch (KafkaFlushTimeoutException $e) {
+    // Flush не успел за $timeoutMs: часть сообщений могла остаться
+    // в локальной очереди продюсера — статус доставки неизвестен
 } catch (KafkaProducerException $e) {
     // Ошибка отправки сообщения
 } catch (KafkaClientException $e) {

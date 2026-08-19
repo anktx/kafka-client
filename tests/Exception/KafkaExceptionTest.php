@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Exception;
 
-use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaException;
+use Anktx\Kafka\Client\Exception\Kafka\KafkaFlushTimeoutException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use PHPUnit\Framework\TestCase;
 
@@ -71,15 +71,15 @@ final class KafkaExceptionTest extends TestCase
         self::assertSame(200, $exception->getCode());
     }
 
-    public function testKafkaConnectionException(): void
+    public function testKafkaFlushTimeoutException(): void
     {
-        $exception = KafkaConnectionException::fromKafkaException(
-            new \RdKafka\Exception('Connection error', 300),
+        $exception = KafkaFlushTimeoutException::fromKafkaException(
+            new \RdKafka\Exception('Flush timeout error', 300),
         );
 
         self::assertInstanceOf(KafkaException::class, $exception);
-        self::assertInstanceOf(KafkaConnectionException::class, $exception);
-        self::assertSame('Connection error', $exception->getMessage());
+        self::assertInstanceOf(KafkaFlushTimeoutException::class, $exception);
+        self::assertSame('Flush timeout error', $exception->getMessage());
         self::assertSame(300, $exception->getCode());
     }
 
@@ -99,9 +99,9 @@ final class KafkaExceptionTest extends TestCase
         self::assertSame(123, $exception->getCode());
     }
 
-    public function testKafkaConnectionExceptionConstructorIsFinal(): void
+    public function testKafkaFlushTimeoutExceptionConstructorIsFinal(): void
     {
-        $exception = new KafkaConnectionException('Test message', 456);
+        $exception = new KafkaFlushTimeoutException('Test message', 456);
 
         self::assertSame('Test message', $exception->getMessage());
         self::assertSame(456, $exception->getCode());
@@ -117,13 +117,14 @@ final class KafkaExceptionTest extends TestCase
         self::assertSame(0, $exception->getCode());
     }
 
-    public function testKafkaConnectionExceptionFlushTimeout(): void
+    public function testKafkaFlushTimeoutExceptionFlushTimeout(): void
     {
-        $exception = KafkaConnectionException::flushTimeout(5000);
+        $exception = KafkaFlushTimeoutException::flushTimeout(5000);
 
         self::assertInstanceOf(KafkaException::class, $exception);
-        self::assertInstanceOf(KafkaConnectionException::class, $exception);
+        self::assertInstanceOf(KafkaFlushTimeoutException::class, $exception);
         self::assertSame('Flush timed out in 5000ms', $exception->getMessage());
+        self::assertSame(\RD_KAFKA_RESP_ERR__TIMED_OUT, $exception->getCode());
     }
 
     public function testKafkaProducerExceptionFlushFailed(): void
@@ -133,5 +134,6 @@ final class KafkaExceptionTest extends TestCase
         self::assertInstanceOf(KafkaException::class, $exception);
         self::assertInstanceOf(KafkaProducerException::class, $exception);
         self::assertSame('Flush failed: Err-123? (123)', $exception->getMessage());
+        self::assertSame(123, $exception->getCode());
     }
 }

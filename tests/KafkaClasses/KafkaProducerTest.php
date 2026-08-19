@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
-use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
+use Anktx\Kafka\Client\Exception\Kafka\KafkaFlushTimeoutException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaProducer;
@@ -200,9 +200,10 @@ final class KafkaProducerTest extends TestCase
 
         try {
             $this->buildProducer($producer, logger: $logger)->flush(25);
-            self::fail('Expected KafkaConnectionException');
-        } catch (KafkaConnectionException $e) {
+            self::fail('Expected KafkaFlushTimeoutException');
+        } catch (KafkaFlushTimeoutException $e) {
             self::assertSame('Flush timed out in 25ms', $e->getMessage());
+            self::assertSame(\RD_KAFKA_RESP_ERR__TIMED_OUT, $e->getCode());
         }
 
         $warnings = $logger->findByMessage('Flush timed out');

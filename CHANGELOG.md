@@ -69,10 +69,20 @@
 - **BC:** `KafkaProducer::flush()` переписан как retry-цикл с суммарным
   дедлайном `$timeoutMs`: транзитный `RD_KAFKA_RESP_ERR__TIMED_OUT` от
   отдельного вызова `RdKafka\Producer::flush()` больше не превращается сразу
-  в `KafkaConnectionException` — вызов повторяется с остатком бюджета и
+  в `KafkaFlushTimeoutException` — вызов повторяется с остатком бюджета и
   бросает исключение только после исчерпания дедлайна. Ошибки, отличные от
   таймаута, по-прежнему фейлят сразу. В контексты логов добавлены
   `out_queue_len` (остаток очереди) и `attempts`.
+- **BC:** `KafkaConnectionException` переименован в `KafkaFlushTimeoutException`:
+  единственный throw-сайт — исчерпание суммарного дедлайна
+  `KafkaProducer::flush()`, к состоянию соединения исключение отношения
+  не имеет — старое имя навязывало неверную семантику обработчикам
+  (комментарий README-примера «Потеряно соединение с Kafka» исправлен на
+  «часть сообщений могла остаться в локальной очереди»). Фабрики
+  `KafkaFlushTimeoutException::flushTimeout()` и
+  `KafkaProducerException::flushFailed()` теперь проставляют `code`
+  (`RD_KAFKA_RESP_ERR__TIMED_OUT` и код ошибки librdkafka соответственно) —
+  раньше код был доступен только парсингом `message`.
 - **BC:** стратегии `TimeoutPollStrategy`/`ProbabilityPollStrategy` валидируют
   параметры через `InvalidConfigException` (единый контракт с конфигами)
   вместо голого `\InvalidArgumentException`: сообщения

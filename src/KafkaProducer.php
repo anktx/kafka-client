@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client;
 
 use Anktx\Kafka\Client\Config\ProducerConfig;
-use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
+use Anktx\Kafka\Client\Exception\Kafka\KafkaFlushTimeoutException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
@@ -130,8 +130,8 @@ final class KafkaProducer
      *
      * @param int $timeoutMs Суммарный таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
      *
-     * @throws KafkaConnectionException Если истёк суммарный таймаут ожидания
-     * @throws KafkaProducerException   Если произошла ошибка при отправке
+     * @throws KafkaFlushTimeoutException Если истёк суммарный таймаут ожидания
+     * @throws KafkaProducerException     Если произошла ошибка при отправке
      */
     public function flush(int $timeoutMs = self::DEFAULT_FLUSH_TIMEOUT_MS): void
     {
@@ -173,7 +173,7 @@ final class KafkaProducer
             'out_queue_len' => $this->producer->getOutQLen(),
         ]);
 
-        throw KafkaConnectionException::flushTimeout($timeoutMs);
+        throw KafkaFlushTimeoutException::flushTimeout($timeoutMs);
     }
 
     /**
