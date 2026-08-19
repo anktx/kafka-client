@@ -37,6 +37,8 @@
   заблуждение сообщением. Ошибки `RdKafka\KafkaConsumer::close()`
   оборачиваются в `KafkaConsumerException` (подробнее —
   docs/lifecycle.md).
+- Валидация `ConsumerConfig::$instanceId`: пустая строка отвергается
+  `InvalidConfigException` (раньше молча уходила в `group.instance.id`).
 
 ## [0.8.0] - 2026-08-19
 

@@ -66,6 +66,16 @@ final class ConsumerConfigTest extends TestCase
         self::assertInstanceOf(Conf::class, $config->asKafkaConfig());
     }
 
+    public function testEmptyInstanceIdThrowsInvalidConfigException(): void
+    {
+        // Пустая строка — ошибка программиста, а не «не задано»: null для
+        // этого есть отдельное значение по умолчанию.
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "instanceId" must not be an empty string');
+
+        new ConsumerConfig(brokers: 'kafka:9092', groupId: 'test-group', instanceId: '');
+    }
+
     public function testAsKafkaConfigWrapsRdKafkaExceptionIntoInvalidConfigException(): void
     {
         // session.timeout.ms вне диапазона librdkafka (1..3600000): конструктор

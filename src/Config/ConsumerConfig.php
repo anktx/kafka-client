@@ -31,6 +31,10 @@ final readonly class ConsumerConfig
             throw InvalidConfigException::emptyString('groupId');
         }
 
+        if ($this->instanceId !== null && $this->instanceId === '') {
+            throw InvalidConfigException::emptyString('instanceId');
+        }
+
         if ($this->autoCommitMs !== null && $this->autoCommitMs < 0) {
             throw InvalidConfigException::nonNegativeInt('autoCommitMs', $this->autoCommitMs);
         }
