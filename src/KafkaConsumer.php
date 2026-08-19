@@ -24,7 +24,7 @@ use RdKafka\TopicPartition;
  *
  * @see https://github.com/edenhill/librdkafka/blob/master/README.md
  */
-final class KafkaConsumer
+final readonly class KafkaConsumer
 {
     /**
      * Коды ошибок librdkafka, означающие потерю соединения с брокерами.
@@ -36,9 +36,8 @@ final class KafkaConsumer
         \RD_KAFKA_RESP_ERR__TRANSPORT,
         \RD_KAFKA_RESP_ERR__RESOLVE,
     ];
-    private readonly \RdKafka\KafkaConsumer $consumer;
-    private readonly LoggerInterface $logger;
-    private bool $isSubscribed = false;
+    private \RdKafka\KafkaConsumer $consumer;
+    private LoggerInterface $logger;
 
     /**
      * Создаёт консьюмера, не подключаясь к брокерам.
@@ -109,8 +108,6 @@ final class KafkaConsumer
             throw KafkaConsumerException::fromKafkaException($e);
         }
 
-        $this->isSubscribed = true;
-
         $this->logger->info('Subscribed to topics', [
             'topics' => $subscriptionList->topicNames(),
             'subscriptions_count' => \count($subscriptionList->items),
@@ -134,8 +131,6 @@ final class KafkaConsumer
             throw KafkaConsumerException::fromKafkaException($e);
         }
 
-        $this->isSubscribed = false;
-
         $this->logger->info('Unsubscribed from all topics');
     }
 
@@ -151,7 +146,9 @@ final class KafkaConsumer
      *
      * Чтение всегда делегируется librdkafka: через consume() также доставляются
      * rebalance-события группы, поэтому предварительных проверок доступности
-     * метод не выполняет.
+     * метод не выполняет. Состояние подписки метод тоже спрашивает у самого
+     * librdkafka через getSubscription() — без librdkafka consume() без
+     * подписки бесконечно возвращает таймауты, неотличимые от пустого топика.
      *
      * @param int $timeoutMs Таймаут ожидания в миллисекундах
      *
@@ -162,7 +159,7 @@ final class KafkaConsumer
      */
     public function consume(int $timeoutMs = 1000): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
     {
-        if (!$this->isSubscribed) {
+        if ($this->consumer->getSubscription() === []) {
             $this->logger->warning('Attempted to consume without subscription');
 
             throw NotSubscribedException::create();

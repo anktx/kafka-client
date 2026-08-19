@@ -27,7 +27,7 @@ use RdKafka\Message as RdKafkaMessage;
  * затирало partition-назначения, выставленные внутренним rebalance-callback'ом
  * librdkafka. Тесты фиксируют контракт: subscribe() вызывает ровно один
  * RdKafka\KafkaConsumer::subscribe() и ноль раз assign(), корректно пишет
- * контекст в лог и выставляет флаг isSubscribed.
+ * контекст в лог, а подписка видна в RdKafka::getSubscription().
  *
  * Также фиксируется контракт отложенного подключения: конструктор и
  * subscribe() не выполняют сетевых вызовов — подключение к брокерам
@@ -95,12 +95,13 @@ final class KafkaConsumerSubscribeTest extends TestCase
     public function testSubscribeWritesInfoLogContextAndEnablesConsumption(): void
     {
         // Интеграция трёх контрактов subscribe(): (1) ровно один RdKafka::subscribe(),
-        // (2) info-лог содержит topics + subscriptions_count, (3) флаг isSubscribed
-        // переключается в true — иначе consume() бросит NotSubscribedException.
+        // (2) info-лог содержит topics + subscriptions_count, (3) подписка видна в
+        // RdKafka::getSubscription() — иначе consume() бросит NotSubscribedException.
         $logger = new InMemoryLogger();
 
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
         $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic']);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->expects($this->never())->method('assign');
 
         $timeoutMessage = new RdKafkaMessage();
@@ -113,7 +114,8 @@ final class KafkaConsumerSubscribeTest extends TestCase
 
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
-        // Если isSubscribed не выставился в true, здесь прилетит NotSubscribedException.
+        // Если подписка не зарегистрировалась в librdkafka, здесь прилетит
+        // NotSubscribedException.
         $result = $consumer->consume(100);
         self::assertInstanceOf(KafkaConsumeTimeout::class, $result);
 

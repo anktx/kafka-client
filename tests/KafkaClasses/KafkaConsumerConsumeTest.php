@@ -31,6 +31,7 @@ final class KafkaConsumerConsumeTest extends TestCase
     public function testConsumeReturnsMessageForNoError(): void
     {
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->expects($this->once())->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
             'topic_name' => 'test-topic',
@@ -58,6 +59,7 @@ final class KafkaConsumerConsumeTest extends TestCase
     public function testConsumeReturnsPartitionEof(): void
     {
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,
             'topic_name' => 'test-topic',
@@ -80,6 +82,7 @@ final class KafkaConsumerConsumeTest extends TestCase
     public function testConsumeReturnsTimeout(): void
     {
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
             'partition' => 0,
@@ -101,6 +104,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         // Теперь обрабатывается как таймаут, позволяя циклу потребления продолжаться
         // и давая librdkafka прокачивать rebalance-протокол (JoinGroup/SyncGroup).
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->expects($this->once())->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
             'partition' => -1,
@@ -139,6 +143,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]);
 
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')
             ->willReturnOnConsecutiveCalls($allBrokersDownMessage, $recoveredMessage)
         ;
@@ -160,6 +165,7 @@ final class KafkaConsumerConsumeTest extends TestCase
     public function testConsumeThrowsOnUnknownErrCode(): void
     {
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__BAD_MSG,
         ]));
@@ -180,6 +186,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         $logger = new InMemoryLogger();
 
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')
             ->willThrowException(new RdKafkaException('transport failure'))
         ;
