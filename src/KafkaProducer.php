@@ -122,39 +122,57 @@ final class KafkaProducer
      * Метод гарантирует, что все накопленные в очереди сообщения отправлены в Kafka.
      * Рекомендуется вызывать перед завершением работы приложения.
      *
-     * @param int $timeoutMs Таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
+     * Отдельный вызов RdKafka\Producer::flush() может вернуть таймаут
+     * транзитно (например, пока устанавливается соединение), поэтому до
+     * истечения суммарного дедлайна $timeoutMs вызов повторяется с остатком
+     * бюджета; исключение бросается только после исчерпания дедлайна.
      *
-     * @throws KafkaConnectionException Если истёк таймаут ожидания
+     * @param int $timeoutMs Суммарный таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
+     *
+     * @throws KafkaConnectionException Если истёк суммарный таймаут ожидания
      * @throws KafkaProducerException   Если произошла ошибка при отправке
      */
     public function flush(int $timeoutMs = self::DEFAULT_FLUSH_TIMEOUT_MS): void
     {
-        $result = $this->producer->flush($timeoutMs);
+        $startedAtNs = hrtime(true);
+        $attempts = 0;
 
-        if ($result === \RD_KAFKA_RESP_ERR_NO_ERROR) {
-            $this->logger->info('Producer flushed successfully', [
-                'timeout_ms' => $timeoutMs,
-            ]);
+        do {
+            $remainingMs = max(0, $timeoutMs - self::elapsedMs($startedAtNs));
+            ++$attempts;
 
-            return;
-        }
+            $result = $this->producer->flush($remainingMs);
 
-        if ($result === \RD_KAFKA_RESP_ERR__TIMED_OUT) {
-            $this->logger->warning('Flush timed out', [
-                'timeout_ms' => $timeoutMs,
-                'error_code' => $result,
-            ]);
+            if ($result === \RD_KAFKA_RESP_ERR_NO_ERROR) {
+                $this->logger->info('Producer flushed successfully', [
+                    'timeout_ms' => $timeoutMs,
+                    'attempts' => $attempts,
+                ]);
 
-            throw KafkaConnectionException::flushTimeout($timeoutMs);
-        }
+                return;
+            }
 
-        $this->logger->error('Flush failed', [
+            if ($result !== \RD_KAFKA_RESP_ERR__TIMED_OUT) {
+                $this->logger->error('Flush failed', [
+                    'timeout_ms' => $timeoutMs,
+                    'attempts' => $attempts,
+                    'error_code' => $result,
+                    'error' => rd_kafka_err2str($result),
+                    'out_queue_len' => $this->producer->getOutQLen(),
+                ]);
+
+                throw KafkaProducerException::flushFailed($result);
+            }
+        } while (self::elapsedMs($startedAtNs) < $timeoutMs);
+
+        $this->logger->warning('Flush timed out', [
             'timeout_ms' => $timeoutMs,
+            'attempts' => $attempts,
             'error_code' => $result,
-            'error' => rd_kafka_err2str($result),
+            'out_queue_len' => $this->producer->getOutQLen(),
         ]);
 
-        throw KafkaProducerException::flushFailed($result);
+        throw KafkaConnectionException::flushTimeout($timeoutMs);
     }
 
     /**
@@ -200,5 +218,13 @@ final class KafkaProducer
         }
 
         return $this->topics[$name];
+    }
+
+    /**
+     * Вычисляет прошедшее время в миллисекундах от отметки hrtime().
+     */
+    private static function elapsedMs(int $startedAtNs): int
+    {
+        return intdiv(hrtime(true) - $startedAtNs, 1_000_000);
     }
 }

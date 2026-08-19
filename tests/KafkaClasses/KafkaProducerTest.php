@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
+use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaProducer;
@@ -146,6 +147,96 @@ final class KafkaProducerTest extends TestCase
         $errorRecords = $logger->findByMessage('Failed to produce message');
         self::assertCount(1, $errorRecords);
         self::assertSame('local queue full', $errorRecords[0]['context']['error']);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testFlushSucceedsOnFirstCallWithoutRetries(): void
+    {
+        $producer = $this->createMock(Producer::class);
+        $producer->expects($this->once())->method('flush')->willReturn(\RD_KAFKA_RESP_ERR_NO_ERROR);
+
+        $logger = new InMemoryLogger();
+
+        $this->buildProducer($producer, logger: $logger)->flush(1000);
+
+        $infoRecords = $logger->findByMessage('Producer flushed successfully');
+        self::assertCount(1, $infoRecords);
+        self::assertSame(1, $infoRecords[0]['context']['attempts']);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testFlushRetriesTransientTimeoutUntilSuccess(): void
+    {
+        // Один вызов RdKafka\Producer::flush() может вернуть TIMED_OUT
+        // транзитно (установка соединения): до истечения суммарного дедлайна
+        // вызов повторяется, исключение — только после исчерпания бюджета.
+        $producer = $this->createMock(Producer::class);
+        $producer->expects($this->exactly(3))->method('flush')->willReturnOnConsecutiveCalls(
+            \RD_KAFKA_RESP_ERR__TIMED_OUT,
+            \RD_KAFKA_RESP_ERR__TIMED_OUT,
+            \RD_KAFKA_RESP_ERR_NO_ERROR,
+        );
+
+        $logger = new InMemoryLogger();
+
+        $this->buildProducer($producer, logger: $logger)->flush(10_000);
+
+        $infoRecords = $logger->findByMessage('Producer flushed successfully');
+        self::assertCount(1, $infoRecords);
+        self::assertSame(3, $infoRecords[0]['context']['attempts']);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testFlushThrowsAfterTotalDeadlineExhausted(): void
+    {
+        // Мгновенные TIMED_OUT от мока крутят retry-цикл ровно до дедлайна —
+        // раньше единственный таймаут сразу превращался в исключение.
+        $producer = $this->createMock(Producer::class);
+        $producer->method('flush')->willReturn(\RD_KAFKA_RESP_ERR__TIMED_OUT);
+        $producer->method('getOutQLen')->willReturn(7);
+
+        $logger = new InMemoryLogger();
+
+        try {
+            $this->buildProducer($producer, logger: $logger)->flush(25);
+            self::fail('Expected KafkaConnectionException');
+        } catch (KafkaConnectionException $e) {
+            self::assertSame('Flush timed out in 25ms', $e->getMessage());
+        }
+
+        $warnings = $logger->findByMessage('Flush timed out');
+        self::assertCount(1, $warnings);
+        self::assertSame('warning', $warnings[0]['level']);
+        self::assertSame(25, $warnings[0]['context']['timeout_ms']);
+        self::assertSame(\RD_KAFKA_RESP_ERR__TIMED_OUT, $warnings[0]['context']['error_code']);
+        self::assertSame(7, $warnings[0]['context']['out_queue_len']);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testFlushThrowsImmediatelyOnHardError(): void
+    {
+        // Ошибка, отличная от таймаута, не ретраится.
+        $producer = $this->createMock(Producer::class);
+        $producer->expects($this->once())->method('flush')->willReturn(\RD_KAFKA_RESP_ERR__INVALID_ARG);
+        $producer->method('getOutQLen')->willReturn(2);
+
+        $logger = new InMemoryLogger();
+
+        try {
+            $this->buildProducer($producer, logger: $logger)->flush(1000);
+            self::fail('Expected KafkaProducerException');
+        } catch (KafkaProducerException $e) {
+            self::assertSame(\sprintf(
+                'Flush failed: %s (%d)',
+                rd_kafka_err2str(\RD_KAFKA_RESP_ERR__INVALID_ARG),
+                \RD_KAFKA_RESP_ERR__INVALID_ARG,
+            ), $e->getMessage());
+        }
+
+        $errorRecords = $logger->findByMessage('Flush failed');
+        self::assertCount(1, $errorRecords);
+        self::assertSame(1, $errorRecords[0]['context']['attempts']);
+        self::assertSame(2, $errorRecords[0]['context']['out_queue_len']);
     }
 
     private static function message(): KafkaProducerMessage

@@ -5,6 +5,18 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 и этот проект следует [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [Unreleased]
+
+### Changed
+
+- **BC:** `KafkaProducer::flush()` переписан как retry-цикл с суммарным
+  дедлайном `$timeoutMs`: транзитный `RD_KAFKA_RESP_ERR__TIMED_OUT` от
+  отдельного вызова `RdKafka\Producer::flush()` больше не превращается сразу
+  в `KafkaConnectionException` — вызов повторяется с остатком бюджета и
+  бросает исключение только после исчерпания дедлайна. Ошибки, отличные от
+  таймаута, по-прежнему фейлят сразу. В контексты логов добавлены
+  `out_queue_len` (остаток очереди) и `attempts`.
+
 ## [0.8.0] - 2026-08-19
 
 ### Changed
