@@ -7,6 +7,7 @@ namespace Anktx\Kafka\Client\Tests\Log;
 use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 use RdKafka\Conf;
@@ -42,8 +43,9 @@ final class RdKafkaCallbacksTest extends TestCase
         self::assertSame(['facility' => 'PRODUCE'], $logger->records[0]['context']);
     }
 
+    #[DataProvider('provideAttachErrorCallbackLogsConnectionErrorsCases')]
     #[AllowMockObjectsWithoutExpectations]
-    public function testAttachErrorCallbackLogsConnectionErrors(): void
+    public function testAttachErrorCallbackLogsConnectionErrors(int $err): void
     {
         $logger = new InMemoryLogger();
         $onBrokerError = $this->captureCallback(
@@ -52,16 +54,30 @@ final class RdKafkaCallbacksTest extends TestCase
             static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachErrorCallback($conf),
         );
 
-        $onBrokerError($this->createMock(KafkaConsumer::class), \RD_KAFKA_RESP_ERR__TRANSPORT, 'connection refused');
+        $onBrokerError($this->createMock(KafkaConsumer::class), $err, 'connection refused');
 
         $records = $logger->findByMessage('Kafka broker connection error');
         self::assertCount(1, $records);
         self::assertSame(LogLevel::WARNING, $records[0]['level']);
-        self::assertSame(\RD_KAFKA_RESP_ERR__TRANSPORT, $records[0]['context']['error_code']);
+        self::assertSame($err, $records[0]['context']['error_code']);
         self::assertSame('connection refused', $records[0]['context']['reason']);
         // Ровно одна запись: удаление return из ветки уронило бы код в общий
         // warning 'Kafka client error' — задвоение записей ловится здесь.
         self::assertCount(1, $logger->records);
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function provideAttachErrorCallbackLogsConnectionErrorsCases(): iterable
+    {
+        // Все коды из RdKafkaCallbacks::CONNECTION_ERROR_CODES: потеря
+        // соединения проявляется любым из них, ветка — одна на все три.
+        yield 'all brokers down' => [\RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN];
+
+        yield 'transport' => [\RD_KAFKA_RESP_ERR__TRANSPORT];
+
+        yield 'resolve' => [\RD_KAFKA_RESP_ERR__RESOLVE];
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -157,7 +173,7 @@ final class RdKafkaCallbacksTest extends TestCase
         self::assertSame('test-topic', $records[0]['context']['topic']);
         self::assertSame(1, $records[0]['context']['partition']);
         self::assertSame(\RD_KAFKA_RESP_ERR__MSG_TIMED_OUT, $records[0]['context']['error_code']);
-        self::assertNotSame('', $records[0]['context']['error']);
+        self::assertNotSame('', $records[0]['context']['reason']);
     }
 
     /**

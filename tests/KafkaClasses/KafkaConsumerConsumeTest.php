@@ -225,7 +225,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         $errorRecords = $logger->findByMessage('Consume failed with unrecognized error');
         self::assertCount(1, $errorRecords);
         self::assertSame(\RD_KAFKA_RESP_ERR__BAD_MSG, $errorRecords[0]['context']['error_code']);
-        self::assertStringContainsString('Bad message format', $errorRecords[0]['context']['error']);
+        self::assertStringContainsString('Bad message format', $errorRecords[0]['context']['reason']);
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -236,7 +236,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')
-            ->willThrowException(new Exception('transport failure'))
+            ->willThrowException($failure = new Exception('transport failure'))
         ;
 
         $consumer = $this->buildConsumer($rdKafka, logger: $logger);
@@ -252,7 +252,8 @@ final class KafkaConsumerConsumeTest extends TestCase
         $errorRecords = $logger->findByMessage('Failed to consume message');
         self::assertCount(1, $errorRecords);
         self::assertSame(100, $errorRecords[0]['context']['timeout_ms']);
-        self::assertSame('transport failure', $errorRecords[0]['context']['error']);
+        self::assertSame('transport failure', $errorRecords[0]['context']['reason']);
+        self::assertSame($failure, $errorRecords[0]['context']['exception']);
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -272,7 +273,7 @@ final class KafkaConsumerConsumeTest extends TestCase
 
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')
-            ->willThrowException(new Exception('subscription state unavailable'))
+            ->willThrowException($failure = new Exception('subscription state unavailable'))
         ;
 
         $consumer = $this->buildConsumer($rdKafka, logger: $logger);
@@ -286,7 +287,8 @@ final class KafkaConsumerConsumeTest extends TestCase
 
         $errorRecords = $logger->findByMessage('Failed to get subscription state');
         self::assertCount(1, $errorRecords);
-        self::assertSame('subscription state unavailable', $errorRecords[0]['context']['error']);
+        self::assertSame('subscription state unavailable', $errorRecords[0]['context']['reason']);
+        self::assertSame($failure, $errorRecords[0]['context']['exception']);
     }
 
     public function testCommitCommitsNextOffset(): void
@@ -320,7 +322,7 @@ final class KafkaConsumerConsumeTest extends TestCase
 
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('commit')
-            ->willThrowException(new Exception('commit failed'))
+            ->willThrowException($failure = new Exception('commit failed'))
         ;
 
         $consumer = $this->buildConsumer($rdKafka, logger: $logger);
@@ -342,7 +344,8 @@ final class KafkaConsumerConsumeTest extends TestCase
         self::assertSame('test-topic', $errorRecords[0]['context']['topic']);
         self::assertSame(3, $errorRecords[0]['context']['partition']);
         self::assertSame(42, $errorRecords[0]['context']['offset']);
-        self::assertSame('commit failed', $errorRecords[0]['context']['error']);
+        self::assertSame('commit failed', $errorRecords[0]['context']['reason']);
+        self::assertSame($failure, $errorRecords[0]['context']['exception']);
     }
 
     /**

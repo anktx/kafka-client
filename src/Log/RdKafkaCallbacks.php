@@ -147,7 +147,7 @@ final readonly class RdKafkaCallbacks
             'topic' => $message->topic_name,
             'partition' => $message->partition,
             'error_code' => $message->err,
-            'error' => $message->errstr(),
+            'reason' => $message->errstr(),
         ]);
     }
 }

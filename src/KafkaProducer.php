@@ -63,7 +63,8 @@ final class KafkaProducer
         } catch (Exception $e) {
             $this->logger->error('Failed to create RdKafka producer', [
                 'brokers' => $config->brokers,
-                'error' => $e->getMessage(),
+                'reason' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             throw KafkaProducerException::fromKafkaException($e);
@@ -105,12 +106,15 @@ final class KafkaProducer
                 timestamp_ms: $message->timestampMs,
             );
         } catch (Exception $e) {
+            // getCode() у RdKafka\Exception — не RD_KAFKA_RESP_ERR_*-код,
+            // поэтому error_code здесь не логируется: исключение целиком
+            // передаётся в PSR-3 context['exception'].
             $this->logger->error('Failed to produce message', [
                 'topic' => $message->topic,
                 'partition' => $message->partition,
                 'key' => $message->key,
-                'error' => $e->getMessage(),
-                'error_code' => $e->getCode(),
+                'reason' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             throw KafkaProducerException::fromKafkaException($e);
@@ -145,7 +149,7 @@ final class KafkaProducer
             $result = $this->producer->flush($remainingMs);
 
             if ($result === \RD_KAFKA_RESP_ERR_NO_ERROR) {
-                $this->logger->info('Producer flushed successfully', [
+                $this->logger->debug('Producer flushed successfully', [
                     'timeout_ms' => $timeoutMs,
                     'attempts' => $attempts,
                 ]);
@@ -158,7 +162,7 @@ final class KafkaProducer
                     'timeout_ms' => $timeoutMs,
                     'attempts' => $attempts,
                     'error_code' => $result,
-                    'error' => rd_kafka_err2str($result),
+                    'reason' => rd_kafka_err2str($result),
                     'out_queue_len' => $this->producer->getOutQLen(),
                 ]);
 

@@ -130,7 +130,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
 
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('subscribe')
-            ->willThrowException(new Exception('broker down'))
+            ->willThrowException($failure = new Exception('broker down'))
         ;
         $rdKafka->expects($this->never())->method('assign');
 
@@ -148,7 +148,8 @@ final class KafkaConsumerSubscribeTest extends TestCase
         $errorRecords = $logger->findByMessage('Failed to subscribe to topics');
         self::assertCount(1, $errorRecords);
         self::assertSame(['test-topic', 'notifications'], $errorRecords[0]['context']['topics']);
-        self::assertSame('broker down', $errorRecords[0]['context']['error']);
+        self::assertSame('broker down', $errorRecords[0]['context']['reason']);
+        self::assertSame($failure, $errorRecords[0]['context']['exception']);
     }
 
     public function testSubscribeWithEmptyListThrowsBeforeAnyConsumerCallAndLogsNothing(): void

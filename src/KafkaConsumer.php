@@ -64,7 +64,8 @@ final class KafkaConsumer
             $this->logger->error('Failed to create RdKafka consumer', [
                 'brokers' => $config->brokers,
                 'group_id' => $config->groupId,
-                'error' => $e->getMessage(),
+                'reason' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             throw KafkaConsumerException::fromKafkaException($e);
@@ -113,7 +114,8 @@ final class KafkaConsumer
         } catch (Exception $e) {
             $this->logger->error('Failed to subscribe to topics', [
                 'topics' => $subscriptionList->topicNames(),
-                'error' => $e->getMessage(),
+                'reason' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             throw KafkaConsumerException::fromKafkaException($e);
@@ -139,7 +141,8 @@ final class KafkaConsumer
             $this->consumer->unsubscribe();
         } catch (Exception $e) {
             $this->logger->error('Failed to unsubscribe', [
-                'error' => $e->getMessage(),
+                'reason' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             throw KafkaConsumerException::fromKafkaException($e);
@@ -180,7 +183,8 @@ final class KafkaConsumer
             $subscription = $this->consumer->getSubscription();
         } catch (Exception $e) {
             $this->logger->error('Failed to get subscription state', [
-                'error' => $e->getMessage(),
+                'reason' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             throw KafkaConsumerException::fromKafkaException($e);
@@ -197,7 +201,8 @@ final class KafkaConsumer
         } catch (Exception $e) {
             $this->logger->error('Failed to consume message', [
                 'timeout_ms' => $timeoutMs,
-                'error' => $e->getMessage(),
+                'reason' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             throw KafkaConsumerException::fromKafkaException($e);
@@ -283,7 +288,8 @@ final class KafkaConsumer
                 'topic' => $message->topic,
                 'partition' => $message->partition,
                 'offset' => $message->offset,
-                'error' => $e->getMessage(),
+                'reason' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             throw KafkaConsumerException::fromKafkaException($e);
@@ -313,7 +319,8 @@ final class KafkaConsumer
             $this->consumer->close();
         } catch (Exception $e) {
             $this->logger->error('Failed to close KafkaConsumer', [
-                'error' => $e->getMessage(),
+                'reason' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             throw KafkaConsumerException::fromKafkaException($e);
@@ -333,7 +340,7 @@ final class KafkaConsumer
     {
         $this->logger->error('Consume failed with unrecognized error', [
             'error_code' => $message->err,
-            'error' => $message->errstr(),
+            'reason' => $message->errstr(),
         ]);
 
         throw KafkaConsumerException::create($message->errstr(), $message->err);

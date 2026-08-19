@@ -46,7 +46,7 @@ final class KafkaConsumerCloseTest extends TestCase
         $logger = new InMemoryLogger();
 
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
-        $rdKafka->method('close')->willThrowException(new Exception('close failed'));
+        $rdKafka->method('close')->willThrowException($failure = new Exception('close failed'));
 
         try {
             $this->buildConsumer($rdKafka, $logger)->close();
@@ -57,7 +57,8 @@ final class KafkaConsumerCloseTest extends TestCase
 
         $errorRecords = $logger->findByMessage('Failed to close KafkaConsumer');
         self::assertCount(1, $errorRecords);
-        self::assertSame('close failed', $errorRecords[0]['context']['error']);
+        self::assertSame('close failed', $errorRecords[0]['context']['reason']);
+        self::assertSame($failure, $errorRecords[0]['context']['exception']);
     }
 
     #[AllowMockObjectsWithoutExpectations]

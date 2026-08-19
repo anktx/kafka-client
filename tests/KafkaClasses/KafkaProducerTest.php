@@ -104,7 +104,7 @@ final class KafkaProducerTest extends TestCase
         $logger = new InMemoryLogger();
 
         $producer = $this->createMock(Producer::class);
-        $producer->method('newTopic')->willThrowException(new Exception('invalid topic name'));
+        $producer->method('newTopic')->willThrowException($failure = new Exception('invalid topic name'));
 
         $kafkaProducer = $this->buildProducer($producer, logger: $logger);
 
@@ -120,8 +120,11 @@ final class KafkaProducerTest extends TestCase
         self::assertSame('test-topic', $errorRecords[0]['context']['topic']);
         self::assertSame(\RD_KAFKA_PARTITION_UA, $errorRecords[0]['context']['partition']);
         self::assertNull($errorRecords[0]['context']['key']);
-        self::assertSame('invalid topic name', $errorRecords[0]['context']['error']);
-        self::assertSame(0, $errorRecords[0]['context']['error_code']);
+        self::assertSame('invalid topic name', $errorRecords[0]['context']['reason']);
+        // PSR-3: исключение передаётся целиком через context['exception'];
+        // getCode() у RdKafka\Exception — не resp-err, поэтому error_code нет.
+        self::assertSame($failure, $errorRecords[0]['context']['exception']);
+        self::assertArrayNotHasKey('error_code', $errorRecords[0]['context']);
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -130,7 +133,7 @@ final class KafkaProducerTest extends TestCase
         $logger = new InMemoryLogger();
 
         $topic = $this->createMock(ProducerTopic::class);
-        $topic->method('producev')->willThrowException(new Exception('local queue full'));
+        $topic->method('producev')->willThrowException($failure = new Exception('local queue full'));
 
         $producer = $this->createMock(Producer::class);
         $producer->method('newTopic')->willReturn($topic);
@@ -146,7 +149,8 @@ final class KafkaProducerTest extends TestCase
 
         $errorRecords = $logger->findByMessage('Failed to produce message');
         self::assertCount(1, $errorRecords);
-        self::assertSame('local queue full', $errorRecords[0]['context']['error']);
+        self::assertSame('local queue full', $errorRecords[0]['context']['reason']);
+        self::assertSame($failure, $errorRecords[0]['context']['exception']);
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -159,10 +163,11 @@ final class KafkaProducerTest extends TestCase
 
         $this->buildProducer($producer, logger: $logger)->flush(1000);
 
-        $infoRecords = $logger->findByMessage('Producer flushed successfully');
-        self::assertCount(1, $infoRecords);
-        self::assertSame(1000, $infoRecords[0]['context']['timeout_ms']);
-        self::assertSame(1, $infoRecords[0]['context']['attempts']);
+        $debugRecords = $logger->findByMessage('Producer flushed successfully');
+        self::assertCount(1, $debugRecords);
+        self::assertSame('debug', $debugRecords[0]['level']);
+        self::assertSame(1000, $debugRecords[0]['context']['timeout_ms']);
+        self::assertSame(1, $debugRecords[0]['context']['attempts']);
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -182,9 +187,10 @@ final class KafkaProducerTest extends TestCase
 
         $this->buildProducer($producer, logger: $logger)->flush(10_000);
 
-        $infoRecords = $logger->findByMessage('Producer flushed successfully');
-        self::assertCount(1, $infoRecords);
-        self::assertSame(3, $infoRecords[0]['context']['attempts']);
+        $debugRecords = $logger->findByMessage('Producer flushed successfully');
+        self::assertCount(1, $debugRecords);
+        self::assertSame('debug', $debugRecords[0]['level']);
+        self::assertSame(3, $debugRecords[0]['context']['attempts']);
     }
 
     #[AllowMockObjectsWithoutExpectations]
