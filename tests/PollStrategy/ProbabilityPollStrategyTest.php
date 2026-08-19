@@ -14,13 +14,13 @@ use Random\Randomizer;
  *
  * Стратегия детерминирована через инъекцию {@see Randomizer} с
  * фиксированным движком Xoshiro256StarStar: последовательность значений
- * getInt(0, 9999) воспроизводима, поэтому граничные случаи (строгое <,
- * точный порог probability * PRECISION, p=0/p=1) проверяются без
- * статистических допущений.
+ * getFloat(0, 1, ClosedOpen) воспроизводима, поэтому граничные случаи
+ * (строгий <, порог ровно равен выпавшему значению, p=0/p=1) проверяются
+ * без статистических допущений.
  *
- * Опорные последовательности:
- * - seed 42: 2214, 5630, 2849, 7329, 1476, ...
- * - seed 7:  1610, 130, 9894, 4336, 5032, ...
+ * Опорные последовательности getFloat(0, 1, ClosedOpen):
+ * - seed 42: 0.24864, 0.84845, 0.27109, 0.22885, ...
+ * - seed 7:  0.21936, 0.11748, 0.44296, 0.71186, ...
  */
 final class ProbabilityPollStrategyTest extends TestCase
 {
@@ -47,7 +47,7 @@ final class ProbabilityPollStrategyTest extends TestCase
 
     public function testShouldPollUsesInjectedRandomizer(): void
     {
-        // seed 42: 2214 < 5000 → true; 5630 ≥ 5000 → false; 2849 < 5000 → true; 7329 ≥ 5000 → false.
+        // seed 42: 0.24864 < 0.5 → true; 0.84845 ≥ 0.5 → false; 0.27109 < 0.5 → true; 0.22885 < 0.5 → true.
         $strategy = new ProbabilityPollStrategy(
             probability: 0.5,
             randomizer: new Randomizer(new Xoshiro256StarStar(42)),
@@ -56,22 +56,22 @@ final class ProbabilityPollStrategyTest extends TestCase
         self::assertTrue($strategy->shouldPoll());
         self::assertFalse($strategy->shouldPoll());
         self::assertTrue($strategy->shouldPoll());
-        self::assertFalse($strategy->shouldPoll());
+        self::assertTrue($strategy->shouldPoll());
     }
 
     public function testShouldPollUsesStrictLessThan(): void
     {
-        // p = 0.2849 задаёт порог ровно 2849 (0.2849 * 10000 === 2849.0).
-        // Третье значение последовательности seed 42 равно 2849: строгий <
-        // даёт false, нестрогий <= дал бы true.
+        // Порог задан ровно равным первому выпавшему значению последовательности
+        // seed 42 (0.24864...): строгий < даёт false, нестрогий <= дал бы true.
         $strategy = new ProbabilityPollStrategy(
-            probability: 0.2849,
+            probability: 0.24863526936112834,
             randomizer: new Randomizer(new Xoshiro256StarStar(42)),
         );
 
+        self::assertFalse($strategy->shouldPoll());
+        self::assertFalse($strategy->shouldPoll());
+        self::assertFalse($strategy->shouldPoll());
         self::assertTrue($strategy->shouldPoll());
-        self::assertFalse($strategy->shouldPoll());
-        self::assertFalse($strategy->shouldPoll());
     }
 
     public function testShouldPollWithZeroProbabilityAlwaysFalse(): void
@@ -100,9 +100,10 @@ final class ProbabilityPollStrategyTest extends TestCase
 
     public function testShouldPollNearZeroBoundaries(): void
     {
-        // seed 7: порог 1610 — первое значение 1610 (false), второе 130 (true), третье 9894 (false).
+        // seed 7, порог 0.12: первое значение 0.21936 (false), второе 0.11748 (true),
+        // третье 0.44296 (false) — проверка значений вплотную к порогу.
         $strategy = new ProbabilityPollStrategy(
-            probability: 0.161,
+            probability: 0.12,
             randomizer: new Randomizer(new Xoshiro256StarStar(7)),
         );
 
