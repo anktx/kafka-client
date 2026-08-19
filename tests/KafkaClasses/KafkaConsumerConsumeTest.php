@@ -287,6 +287,7 @@ final class KafkaConsumerConsumeTest extends TestCase
     {
         $message = new Message();
         foreach ($values as $name => $value) {
+            // @phpstan-ignore property.dynamicName
             $message->{$name} = $value;
         }
 

@@ -36,8 +36,9 @@
     "analyse:baseline": "phpstan analyse --memory-limit=512M --generate-baseline",
     "cs-fix": "php-cs-fixer fix -v --diff --show-progress=dots",
     "cs-check": "php-cs-fixer fix -v --diff --show-progress=dots --dry-run",
-    "tests": "phpunit tests",
-    "coverage": "phpunit --coverage-text",
+    "tests": "phpunit --testsuite=Unit",
+    "tests-integration": "phpunit --testsuite=Integration",
+    "coverage": "phpunit --testsuite=Unit --coverage-text",
     "infection": "infection --show-mutations",
     "qa": [
       "@cs-check",

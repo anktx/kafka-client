@@ -124,6 +124,10 @@ $producer = new KafkaProducer(
 - `TimeoutPollStrategy` — вызывать `poll()` каждые N секунд
 - `ProbabilityPollStrategy` — вызывать `poll()` с вероятностью N (например, 10% вызовов)
 
+Ошибки доставки сообщений (delivery reports) продюсер логирует через PSR-3
+на уровне error. Отчёты доставляются callback'ам только при вызове `poll()`:
+со стратегиями опроса — в фоне, с `NeverPollStrategy` — только в момент `flush()`.
+
 ## Конфигурация
 
 ### ProducerConfig
@@ -149,9 +153,16 @@ $config = new ConsumerConfig(
     offsetReset: OffsetReset,           // По умолчанию: earliest
     autoCommitMs: ?int,                 // По умолчанию: null (ручной коммит)
     sessionTimeoutMs: ?int,             // По умолчанию: null
+    reconnectBackoffMs: ?int,           // По умолчанию: null
+    reconnectBackoffMaxMs: ?int,        // По умолчанию: null
+    socketKeepaliveEnable: bool,        // По умолчанию: true
     isDebug: bool,                      // По умолчанию: false
 );
 ```
+
+Невалидные значения (пустые `brokers`/`groupId`, отрицательные интервалы,
+`reconnectBackoffMaxMs < reconnectBackoffMs`) отбрасываются в конструкторе
+исключением `InvalidConfigException`.
 
 ### Логирование
 
@@ -230,12 +241,15 @@ src/
 
 ```
 Exception
-├── KafkaException                    # Ошибки Kafka
+├── KafkaException                    # Ошибки Kafka (наследует RdKafka\Exception)
 │   ├── KafkaConnectionException      # Потеряно соединение
 │   ├── KafkaConsumerException        # Ошибка консьюмера
-│   └── KafkaProducerException        # Ошибка продюсера
+│   ├── KafkaProducerException        # Ошибка продюсера
+│   ├── KafkaUnavailableException     # Kafka недоступен дольше порога
+│   └── InvalidConfigException        # Невалидная конфигурация
 ├── LogicException                    # Логические ошибки
-│   └── NotSubscribedException        # Не подписан на топики
+│   ├── NotSubscribedException        # Не подписан на топики
+│   └── InvalidMessageException       # Сообщение без offset и т.п.
 └── BusinessException                 # Бизнес-логика
     ├── EmptySubscriptionsException   # Пустой список подписок
     └── TopicHasNoPartitionException  # Топик не имеет партиций
