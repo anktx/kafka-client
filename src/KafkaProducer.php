@@ -14,6 +14,7 @@ use Anktx\Kafka\Client\PollStrategy\PollStrategy;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RdKafka\Exception;
+use RdKafka\Message;
 use RdKafka\Producer;
 use RdKafka\ProducerTopic;
 
@@ -59,6 +60,7 @@ final class KafkaProducer
 
         $conf->setLogCb($this->onLog(...));
         $conf->setErrorCb($this->onBrokerError(...));
+        $conf->setDrMsgCb($this->onDeliveryReport(...));
 
         $this->producer = new Producer($conf);
 
@@ -168,6 +170,39 @@ final class KafkaProducer
         }
 
         return $this->topics[$name];
+    }
+
+    /**
+     * Delivery-report callback librdkafka: сообщает итог доставки каждого
+     * отправленного сообщения.
+     *
+     * Выполняется синхронно в C-коде ext-rdkafka при poll()/flush(), поэтому
+     * бросать исключения отсюда нельзя — ошибка доставки только логируется.
+     * Отчёты доезжают до этого callback'а только когда кто-то вызывает poll():
+     * PollStrategy с опросом ({@see TimeoutPollStrategy}) доставляет отчёты
+     * в фоне, NeverPollStrategy — только в момент {@see flush()}.
+     *
+     * @param Producer $producer Продюсер (не используется)
+     * @param Message  $message  Отчёт о доставке сообщения
+     */
+    private function onDeliveryReport(Producer $producer, Message $message): void
+    {
+        if ($message->err === \RD_KAFKA_RESP_ERR_NO_ERROR) {
+            $this->logger->debug('Message delivered', [
+                'topic' => $message->topic_name,
+                'partition' => $message->partition,
+                'offset' => $message->offset,
+            ]);
+
+            return;
+        }
+
+        $this->logger->error('Message delivery failed', [
+            'topic' => $message->topic_name,
+            'partition' => $message->partition,
+            'error_code' => $message->err,
+            'error' => $message->errstr(),
+        ]);
     }
 
     /**
