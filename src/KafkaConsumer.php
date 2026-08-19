@@ -11,6 +11,7 @@ use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
+use Anktx\Kafka\Client\Log\LibrdkafkaLogLevel;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -300,7 +301,8 @@ final readonly class KafkaConsumer
     }
 
     /**
-     * Log-callback librdkafka: перенаправляет внутренние сообщения библиотеки в PSR-3 лог.
+     * Log-callback librdkafka: перенаправляет внутренние сообщения библиотеки
+     * в PSR-3 лог, преобразуя syslog severity в строковый уровень PSR-3.
      *
      * @param \RdKafka\KafkaConsumer $consumer Консьюмер (не используется)
      * @param int                    $level    Уровень логирования (syslog severity 0–7)
@@ -309,7 +311,7 @@ final readonly class KafkaConsumer
      */
     private function onLog(\RdKafka\KafkaConsumer $consumer, int $level, string $facility, string $message): void
     {
-        $this->logger->log($level, $message, ['facility' => $facility]);
+        $this->logger->log(LibrdkafkaLogLevel::toPsrLevel($level), $message, ['facility' => $facility]);
     }
 
     /**

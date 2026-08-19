@@ -14,6 +14,7 @@ use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LogLevel;
 use RdKafka\Exception as RdKafkaException;
 use RdKafka\KafkaConsumer as RdKafkaConsumer;
 use RdKafka\Message as RdKafkaMessage;
@@ -259,7 +260,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         );
 
         self::assertCount(1, $logger->records);
-        self::assertSame(3, $logger->records[0]['level']);
+        self::assertSame(LogLevel::ERROR, $logger->records[0]['level']);
         self::assertSame('message fetched', $logger->records[0]['message']);
         self::assertSame(['facility' => 'FETCH'], $logger->records[0]['context']);
     }
