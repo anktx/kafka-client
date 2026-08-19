@@ -169,11 +169,19 @@ final class KafkaConsumerSubscribeTest extends TestCase
     }
 
     #[AllowMockObjectsWithoutExpectations]
-    public function testConsumeBeforeSubscribeThrowsNotSubscribed(): void
+    public function testConsumeBeforeSubscribeThrowsNotSubscribedAndLogsWarning(): void
     {
-        $this->expectException(NotSubscribedException::class);
+        $logger = new InMemoryLogger();
 
-        $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class))->consume(100);
+        try {
+            $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class), $logger)->consume(100);
+            self::fail('Expected NotSubscribedException');
+        } catch (NotSubscribedException) {
+        }
+
+        $warnings = $logger->findByMessage('Attempted to consume without subscription');
+        self::assertCount(1, $warnings);
+        self::assertSame('warning', $warnings[0]['level']);
     }
 
     /**

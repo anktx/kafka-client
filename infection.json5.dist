@@ -1,0 +1,58 @@
+{
+    // Все мутаторы профиля @default включены, включая MethodCallRemoval:
+    // удаление любого statement-вызова (producev()/commit()/attach*()/логи)
+    // обязано детектиться тестами. global-ignoreSourceCodeByRegex ниже —
+    // единственные точечные исключения, каждое с обоснованием: мутант
+    // принципиально не убивается юнит-тестами (нет наблюдаемого эффекта
+    // без живого RdKafka-объекта или реального времени).
+    "$schema": "https://raw.githubusercontent.com/infection/infection/0.35.1/resources/schema.json",
+    "source": {
+        "directories": [
+            "src"
+        ]
+    },
+    "logs": {
+        "text": ".infection/log.txt",
+        "summary": ".infection/summary.log",
+        "debug": ".infection/debug.log",
+        "perMutator": ".infection/per-mutator.md"
+    },
+    "mutators": {
+        "@default": true,
+        "global-ignoreSourceCodeByRegex": [
+            // KafkaProducer::flush(): тайминговые мутанты границ бюджета
+            // retry-цикла (пересчёт ns->ms, clamp остатка, условие выхода) —
+            // убиваются только ассертами реального времени, т.е. flaky-тестами.
+            "\\$remainingMs = max\\(0, \\$timeoutMs - self::elapsedMs\\(\\$startedAtNs\\)\\);",
+            "\\} while \\(self::elapsedMs\\(\\$startedAtNs\\) < \\$timeoutMs\\);",
+            "return intdiv\\(hrtime\\(true\\) - \\$startedAtNs, 1_000_000\\);",
+
+            // ConsumerConfig: auto.offset.reset — topic-level свойство,
+            // RdKafka\Conf::dump() его не возвращает; значение валидируется
+            // самим set(), но факт вызова через публичный API не наблюдаем.
+            "\\$conf->set\\('auto\\.offset\\.reset', \\$this->offsetReset->value\\);",
+
+            // ConsumerConfig: 'true' совпадает с дефолтом librdkafka — удаление
+            // set() неотличимо в dump(). Инверсия ветки ('false') наблюдаема
+            // и покрыта тестом; парный set() auto.commit.interval.ms — тоже.
+            "\\$conf->set\\('enable\\.auto\\.commit', 'true'\\);",
+
+            // Конструкторы KafkaConsumer/KafkaProducer: Conf создаётся внутри
+            // asKafkaConfig(), перехватить set*Cb() можно только на реальном
+            // RdKafka-объекте (сетевые потоки => flaky). Сами attach*-
+            // реализации (setLogCb/setErrorCb/setDrMsgCb) мутационно
+            // проверены в RdKafkaCallbacksTest.
+            "\\$callbacks->attachLogCallback\\(\\$conf\\);",
+            "\\$callbacks->attachErrorCallback\\(\\$conf\\);",
+            "\\$callbacks->attachDeliveryReportCallback\\(\\$conf\\);"
+        ]
+    },
+    "testFramework": "phpunit",
+    "testFrameworkOptions": "--testsuite=Unit",
+    "phpUnit": {
+        "configDir": "."
+    },
+    "threads": 10,
+    "minMsi": 100,
+    "minCoveredMsi": 100
+}

@@ -104,9 +104,16 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
 2. **Мутационное тестирование** (Infection, 10 threads) имеет пороги:
    - MSI (Mutation Score Indicator): 100%
    - Covered MSI: 100%
-   - Граничные тайминговые мутанты `KafkaProducer::flush()` (точность
-     пересчёта наносекунд в миллисекунды, границы бюджета retry-цикла)
-     игнорируются через `global-ignoreSourceCodeByRegex` в `infection.json.dist`
+   - Все мутаторы профиля `@default` включены, включая `MethodCallRemoval`
+     (раньше отключался глобально — удаление `producev()`/`commit()`/`attach*()`
+     нигде не детектилось, что противоречило заявленным 100%)
+   - Точечные исключения `global-ignoreSourceCodeByRegex` в
+     `infection.json5.dist`, каждое с обоснованием в комментарии:
+     тайминговые границы `KafkaProducer::flush()`, ненаблюдаемые через
+     публичный API ext-rdkafka `Conf::set()` в `ConsumerConfig`
+     (`auto.offset.reset`, `enable.auto.commit='true'` — совпадает с
+     дефолтом librdkafka), wiring `attach*()` в конструкторах клиентов
+     (`Conf` создаётся внутри, перехват `set*Cb()` требует живого брокера)
    - Для ослабленных проверок используйте `make infection-relaxed`
 
 3. **Static Analysis** (PHPStan level 8 + strict-rules) требует 512MB памяти.
@@ -164,7 +171,8 @@ make clean               # Очистка сгенерированных фай�
 - **PHPUnit**: `phpunit.dist.xml` — сьюты Unit/Integration, strict-режимы
 - **PHP-CS-Fixer**: `.php-cs-fixer.dist.php` — PER preset с risky rules и custom настройками
 - **PHPStan**: `phpstan.neon.dist` — level 8 + strict-rules + deprecation-rules + phpstan-phpunit
-- **Infection**: `infection.json.dist` — MSI 100% / Covered MSI 100%, 10 threads,
-  только testsuite Unit, тайминговые мутанты `flush()` в ignore
+- **Infection**: `infection.json5.dist` — MSI 100% / Covered MSI 100%, 10 threads,
+  только testsuite Unit, все мутаторы `@default` (точечные ignore — с
+  обоснованиями в комментариях внутри конфига)
 - **CI**: `.github/workflows/ci.yml` — QA + Infection + Integration (RedPanda
   через `services:`) на PHP 8.4, concurrency-группа и кэш composer

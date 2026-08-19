@@ -20,7 +20,7 @@ composer tests-integration # integration-тесты (KAFKA_BROKERS, default loca
 composer analyse          # PHPStan (нужен memory_limit 512M)
 composer cs-check         # проверка стиля (dry-run)
 composer cs-fix           # исправление стиля
-composer infection        # мутационное тестирование (threads + пороги в infection.json.dist)
+composer infection        # мутационное тестирование (threads + пороги в infection.json5.dist)
 ```
 
 Docker-аналоги — в `Makefile`: `make qa`, `make test`, `make test-integration`,
@@ -47,9 +47,13 @@ Docker-аналоги — в `Makefile`: `make qa`, `make test`, `make test-inte
   RedPanda-сервис-контейнера (job `integration`), в `composer tests`/`make qa` не входят
 - Тест-двойники RdKafka — моки PHPUnit + reflection-инъекция
   в readonly-свойства (`newInstanceWithoutConstructor()`)
-- Пороги Infection: MSI 100%, Covered MSI 100% (10 threads;
-  граничные тайминговые мутанты `flush()` игнорируются через
-  `global-ignoreSourceCodeByRegex`; ослабленный режим: `make infection-relaxed`)
+- Пороги Infection: MSI 100%, Covered MSI 100% (10 threads); все мутаторы
+  профиля `@default` включены (включая `MethodCallRemoval`). Точечные
+  `global-ignoreSourceCodeByRegex` в `infection.json5.dist` (каждый с
+  обоснованием в комментарии) — только для мутантов, принципиально не
+  убиваемых юнит-тестами: тайминговые границы `flush()`, два
+  ненаблюдаемых `Conf::set()` в `ConsumerConfig`, wiring `attach*()`
+  в конструкторах клиентов. Ослабленный режим: `make infection-relaxed`
 
 ## Подробнее
 

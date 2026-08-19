@@ -167,17 +167,19 @@ final class ConsumerConfigTest extends TestCase
 
     public function testAsKafkaConfigWithAutoCommit(): void
     {
+        // 7000, а не дефолтные librdkafka 5000: иначе удаление set()
+        // auto.commit.interval.ms неотличимо в dump() от значения по умолчанию.
         $config = new ConsumerConfig(
             brokers: 'kafka:9092',
             groupId: 'test-group',
             instanceId: 'test-instance',
-            autoCommitMs: 5000,
+            autoCommitMs: 7000,
         );
 
         $dump = $config->asKafkaConfig()->dump();
 
         self::assertSame('true', $dump['enable.auto.commit']);
-        self::assertSame('5000', $dump['auto.commit.interval.ms']);
+        self::assertSame('7000', $dump['auto.commit.interval.ms']);
     }
 
     public function testAsKafkaConfigWithSessionTimeout(): void
@@ -231,7 +233,7 @@ final class ConsumerConfigTest extends TestCase
             groupId: 'test-group',
             instanceId: 'test-instance',
             offsetReset: OffsetReset::Latest,
-            autoCommitMs: 5000,
+            autoCommitMs: 7000,
             sessionTimeoutMs: 10000,
             isDebug: true,
         );
@@ -242,7 +244,7 @@ final class ConsumerConfigTest extends TestCase
         self::assertSame('test-group', $dump['group.id']);
         self::assertSame('test-instance', $dump['group.instance.id']);
         self::assertSame('true', $dump['enable.auto.commit']);
-        self::assertSame('5000', $dump['auto.commit.interval.ms']);
+        self::assertSame('7000', $dump['auto.commit.interval.ms']);
         self::assertSame('10000', $dump['session.timeout.ms']);
         // librdkafka разворачивает 'all' в полный список флагов
         self::assertStringContainsString('all', $dump['debug']);
