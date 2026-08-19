@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\KafkaMessage;
 
 use Anktx\Kafka\Client\ConsumeResult\ConsumeResult;
-use Anktx\Kafka\Client\ConsumeResult\ConsumeResultKind;
 use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 
 /**
@@ -47,10 +46,5 @@ final readonly class KafkaConsumerMessage implements ConsumeResult
         if ($this->timestampMs !== null && $this->timestampMs < 0) {
             throw InvalidMessageException::nonNegativeInt('timestampMs', $this->timestampMs);
         }
-    }
-
-    public function kind(): ConsumeResultKind
-    {
-        return ConsumeResultKind::Message;
     }
 }

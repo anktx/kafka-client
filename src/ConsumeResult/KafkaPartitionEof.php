@@ -11,9 +11,4 @@ final readonly class KafkaPartitionEof implements ConsumeResult
         public int $partition,
         public int $offset,
     ) {}
-
-    public function kind(): ConsumeResultKind
-    {
-        return ConsumeResultKind::PartitionEof;
-    }
 }

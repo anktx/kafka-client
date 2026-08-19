@@ -59,11 +59,12 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
 6. **ConsumeResult** (`src/ConsumeResult/`)
    - Union-типы для разных результатов потребления
    - Типобезопасная обработка результатов
-   - Маркерный интерфейс `ConsumeResult` с дискриминатором
-     `kind(): ConsumeResultKind` — общий supertype результатов `consume()`
-     для хелперов/логов/метрик (реализован и `KafkaConsumerMessage`);
-     narrowing — по-прежнему `match ($result::class)`/`instanceof`,
-     точный union в сигнатуре `consume()` сохранён
+   - Маркерный интерфейс `ConsumeResult` — общий supertype результатов
+     `consume()` для хелперов/логов/метрик (реализован и `KafkaConsumerMessage`);
+     единственный механизм дискриминации — narrowing через
+     `match ($result::class)`/`instanceof` по точному union в сигнатуре
+     `consume()`; соответствие union ↔ реализаций интерфейса закреплено
+     рефлексионным тестом (список вариантов не дублируется)
 
 ## Ключевые паттерны проектирования
 

@@ -208,10 +208,10 @@ $consumer = new KafkaConsumer($config, logger: $logger);
 ## Типы возвращаемых значений
 
 Метод `consume()` возвращает union type (все варианты реализуют интерфейс
-`ConsumeResult` с дискриминатором `kind(): ConsumeResultKind`):
-- `KafkaConsumerMessage` — успешно полученное сообщение (`ConsumeResultKind::Message`)
-- `KafkaConsumeTimeout` — таймаут (нет новых сообщений) (`ConsumeResultKind::Timeout`)
-- `KafkaPartitionEof` — достигнут конец партиции (`ConsumeResultKind::PartitionEof`)
+`ConsumeResult`):
+- `KafkaConsumerMessage` — успешно полученное сообщение
+- `KafkaConsumeTimeout` — таймаут (нет новых сообщений)
+- `KafkaPartitionEof` — достигнут конец партиции
 
 Пример обработки — `match` по классу даёт исчерпывающую диспетчеризацию
 (при появлении нового варианта union будет `UnhandledMatchError`, а не
@@ -227,8 +227,8 @@ match ($result::class) {
 };
 ```
 
-`kind()` удобен там, где суженный тип не нужен: метрики (`$result->kind()->name`),
-логи и хелперы, принимающие `ConsumeResult` целиком. Если нужна только
+`ConsumeResult` — именованный supertype для хелперов, логгеров и метрик,
+принимающих любой результат `consume()` целиком. Если нужна только
 обработка сообщений без ветвления — см. [Message Stream](#message-stream).
 
 ## Структура проекта
