@@ -60,7 +60,11 @@ final class KafkaConsumer
 
         try {
             $this->consumer = new \RdKafka\KafkaConsumer($conf);
-        } catch (Exception $e) {
+        } catch (Exception $e) { // @codeCoverageIgnoreStart
+            // Через публичный API недостижимо: все значения Conf провалидированы
+            // в ConsumerConfig::asKafkaConfig() (отклонение set() уходит как
+            // InvalidConfigException ещё до try), group.id гарантированно непуст;
+            // отказ rd_kafka_new() возможен только на уровне процесса (OOM/EMFILE).
             $this->logger->error('Failed to create RdKafka consumer', [
                 'brokers' => $config->brokers,
                 'group_id' => $config->groupId,
@@ -69,6 +73,7 @@ final class KafkaConsumer
             ]);
 
             throw KafkaConsumerException::fromKafkaException($e);
+            // @codeCoverageIgnoreEnd
         }
 
         $this->logger->info('KafkaConsumer created', [

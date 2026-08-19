@@ -5,7 +5,7 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 и этот проект следует [Semantic Versioning](https://semver.org/lang/ru/).
 
-## [Unreleased]
+## [0.9.0] - 2026-08-20
 
 ### Added
 
@@ -47,14 +47,12 @@
   `Psr\Clock\ClockInterface` (новая зависимость `psr/clock`; по умолчанию —
   новая `Clock\SystemClock`), граничные случаи интервала (ровно граница/−1 мс)
   покрыты детерминированными тестами на управляемых часах вместо заглушек.
-
 - **BC:** кейсы `CompressionType` и `OffsetReset` переименованы в
   PascalCase согласно конвенции PHP (`snappy` → `Snappy`, `lz4` → `Lz4`,
   `earliest` → `Earliest` и т.д.); бэкинг-значения — стабильные
   идентификаторы Kafka-протокола — не изменились, кроме случая
   «без сброса» у `OffsetReset` (см. Fixed). В test-комплект добавлены
   ассерты бэкинг-значений и маппинга `asKafkaConfig()` в термины librdkafka.
-
 - **BC:** иерархия исключений переработана в два семейства + маркерный
   интерфейс `Anktx\Kafka\Client\Exception\KafkaClientException`
   (`extends \Throwable`), реализуемый обеими базами: один
@@ -125,6 +123,12 @@
   сбои `asKafkaConfig()` оборачиваются в `InvalidConfigException`, конструкторов
   клиентов и `produce()` (включая `newTopic()`) — в
   `KafkaConsumerException`/`KafkaProducerException` с контекстом в логе.
+- Лог-контексты приведены к PSR-3: пойманные исключения передаются целиком
+  через `context['exception']` вместо дублирования `getMessage()` под
+  строковым ключом; ключ `error` переименован в `reason` во всех логах
+  клиентов и в delivery-report колбэке. Из лога сбоя `produce()` удалён
+  ложный `error_code` (`getCode()` у `RdKafka\Exception` — не
+  `RD_KAFKA_RESP_ERR_*`-код), успешный `flush()` переведён с info на debug.
 - Инструментарий: Infection обновлён до `^0.35` (kwn/php-rdkafka-stubs
   удалён); пороги Infection подняты до MSI 100% / Covered MSI 100%
   (10 threads; граничные тайминговые мутанты `flush()` — в
@@ -352,7 +356,8 @@
   Обратно совместимо — существующий код, передающий `instanceId`, работает
   без изменений.
 
-[0.8.0]: https://git.anom.ru/anktx/kafka-client/compare/0.7.2...master
+[0.9.0]: https://git.anom.ru/anktx/kafka-client/compare/0.8.0...master
+[0.8.0]: https://git.anom.ru/anktx/kafka-client/compare/0.7.2...0.8.0
 [0.7.2]: https://git.anom.ru/anktx/kafka-client/compare/0.7.1...0.7.2
 [0.7.1]: https://git.anom.ru/anktx/kafka-client/compare/0.7.0...0.7.1
 [0.7.0]: https://git.anom.ru/anktx/kafka-client/compare/0.6.0...0.7.0

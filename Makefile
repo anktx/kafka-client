@@ -1,4 +1,4 @@
-.PHONY: help validate test test-integration test-all test-file test-coverage test-coverage-text \
+.PHONY: help validate test test-integration test-all test-file test-coverage test-coverage-text coverage \
 	infection infection-test infection-test-src infection-test-src-skip infection-relaxed \
 	cs-fix cs-dry analyse analyse-baseline qa clean ci
 
@@ -46,6 +46,11 @@ test-coverage-text: ## Run PHPUnit tests with coverage (text report)
 	@echo '$(BLUE)Running PHPUnit tests with coverage (text)...$(NC)'
 	$(DOCKER_RUN) vendor/bin/phpunit --testsuite=Unit --coverage-text --colors=never
 
+coverage: ## Run PHPUnit tests with coverage and enforce the 100% line coverage gate
+	@echo '$(BLUE)Running PHPUnit tests with coverage gate...$(NC)'
+	$(DOCKER_RUN) vendor/bin/phpunit --testsuite=Unit --coverage-text --coverage-php=.phpunit.cache/coverage.cov --colors=never
+	$(DOCKER_RUN) php bin/coverage-check.php
+
 infection: ## Run Infection mutation testing (same as composer infection)
 	@echo '$(BLUE)Running Infection mutation testing...$(NC)'
 	$(DOCKER_RUN) vendor/bin/infection --show-mutations
@@ -82,7 +87,7 @@ analyse-baseline: ## Generate PHPStan baseline
 	@echo '$(BLUE)Generating PHPStan baseline...$(NC)'
 	$(DOCKER_RUN) vendor/bin/phpstan analyse --memory-limit=512M --generate-baseline
 
-qa: validate cs-dry analyse test ## Run full QA pipeline (validate + style check + static analysis + unit tests)
+qa: validate cs-dry analyse coverage ## Run full QA pipeline (validate + style check + static analysis + unit tests + coverage gate)
 	@echo '$(GREEN)QA pipeline completed successfully!$(NC)'
 
 clean: ## Clean up generated files
@@ -92,5 +97,5 @@ clean: ## Clean up generated files
 	rm -rf phpstan-baseline.neon
 	@echo '$(GREEN)Cleaned up!$(NC)'
 
-ci: validate cs-dry analyse test infection ## Run full CI pipeline (validate + style + static analysis + tests + mutation testing)
+ci: validate cs-dry analyse coverage infection ## Run full CI pipeline (validate + style + static analysis + tests + coverage gate + mutation testing)
 	@echo '$(GREEN)CI pipeline completed successfully!$(NC)'

@@ -60,7 +60,11 @@ final class KafkaProducer
 
         try {
             $this->producer = new Producer($conf);
-        } catch (Exception $e) {
+        } catch (Exception $e) { // @codeCoverageIgnoreStart
+            // Через публичный API недостижимо: все значения Conf провалидированы
+            // в ProducerConfig::asKafkaConfig() (отклонение set() уходит как
+            // InvalidConfigException ещё до try); отказ rd_kafka_new()
+            // возможен только на уровне процесса (OOM/EMFILE).
             $this->logger->error('Failed to create RdKafka producer', [
                 'brokers' => $config->brokers,
                 'reason' => $e->getMessage(),
@@ -68,6 +72,7 @@ final class KafkaProducer
             ]);
 
             throw KafkaProducerException::fromKafkaException($e);
+            // @codeCoverageIgnoreEnd
         }
 
         $this->logger->info('KafkaProducer created', [

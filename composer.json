@@ -40,13 +40,13 @@
     "cs-check": "php-cs-fixer fix -v --diff --show-progress=dots --dry-run",
     "tests": "phpunit --testsuite=Unit",
     "tests-integration": "phpunit --testsuite=Integration",
-    "coverage": "phpunit --testsuite=Unit --coverage-text",
+    "coverage": "phpunit --testsuite=Unit --coverage-text --coverage-php=.phpunit.cache/coverage.cov && php bin/coverage-check.php",
     "infection": "infection --show-mutations",
     "qa": [
       "@composer validate --strict",
       "@cs-check",
       "@analyse",
-      "@tests"
+      "@coverage"
     ]
   },
   "scripts-descriptions": {
@@ -56,9 +56,9 @@
     "cs-check": "Checks code style with PHP CS Fixer without modifying files",
     "tests": "Runs unit tests",
     "tests-integration": "Runs integration tests (requires a running Kafka broker)",
-    "coverage": "Runs unit tests and prints a text code coverage report",
+    "coverage": "Runs unit tests with coverage report and enforces a 100% line coverage gate (bin/coverage-check.php)",
     "infection": "Runs Infection mutation testing",
-    "qa": "Runs full QA pipeline (composer validate + style check + static analysis + tests)"
+    "qa": "Runs full QA pipeline (composer validate + style check + static analysis + tests with line coverage gate)"
   },
   "config": {
     "optimize-autoloader": true,

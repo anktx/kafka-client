@@ -8,6 +8,7 @@ parameters:
     paths:
         - src
         - tests
+        - bin
 
     ignoreErrors:
         # phpstan-phpunit помечает assertInstanceOf() с уже известным типом

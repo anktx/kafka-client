@@ -28,6 +28,9 @@ final class RdKafkaLogLevel
         LogLevel::DEBUG,
     ];
 
+    // Неинстанцируемый static-helper: пустой приватный конструктор не имеет
+    // наблюдаемого поведения, исключён из line-coverage гейта.
+    /** @codeCoverageIgnore */
     private function __construct() {}
 
     public static function toPsrLevel(int $severity): string

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
+use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaFlushTimeoutException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaProducer;
+use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;
 use Anktx\Kafka\Client\PollStrategy\PollStrategy;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -17,7 +19,9 @@ use RdKafka\Producer;
 use RdKafka\ProducerTopic;
 
 /**
- * Юнит-тесты {@see KafkaProducer::produce()} на mock'е RdKafka\Producer.
+ * Юнит-тесты {@see KafkaProducer}: конструктор (контракт отложенного
+ * подключения, как у консьюмера) и {@see KafkaProducer::produce()} на
+ * mock'е RdKafka\Producer.
  *
  * Фиксируют контракт drain-цикла delivery-report'ов: drain выполняется только
  * при разрешении PollStrategy, ограничен бюджетом poll()-вызовов (раньше при
@@ -27,6 +31,26 @@ use RdKafka\ProducerTopic;
 final class KafkaProducerTest extends TestCase
 {
     private const int MAX_DRAIN_POLLS = 100;
+
+    public function testConstructorDoesNotProbeBrokersAndLogsContext(): void
+    {
+        // Конструктор — неблокирующая операция, безопасная для DI-резолва:
+        // как и у консьюмера, подключение к брокерам librdkafka выполняет
+        // асинхронно в фоновых потоках, до первого produce() сети нет.
+        $logger = new InMemoryLogger();
+
+        $producer = new KafkaProducer(new ProducerConfig(brokers: 'localhost:1'), logger: $logger);
+
+        self::assertInstanceOf(KafkaProducer::class, $producer);
+
+        $createdRecords = $logger->findByMessage('KafkaProducer created');
+        self::assertCount(1, $createdRecords);
+        self::assertSame([
+            'brokers' => 'localhost:1',
+            'compression' => 'snappy',
+            'poll_strategy' => NeverPollStrategy::class,
+        ], $createdRecords[0]['context']);
+    }
 
     #[AllowMockObjectsWithoutExpectations]
     public function testProduceDrainsDeliveryReportsWhenPollStrategyAllowsPolling(): void
