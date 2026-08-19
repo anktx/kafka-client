@@ -11,7 +11,6 @@ use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
 use Anktx\Kafka\Client\Exception\Logic\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
-use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
@@ -207,12 +206,16 @@ final class KafkaConsumer
         return match ($message->err) {
             \RD_KAFKA_RESP_ERR_NO_ERROR => new KafkaConsumerMessage(
                 topic: $message->topic_name,
-                body: $message->payload,
                 partition: $message->partition,
                 offset: $message->offset,
+                body: $message->payload,
                 key: $message->key,
                 headers: $message->headers,
-                timestampMs: $message->timestamp,
+                // ext-rdkafka не задаёт timestamp при null-payload, а -1 —
+                // сентинел «брокер не передал время»: оба случая — null.
+                timestampMs: $message->timestamp !== null && $message->timestamp !== -1
+                    ? $message->timestamp
+                    : null,
             ),
 
             \RD_KAFKA_RESP_ERR__PARTITION_EOF => new KafkaPartitionEof(
@@ -264,22 +267,12 @@ final class KafkaConsumer
      *
      * @param KafkaConsumerMessage $message Обработанное сообщение
      *
-     * @throws ClientClosedException   Если консьюмер закрыт через close()
-     * @throws InvalidMessageException Если у сообщения нет смещения
-     * @throws KafkaConsumerException  Если коммит не удался
+     * @throws ClientClosedException  Если консьюмер закрыт через close()
+     * @throws KafkaConsumerException Если коммит не удался
      */
     public function commit(KafkaConsumerMessage $message): void
     {
         $this->assertNotClosed(__METHOD__);
-
-        if ($message->offset === null) {
-            $this->logger->error('Attempted to commit a message without offset', [
-                'topic' => $message->topic,
-                'partition' => $message->partition,
-            ]);
-
-            throw InvalidMessageException::noOffset($message);
-        }
 
         try {
             $this->consumer->commit([

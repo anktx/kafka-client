@@ -7,13 +7,13 @@ namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
-use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Exception;
 use RdKafka\Message;
@@ -53,6 +53,44 @@ final class KafkaConsumerConsumeTest extends TestCase
         self::assertSame('hello', $result->body);
         self::assertSame(3, $result->partition);
         self::assertSame(42, $result->offset);
+        self::assertSame('k', $result->key);
+        self::assertSame(['h' => 'v'], $result->headers);
+        self::assertSame(1234, $result->timestampMs);
+    }
+
+    #[DataProvider('provideConsumeNormalizesUnknownTimestampToNullCases')]
+    #[AllowMockObjectsWithoutExpectations]
+    public function testConsumeNormalizesUnknownTimestampToNull(?int $brokerTimestamp, ?string $payload): void
+    {
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
+        $rdKafka->method('consume')->willReturn(self::message([
+            'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
+            'topic_name' => 'test-topic',
+            'partition' => 3,
+            'offset' => 42,
+            'payload' => $payload,
+            'headers' => [],
+            'timestamp' => $brokerTimestamp,
+        ]));
+
+        $consumer = $this->buildConsumer($rdKafka);
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+
+        $result = $consumer->consume(100);
+
+        self::assertInstanceOf(KafkaConsumerMessage::class, $result);
+        self::assertNull($result->timestampMs);
+    }
+
+    /**
+     * @return iterable<string, array{null|int, null|string}>
+     */
+    public static function provideConsumeNormalizesUnknownTimestampToNullCases(): iterable
+    {
+        yield 'sentinel -1: broker did not provide timestamp' => [-1, 'hello'];
+
+        yield 'null: ext-rdkafka leaves timestamp unset for null payload' => [null, null];
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -249,32 +287,6 @@ final class KafkaConsumerConsumeTest extends TestCase
         $errorRecords = $logger->findByMessage('Failed to get subscription state');
         self::assertCount(1, $errorRecords);
         self::assertSame('subscription state unavailable', $errorRecords[0]['context']['error']);
-    }
-
-    #[AllowMockObjectsWithoutExpectations]
-    public function testCommitWithoutOffsetThrowsInvalidMessageException(): void
-    {
-        // Сообщение без offset нельзя закоммитить: commit() фиксировал бы
-        // фиктивное смещение (null + 1).
-        $logger = new InMemoryLogger();
-        $consumer = $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class), logger: $logger);
-
-        $message = new KafkaConsumerMessage(topic: 'test-topic', body: 'hello');
-
-        try {
-            $consumer->commit($message);
-            self::fail('Expected InvalidMessageException');
-        } catch (InvalidMessageException $e) {
-            self::assertSame(
-                'Message from topic "test-topic" (partition -1) has no offset and cannot be committed',
-                $e->getMessage(),
-            );
-        }
-
-        $errorRecords = $logger->findByMessage('Attempted to commit a message without offset');
-        self::assertCount(1, $errorRecords);
-        self::assertSame('test-topic', $errorRecords[0]['context']['topic']);
-        self::assertSame(-1, $errorRecords[0]['context']['partition']);
     }
 
     public function testCommitCommitsNextOffset(): void

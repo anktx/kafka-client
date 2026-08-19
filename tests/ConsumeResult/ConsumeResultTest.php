@@ -15,7 +15,7 @@ final class ConsumeResultTest extends TestCase
 {
     public function testEveryConsumeResultVariantImplementsContractWithOwnKind(): void
     {
-        $message = new KafkaConsumerMessage(topic: 'test-topic');
+        $message = new KafkaConsumerMessage(topic: 'test-topic', partition: 1, offset: 100);
         $timeout = new KafkaConsumeTimeout();
         $eof = new KafkaPartitionEof(topic: 'test-topic', partition: 1, offset: 100);
 

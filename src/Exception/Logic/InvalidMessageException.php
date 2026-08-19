@@ -4,16 +4,24 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Exception\Logic;
 
-use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
-
 final class InvalidMessageException extends LogicException
 {
-    public static function noOffset(KafkaConsumerMessage $message): self
+    public static function emptyString(string $property): self
+    {
+        return new self(\sprintf('Message property "%s" must not be an empty string', $property));
+    }
+
+    public static function nonNegativeInt(string $property, int $value): self
+    {
+        return new self(\sprintf('Message property "%s" must not be negative, %d given', $property, $value));
+    }
+
+    public static function partitionBelowUnassigned(int $partition): self
     {
         return new self(\sprintf(
-            'Message from topic "%s" (partition %d) has no offset and cannot be committed',
-            $message->topic,
-            $message->partition,
+            'Message property "partition" must not be less than RD_KAFKA_PARTITION_UA (%d), %d given',
+            \RD_KAFKA_PARTITION_UA,
+            $partition,
         ));
     }
 }

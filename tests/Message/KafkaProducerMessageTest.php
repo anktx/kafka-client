@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Message;
 
+use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use PHPUnit\Framework\TestCase;
 
@@ -15,6 +16,10 @@ final class KafkaProducerMessageTest extends TestCase
 
         self::assertSame('test-topic', $message->topic);
         self::assertNull($message->body);
+        self::assertSame(\RD_KAFKA_PARTITION_UA, $message->partition);
+        self::assertNull($message->key);
+        self::assertNull($message->headers);
+        self::assertSame(0, $message->timestampMs);
     }
 
     public function testCreateWithAllParameters(): void
@@ -37,10 +42,29 @@ final class KafkaProducerMessageTest extends TestCase
         self::assertSame(123456789, $message->timestampMs);
     }
 
-    public function testDefaultTimestamp(): void
+    public function testRejectsEmptyTopic(): void
     {
-        $message = new KafkaProducerMessage(topic: 'test-topic');
+        $this->expectException(InvalidMessageException::class);
+        $this->expectExceptionMessage('Message property "topic" must not be an empty string');
 
-        self::assertSame(0, $message->timestampMs);
+        new KafkaProducerMessage(topic: '');
+    }
+
+    public function testRejectsPartitionBelowUnassigned(): void
+    {
+        $this->expectException(InvalidMessageException::class);
+        $this->expectExceptionMessage(
+            'Message property "partition" must not be less than RD_KAFKA_PARTITION_UA (-1), -2 given',
+        );
+
+        new KafkaProducerMessage(topic: 'test-topic', partition: -2);
+    }
+
+    public function testRejectsNegativeTimestamp(): void
+    {
+        $this->expectException(InvalidMessageException::class);
+        $this->expectExceptionMessage('Message property "timestampMs" must not be negative, -1 given');
+
+        new KafkaProducerMessage(topic: 'test-topic', timestampMs: -1);
     }
 }

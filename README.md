@@ -222,9 +222,8 @@ src/
 │   └── Logic/                       # Детерминированные ошибки программиста
 │
 ├── KafkaMessage/                    # Сообщения
-│   ├── AbstractMessage.php          # Базовый класс
-│   ├── KafkaConsumerMessage.php     # Сообщение консьюмера
-│   └── KafkaProducerMessage.php     # Сообщение продюсера
+│   ├── KafkaConsumerMessage.php     # Сообщение консьюмера (topic/partition/offset обязательны)
+│   └── KafkaProducerMessage.php     # Сообщение продюсера (валидация в конструкторе)
 │
 ├── PollStrategy/                    # Стратегии опроса очереди
 │   ├── PollStrategy.php             # Интерфейс стратегии
@@ -255,7 +254,7 @@ KafkaClientException                 # Маркер: всё, что кидает
     ├── ClientClosedException         # Операция после close() клиента
     ├── EmptySubscriptionsException   # Пустой список подписок
     ├── InvalidConfigException        # Невалидная конфигурация или параметры
-    ├── InvalidMessageException       # Сообщение без offset и т.п.
+    ├── InvalidMessageException       # Невалидные свойства сообщения (пустой topic и т.п.)
     ├── InvalidSubscriptionException  # Пустой topic в подписке
     └── NotSubscribedException        # Не подписан на топики
 ```
