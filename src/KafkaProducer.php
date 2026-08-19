@@ -8,13 +8,12 @@ use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
-use Anktx\Kafka\Client\Log\LibrdkafkaLogLevel;
+use Anktx\Kafka\Client\Log\LibrdkafkaCallbacks;
 use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;
 use Anktx\Kafka\Client\PollStrategy\PollStrategy;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RdKafka\Exception;
-use RdKafka\Message;
 use RdKafka\Producer;
 use RdKafka\ProducerTopic;
 
@@ -26,17 +25,6 @@ use RdKafka\ProducerTopic;
 final class KafkaProducer
 {
     private const int DEFAULT_FLUSH_TIMEOUT_MS = 1000;
-
-    /**
-     * Коды ошибок librdkafka, означающие потерю соединения с брокерами.
-     *
-     * @var list<int>
-     */
-    private const array CONNECTION_ERROR_CODES = [
-        \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
-        \RD_KAFKA_RESP_ERR__TRANSPORT,
-        \RD_KAFKA_RESP_ERR__RESOLVE,
-    ];
     private readonly Producer $producer;
 
     /**
@@ -58,9 +46,10 @@ final class KafkaProducer
     ) {
         $conf = $config->asKafkaConfig();
 
-        $conf->setLogCb($this->onLog(...));
-        $conf->setErrorCb($this->onBrokerError(...));
-        $conf->setDrMsgCb($this->onDeliveryReport(...));
+        $callbacks = new LibrdkafkaCallbacks($this->logger);
+        $callbacks->attachLogCallback($conf);
+        $callbacks->attachErrorCallback($conf);
+        $callbacks->attachDeliveryReportCallback($conf);
 
         $this->producer = new Producer($conf);
 
@@ -170,74 +159,5 @@ final class KafkaProducer
         }
 
         return $this->topics[$name];
-    }
-
-    /**
-     * Delivery-report callback librdkafka: сообщает итог доставки каждого
-     * отправленного сообщения.
-     *
-     * Выполняется синхронно в C-коде ext-rdkafka при poll()/flush(), поэтому
-     * бросать исключения отсюда нельзя — ошибка доставки только логируется.
-     * Отчёты доезжают до этого callback'а только когда кто-то вызывает poll():
-     * PollStrategy с опросом ({@see TimeoutPollStrategy}) доставляет отчёты
-     * в фоне, NeverPollStrategy — только в момент {@see flush()}.
-     *
-     * @param Producer $producer Продюсер (не используется)
-     * @param Message  $message  Отчёт о доставке сообщения
-     */
-    private function onDeliveryReport(Producer $producer, Message $message): void
-    {
-        if ($message->err === \RD_KAFKA_RESP_ERR_NO_ERROR) {
-            $this->logger->debug('Message delivered', [
-                'topic' => $message->topic_name,
-                'partition' => $message->partition,
-                'offset' => $message->offset,
-            ]);
-
-            return;
-        }
-
-        $this->logger->error('Message delivery failed', [
-            'topic' => $message->topic_name,
-            'partition' => $message->partition,
-            'error_code' => $message->err,
-            'error' => $message->errstr(),
-        ]);
-    }
-
-    /**
-     * Log-callback librdkafka: перенаправляет внутренние сообщения библиотеки
-     * в PSR-3 лог, преобразуя syslog severity в строковый уровень PSR-3.
-     *
-     * @param Producer $producer Продюсер (не используется)
-     * @param int      $level    Уровень логирования (syslog severity 0–7)
-     * @param string   $facility Источник сообщения
-     * @param string   $message  Текст сообщения
-     */
-    private function onLog(Producer $producer, int $level, string $facility, string $message): void
-    {
-        $this->logger->log(LibrdkafkaLogLevel::toPsrLevel($level), $message, ['facility' => $facility]);
-    }
-
-    /**
-     * Error-callback librdkafka: логирует потерю соединения с брокерами.
-     *
-     * Выполняется синхронно в C-коде ext-rdkafka, поэтому бросать исключения
-     * отсюда нельзя. Переподключением librdkafka занимается сам.
-     *
-     * @param Producer $producer Продюсер (не используется)
-     * @param int      $err      Код ошибки RD_KAFKA_RESP_ERR__*
-     * @param string   $reason   Описание ошибки
-     */
-    private function onBrokerError(Producer $producer, int $err, string $reason): void
-    {
-        if (!\in_array($err, self::CONNECTION_ERROR_CODES, true)) {
-            return;
-        }
-
-        $this->logger->warning('Kafka broker connection error', [
-            'error_code' => $err,
-            'reason' => $reason,
-        ]);
     }
 }

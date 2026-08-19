@@ -15,6 +15,12 @@
   (`setLogCb`, `setErrorCb`) навешиваются самими клиентами — вся политика
   логирования живёт в одном месте. Логи librdkafka продюсера теперь тоже
   содержат `facility` в контексте.
+- Дублированные колбэки `onLog`/`onBrokerError` (и producer-only
+  `onDeliveryReport`) вынесены из `KafkaProducer`/`KafkaConsumer` в
+  `Anktx\Kafka\Client\Log\LibrdkafkaCallbacks`: attach-методы
+  `attachLogCallback()`/`attachErrorCallback()`/`attachDeliveryReportCallback()`
+  навешивают политику логирования на `RdKafka\Conf`. Публичный API клиентов
+  не изменился.
 - **BC:** в конструкторе `ConsumerConfig` параметр `isDebug` перенесён в конец
   сигнатуры (после `$socketKeepaliveEnable`) — позиционные аргументы после
   `$sessionTimeoutMs` «съезжают», при именованных аргументах проблем нет.

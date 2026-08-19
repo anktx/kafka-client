@@ -15,7 +15,6 @@ use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LogLevel;
 use RdKafka\Exception;
 use RdKafka\Message;
 use RdKafka\TopicPartition;
@@ -225,61 +224,6 @@ final class KafkaConsumerConsumeTest extends TestCase
         $this->expectException(NotSubscribedException::class);
 
         $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class))->consume(100);
-    }
-
-    #[AllowMockObjectsWithoutExpectations]
-    public function testOnBrokerErrorLogsConnectionErrors(): void
-    {
-        $logger = new InMemoryLogger();
-        $consumer = $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class), logger: $logger);
-
-        (new \ReflectionMethod($consumer, 'onBrokerError'))->invoke(
-            $consumer,
-            $this->createMock(\RdKafka\KafkaConsumer::class),
-            \RD_KAFKA_RESP_ERR__TRANSPORT,
-            'connection refused',
-        );
-
-        $records = $logger->findByMessage('Kafka broker connection error');
-        self::assertCount(1, $records);
-        self::assertSame(\RD_KAFKA_RESP_ERR__TRANSPORT, $records[0]['context']['error_code']);
-        self::assertSame('connection refused', $records[0]['context']['reason']);
-    }
-
-    #[AllowMockObjectsWithoutExpectations]
-    public function testOnLogForwardsLibrdkafkaLogToLogger(): void
-    {
-        $logger = new InMemoryLogger();
-        $consumer = $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class), logger: $logger);
-
-        (new \ReflectionMethod($consumer, 'onLog'))->invoke(
-            $consumer,
-            $this->createMock(\RdKafka\KafkaConsumer::class),
-            3,
-            'FETCH',
-            'message fetched',
-        );
-
-        self::assertCount(1, $logger->records);
-        self::assertSame(LogLevel::ERROR, $logger->records[0]['level']);
-        self::assertSame('message fetched', $logger->records[0]['message']);
-        self::assertSame(['facility' => 'FETCH'], $logger->records[0]['context']);
-    }
-
-    #[AllowMockObjectsWithoutExpectations]
-    public function testOnBrokerErrorIgnoresNonConnectionErrors(): void
-    {
-        $logger = new InMemoryLogger();
-        $consumer = $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class), logger: $logger);
-
-        (new \ReflectionMethod($consumer, 'onBrokerError'))->invoke(
-            $consumer,
-            $this->createMock(\RdKafka\KafkaConsumer::class),
-            \RD_KAFKA_RESP_ERR__BAD_MSG,
-            'bad message format',
-        );
-
-        self::assertSame([], $logger->records);
     }
 
     #[AllowMockObjectsWithoutExpectations]

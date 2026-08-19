@@ -12,7 +12,7 @@ use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
-use Anktx\Kafka\Client\Log\LibrdkafkaLogLevel;
+use Anktx\Kafka\Client\Log\LibrdkafkaCallbacks;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -31,17 +31,6 @@ use RdKafka\TopicPartition;
 final readonly class KafkaConsumer
 {
     private const int DEFAULT_CONSUME_TIMEOUT_MS = 1000;
-
-    /**
-     * Коды ошибок librdkafka, означающие потерю соединения с брокерами.
-     *
-     * @var list<int>
-     */
-    private const array CONNECTION_ERROR_CODES = [
-        \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
-        \RD_KAFKA_RESP_ERR__TRANSPORT,
-        \RD_KAFKA_RESP_ERR__RESOLVE,
-    ];
     private \RdKafka\KafkaConsumer $consumer;
 
     /**
@@ -62,8 +51,9 @@ final readonly class KafkaConsumer
     ) {
         $conf = $config->asKafkaConfig();
 
-        $conf->setLogCb($this->onLog(...));
-        $conf->setErrorCb($this->onBrokerError(...));
+        $callbacks = new LibrdkafkaCallbacks($this->logger);
+        $callbacks->attachLogCallback($conf);
+        $callbacks->attachErrorCallback($conf);
 
         $this->consumer = new \RdKafka\KafkaConsumer($conf);
 
@@ -304,41 +294,5 @@ final readonly class KafkaConsumer
         ]);
 
         throw KafkaConsumerException::create($message->errstr(), $message->err);
-    }
-
-    /**
-     * Log-callback librdkafka: перенаправляет внутренние сообщения библиотеки
-     * в PSR-3 лог, преобразуя syslog severity в строковый уровень PSR-3.
-     *
-     * @param \RdKafka\KafkaConsumer $consumer Консьюмер (не используется)
-     * @param int                    $level    Уровень логирования (syslog severity 0–7)
-     * @param string                 $facility Источник сообщения
-     * @param string                 $message  Текст сообщения
-     */
-    private function onLog(\RdKafka\KafkaConsumer $consumer, int $level, string $facility, string $message): void
-    {
-        $this->logger->log(LibrdkafkaLogLevel::toPsrLevel($level), $message, ['facility' => $facility]);
-    }
-
-    /**
-     * Error-callback librdkafka: логирует потерю соединения с брокерами.
-     *
-     * Выполняется синхронно в C-коде ext-rdkafka, поэтому бросать исключения
-     * отсюда нельзя. Переподключением librdkafka занимается сам.
-     *
-     * @param \RdKafka\KafkaConsumer $kafka  Консьюмер (не используется)
-     * @param int                    $err    Код ошибки RD_KAFKA_RESP_ERR__*
-     * @param string                 $reason Описание ошибки
-     */
-    private function onBrokerError(\RdKafka\KafkaConsumer $kafka, int $err, string $reason): void
-    {
-        if (!\in_array($err, self::CONNECTION_ERROR_CODES, true)) {
-            return;
-        }
-
-        $this->logger->warning('Kafka broker connection error', [
-            'error_code' => $err,
-            'reason' => $reason,
-        ]);
     }
 }
