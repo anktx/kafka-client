@@ -10,6 +10,7 @@ use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
+use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
 use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
@@ -29,10 +30,11 @@ use RdKafka\TopicPartition;
  *
  * @see https://github.com/edenhill/librdkafka/blob/master/README.md
  */
-final readonly class KafkaConsumer
+final class KafkaConsumer
 {
     private const int DEFAULT_CONSUME_TIMEOUT_MS = 1000;
     private \RdKafka\KafkaConsumer $consumer;
+    private bool $closed = false;
 
     /**
      * Создаёт консьюмера, не подключаясь к брокерам.
@@ -49,7 +51,7 @@ final readonly class KafkaConsumer
      */
     public function __construct(
         ConsumerConfig $config,
-        private LoggerInterface $logger = new NullLogger(),
+        private readonly LoggerInterface $logger = new NullLogger(),
     ) {
         $conf = $config->asKafkaConfig();
 
@@ -95,11 +97,14 @@ final readonly class KafkaConsumer
      *
      * @param TopicSubscriptionList $subscriptionList Список подписок на топики/партиции
      *
+     * @throws ClientClosedException       Если консьюмер закрыт через close()
      * @throws EmptySubscriptionsException Если список подписок пуст
      * @throws KafkaConsumerException      Если librdkafka не принял подписку
      */
     public function subscribe(TopicSubscriptionList $subscriptionList): void
     {
+        $this->assertNotClosed(__METHOD__);
+
         if ($subscriptionList->isEmpty()) {
             throw EmptySubscriptionsException::create();
         }
@@ -128,10 +133,13 @@ final readonly class KafkaConsumer
     /**
      * Отписывается от всех топиков.
      *
+     * @throws ClientClosedException  Если консьюмер закрыт через close()
      * @throws KafkaConsumerException Если не удалось отписаться
      */
     public function unsubscribe(): void
     {
+        $this->assertNotClosed(__METHOD__);
+
         try {
             $this->consumer->unsubscribe();
         } catch (Exception $e) {
@@ -165,11 +173,14 @@ final readonly class KafkaConsumer
      *
      * @return KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат чтения
      *
+     * @throws ClientClosedException  Если консьюмер закрыт через close()
      * @throws NotSubscribedException Если консьюмер не подписан на топики
      * @throws KafkaConsumerException Если чтение завершилось ошибкой
      */
     public function consume(int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
     {
+        $this->assertNotClosed(__METHOD__);
+
         if ($this->consumer->getSubscription() === []) {
             $this->logger->warning('Attempted to consume without subscription');
 
@@ -220,6 +231,7 @@ final readonly class KafkaConsumer
      *
      * @return mixed Значение, возвращённое сработавшим callback'ом
      *
+     * @throws ClientClosedException  Если консьюмер закрыт через close()
      * @throws NotSubscribedException Если консьюмер не подписан на топики
      * @throws KafkaConsumerException Если чтение завершилось ошибкой
      */
@@ -246,11 +258,14 @@ final readonly class KafkaConsumer
      *
      * @param KafkaConsumerMessage $message Обработанное сообщение
      *
+     * @throws ClientClosedException   Если консьюмер закрыт через close()
      * @throws InvalidMessageException Если у сообщения нет смещения
      * @throws KafkaConsumerException  Если коммит не удался
      */
     public function commit(KafkaConsumerMessage $message): void
     {
+        $this->assertNotClosed(__METHOD__);
+
         if ($message->offset === null) {
             $this->logger->error('Attempted to commit a message without offset', [
                 'topic' => $message->topic,
@@ -279,13 +294,33 @@ final readonly class KafkaConsumer
     /**
      * Закрывает консьюмер и освобождает ресурсы.
      *
-     * Рекомендуется вызывать перед завершением работы приложения.
+     * Идемпотентен: повторные вызовы — no-op. После закрытия все методы
+     * (кроме close()) бросают {@see ClientClosedException} до любых
+     * обращений к RdKafka.
+     *
+     * @throws KafkaConsumerException Если librdkafka не смог закрыть консьюмера
      */
     public function close(): void
     {
+        if ($this->closed) {
+            $this->logger->debug('KafkaConsumer already closed');
+
+            return;
+        }
+
         $this->logger->info('Closing KafkaConsumer');
 
-        $this->consumer->close();
+        try {
+            $this->consumer->close();
+        } catch (Exception $e) {
+            $this->logger->error('Failed to close KafkaConsumer', [
+                'error' => $e->getMessage(),
+            ]);
+
+            throw KafkaConsumerException::fromKafkaException($e);
+        }
+
+        $this->closed = true;
 
         $this->logger->info('KafkaConsumer closed');
     }
@@ -303,5 +338,23 @@ final readonly class KafkaConsumer
         ]);
 
         throw KafkaConsumerException::create($message->errstr(), $message->err);
+    }
+
+    /**
+     * Гарантирует, что консьюмер ещё открыт.
+     *
+     * @param string $method Полное имя вызывающего метода (__METHOD__)
+     *
+     * @throws ClientClosedException Если консьюмер уже закрыт
+     */
+    private function assertNotClosed(string $method): void
+    {
+        if ($this->closed) {
+            $this->logger->warning('Attempted to use a closed KafkaConsumer', [
+                'method' => $method,
+            ]);
+
+            throw ClientClosedException::forMethod($method);
+        }
     }
 }

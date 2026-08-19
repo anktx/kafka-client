@@ -27,6 +27,17 @@
   отвергаются новым `InvalidSubscriptionException` (раньше мусорные значения
   молча игнорировались при подписке).
 
+### Added
+
+- Жизненный цикл закрытия консьюмера: повторный `KafkaConsumer::close()` —
+  no-op (раньше делегировался в RdKafka повторно и падал), а
+  `subscribe()`/`unsubscribe()`/`consume()`/`commit()` после закрытия
+  бросают новый `ClientClosedException` до любых обращений к RdKafka —
+  вместо утекающего из ext-rdkafka голого `\Exception` с вводящим в
+  заблуждение сообщением. Ошибки `RdKafka\KafkaConsumer::close()`
+  оборачиваются в `KafkaConsumerException` (подробнее —
+  docs/lifecycle.md).
+
 ## [0.8.0] - 2026-08-19
 
 ### Changed

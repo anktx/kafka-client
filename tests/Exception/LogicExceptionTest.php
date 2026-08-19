@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Exception;
 
+use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
 use Anktx\Kafka\Client\Exception\Logic\LogicException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use PHPUnit\Framework\TestCase;
@@ -48,5 +49,19 @@ final class LogicExceptionTest extends TestCase
         $exception = new NotSubscribedException('Test', 0, $previous);
 
         self::assertSame($previous, $exception->getPrevious());
+    }
+
+    public function testClientClosedExceptionForMethod(): void
+    {
+        $exception = ClientClosedException::forMethod('consume');
+
+        self::assertInstanceOf(LogicException::class, $exception);
+        self::assertInstanceOf(ClientClosedException::class, $exception);
+        self::assertSame('Cannot call consume(): the client is closed', $exception->getMessage());
+    }
+
+    public function testClientClosedExceptionIsLogicException(): void
+    {
+        self::assertInstanceOf(\LogicException::class, ClientClosedException::forMethod('flush'));
     }
 }

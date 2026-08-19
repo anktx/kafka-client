@@ -248,6 +248,7 @@ Exception
 │   ├── KafkaUnavailableException     # Kafka недоступен дольше порога
 │   └── InvalidConfigException        # Невалидная конфигурация
 ├── LogicException                    # Логические ошибки
+│   ├── ClientClosedException         # Операция после close() клиента
 │   ├── NotSubscribedException        # Не подписан на топики
 │   └── InvalidMessageException       # Сообщение без offset и т.п.
 └── BusinessException                 # Бизнес-логика
