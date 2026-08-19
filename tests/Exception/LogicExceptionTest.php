@@ -14,32 +14,32 @@ final class LogicExceptionTest extends TestCase
     {
         $exception = new NotSubscribedException('Not subscribed');
 
-        $this->assertInstanceOf(LogicException::class, $exception);
-        $this->assertInstanceOf(NotSubscribedException::class, $exception);
-        $this->assertSame('Not subscribed', $exception->getMessage());
-        $this->assertSame(0, $exception->getCode());
+        self::assertInstanceOf(LogicException::class, $exception);
+        self::assertInstanceOf(NotSubscribedException::class, $exception);
+        self::assertSame('Not subscribed', $exception->getMessage());
+        self::assertSame(0, $exception->getCode());
     }
 
     public function testNotSubscribedExceptionWithCode(): void
     {
         $exception = new NotSubscribedException('Not subscribed', 100);
 
-        $this->assertSame(100, $exception->getCode());
+        self::assertSame(100, $exception->getCode());
     }
 
     public function testNotSubscribedExceptionIsLogicException(): void
     {
         $exception = new NotSubscribedException('Test');
 
-        $this->assertInstanceOf(\LogicException::class, $exception);
+        self::assertInstanceOf(\LogicException::class, $exception);
     }
 
     public function testNotSubscribedExceptionCreate(): void
     {
         $exception = NotSubscribedException::create();
 
-        $this->assertSame('Consumer is not subscribed to any topics', $exception->getMessage());
-        $this->assertInstanceOf(NotSubscribedException::class, $exception);
+        self::assertSame('Consumer is not subscribed to any topics', $exception->getMessage());
+        self::assertInstanceOf(NotSubscribedException::class, $exception);
     }
 
     public function testNotSubscribedExceptionWithPrevious(): void
@@ -47,6 +47,6 @@ final class LogicExceptionTest extends TestCase
         $previous = new \Exception('Previous error');
         $exception = new NotSubscribedException('Test', 0, $previous);
 
-        $this->assertSame($previous, $exception->getPrevious());
+        self::assertSame($previous, $exception->getPrevious());
     }
 }

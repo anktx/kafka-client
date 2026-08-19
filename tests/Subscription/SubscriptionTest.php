@@ -15,27 +15,27 @@ final class SubscriptionTest extends TestCase
     {
         $subscription = TopicSubscription::create('topic1');
 
-        $this->assertSame('topic1', $subscription->topic);
-        $this->assertNull($subscription->partition);
-        $this->assertNull($subscription->offset);
+        self::assertSame('topic1', $subscription->topic);
+        self::assertNull($subscription->partition);
+        self::assertNull($subscription->offset);
     }
 
     public function testCreateWithPartition(): void
     {
         $subscription = TopicSubscription::create('topic1', 0);
 
-        $this->assertSame('topic1', $subscription->topic);
-        $this->assertSame(0, $subscription->partition);
-        $this->assertNull($subscription->offset);
+        self::assertSame('topic1', $subscription->topic);
+        self::assertSame(0, $subscription->partition);
+        self::assertNull($subscription->offset);
     }
 
     public function testCreateWithPartitionAndOffset(): void
     {
         $subscription = TopicSubscription::create('topic1', 0, 100);
 
-        $this->assertSame('topic1', $subscription->topic);
-        $this->assertSame(0, $subscription->partition);
-        $this->assertSame(100, $subscription->offset);
+        self::assertSame('topic1', $subscription->topic);
+        self::assertSame(0, $subscription->partition);
+        self::assertSame(100, $subscription->offset);
     }
 
     public function testAsKafkaTopicPartition(): void
@@ -44,8 +44,8 @@ final class SubscriptionTest extends TestCase
 
         $tp = $subscription->asKafkaTopicPartition();
 
-        $this->assertSame('topic1', $tp->getTopic());
-        $this->assertSame(0, $tp->getPartition());
+        self::assertSame('topic1', $tp->getTopic());
+        self::assertSame(0, $tp->getPartition());
     }
 
     public function testAsKafkaTopicPartitionWithOffset(): void
@@ -54,9 +54,9 @@ final class SubscriptionTest extends TestCase
 
         $tp = $subscription->asKafkaTopicPartition();
 
-        $this->assertSame('topic1', $tp->getTopic());
-        $this->assertSame(0, $tp->getPartition());
-        $this->assertSame(100, $tp->getOffset());
+        self::assertSame('topic1', $tp->getTopic());
+        self::assertSame(0, $tp->getPartition());
+        self::assertSame(100, $tp->getOffset());
     }
 
     public function testAsKafkaTopicPartitionThrowsExceptionWithoutPartition(): void
@@ -75,9 +75,9 @@ final class SubscriptionTest extends TestCase
 
         $subscription = TopicSubscription::fromKafkaTopicPartition($kafkaTp);
 
-        $this->assertSame('topic1', $subscription->topic);
-        $this->assertSame(0, $subscription->partition);
-        $this->assertSame(100, $subscription->offset);
+        self::assertSame('topic1', $subscription->topic);
+        self::assertSame(0, $subscription->partition);
+        self::assertSame(100, $subscription->offset);
     }
 
     public function testFromKafkaTopicPartitionWithoutOffset(): void
@@ -86,27 +86,27 @@ final class SubscriptionTest extends TestCase
 
         $subscription = TopicSubscription::fromKafkaTopicPartition($kafkaTp);
 
-        $this->assertSame('topic1', $subscription->topic);
-        $this->assertSame(0, $subscription->partition);
+        self::assertSame('topic1', $subscription->topic);
+        self::assertSame(0, $subscription->partition);
         // TopicPartition без offset возвращает offset как int, но может быть RD_KAFKA_OFFSET_INVALID
-        $this->assertIsInt($subscription->offset);
+        self::assertIsInt($subscription->offset);
     }
 
     public function testConstructor(): void
     {
         $subscription = new TopicSubscription('topic1', 1, 200);
 
-        $this->assertSame('topic1', $subscription->topic);
-        $this->assertSame(1, $subscription->partition);
-        $this->assertSame(200, $subscription->offset);
+        self::assertSame('topic1', $subscription->topic);
+        self::assertSame(1, $subscription->partition);
+        self::assertSame(200, $subscription->offset);
     }
 
     public function testConstructorWithOnlyTopic(): void
     {
         $subscription = new TopicSubscription('topic1');
 
-        $this->assertSame('topic1', $subscription->topic);
-        $this->assertNull($subscription->partition);
-        $this->assertNull($subscription->offset);
+        self::assertSame('topic1', $subscription->topic);
+        self::assertNull($subscription->partition);
+        self::assertNull($subscription->offset);
     }
 }

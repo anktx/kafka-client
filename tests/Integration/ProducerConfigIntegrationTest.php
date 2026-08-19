@@ -15,6 +15,6 @@ final class ProducerConfigIntegrationTest extends TestCase
         $config = new ProducerConfig('localhost:9092');
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 }

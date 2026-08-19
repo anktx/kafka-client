@@ -15,40 +15,40 @@ final class BusinessExceptionTest extends TestCase
     {
         $exception = new class ('Test message') extends BusinessException {};
 
-        $this->assertInstanceOf(\DomainException::class, $exception);
-        $this->assertSame('Test message', $exception->getMessage());
+        self::assertInstanceOf(\DomainException::class, $exception);
+        self::assertSame('Test message', $exception->getMessage());
     }
 
     public function testEmptySubscriptionsException(): void
     {
         $exception = new EmptySubscriptionsException('No subscriptions');
 
-        $this->assertInstanceOf(BusinessException::class, $exception);
-        $this->assertInstanceOf(EmptySubscriptionsException::class, $exception);
-        $this->assertSame('No subscriptions', $exception->getMessage());
+        self::assertInstanceOf(BusinessException::class, $exception);
+        self::assertInstanceOf(EmptySubscriptionsException::class, $exception);
+        self::assertSame('No subscriptions', $exception->getMessage());
     }
 
     public function testTopicHasNoPartitionException(): void
     {
         $exception = new TopicHasNoPartitionException('Topic has no partition');
 
-        $this->assertInstanceOf(BusinessException::class, $exception);
-        $this->assertInstanceOf(TopicHasNoPartitionException::class, $exception);
-        $this->assertSame('Topic has no partition', $exception->getMessage());
+        self::assertInstanceOf(BusinessException::class, $exception);
+        self::assertInstanceOf(TopicHasNoPartitionException::class, $exception);
+        self::assertSame('Topic has no partition', $exception->getMessage());
     }
 
     public function testEmptySubscriptionsExceptionWithCode(): void
     {
         $exception = new EmptySubscriptionsException('No subscriptions', 100);
 
-        $this->assertSame(100, $exception->getCode());
+        self::assertSame(100, $exception->getCode());
     }
 
     public function testTopicHasNoPartitionExceptionWithCode(): void
     {
         $exception = new TopicHasNoPartitionException('Topic has no partition', 200);
 
-        $this->assertSame(200, $exception->getCode());
+        self::assertSame(200, $exception->getCode());
     }
 
     public function testBusinessExceptionWithPrevious(): void
@@ -56,38 +56,38 @@ final class BusinessExceptionTest extends TestCase
         $previous = new \Exception('Previous error');
         $exception = new class ('Test message', 0, $previous) extends BusinessException {};
 
-        $this->assertSame($previous, $exception->getPrevious());
+        self::assertSame($previous, $exception->getPrevious());
     }
 
     public function testEmptySubscriptionsExceptionIsDomainException(): void
     {
         $exception = new EmptySubscriptionsException('Test');
 
-        $this->assertInstanceOf(\DomainException::class, $exception);
+        self::assertInstanceOf(\DomainException::class, $exception);
     }
 
     public function testTopicHasNoPartitionExceptionIsDomainException(): void
     {
         $exception = new TopicHasNoPartitionException('Test');
 
-        $this->assertInstanceOf(\DomainException::class, $exception);
+        self::assertInstanceOf(\DomainException::class, $exception);
     }
 
     public function testEmptySubscriptionsExceptionCreate(): void
     {
         $exception = EmptySubscriptionsException::create();
 
-        $this->assertInstanceOf(BusinessException::class, $exception);
-        $this->assertInstanceOf(EmptySubscriptionsException::class, $exception);
-        $this->assertSame('At least one subscription is required', $exception->getMessage());
+        self::assertInstanceOf(BusinessException::class, $exception);
+        self::assertInstanceOf(EmptySubscriptionsException::class, $exception);
+        self::assertSame('At least one subscription is required', $exception->getMessage());
     }
 
     public function testTopicHasNoPartitionExceptionCreate(): void
     {
         $exception = TopicHasNoPartitionException::create('test-topic');
 
-        $this->assertInstanceOf(BusinessException::class, $exception);
-        $this->assertInstanceOf(TopicHasNoPartitionException::class, $exception);
-        $this->assertSame('Topic "test-topic" has no partition', $exception->getMessage());
+        self::assertInstanceOf(BusinessException::class, $exception);
+        self::assertInstanceOf(TopicHasNoPartitionException::class, $exception);
+        self::assertSame('Topic "test-topic" has no partition', $exception->getMessage());
     }
 }

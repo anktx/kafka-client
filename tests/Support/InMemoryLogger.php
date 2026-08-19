@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\Tests\Support;
 
 use Psr\Log\LoggerInterface;
-use Psr\Log\LoggerTrait;
 
 /**
  * Простейший PSR-3 logger-spy: собирает все записи в массив для assert'ов
@@ -14,8 +13,6 @@ use Psr\Log\LoggerTrait;
  */
 final class InMemoryLogger implements LoggerInterface
 {
-    use LoggerTrait;
-
     /**
      * @var list<array{level: mixed, message: string, context: array<mixed>}>
      */
@@ -32,6 +29,70 @@ final class InMemoryLogger implements LoggerInterface
             'message' => (string) $message,
             'context' => $context,
         ];
+    }
+
+    /**
+     * @param array<mixed> $context
+     */
+    public function emergency(string|\Stringable $message, array $context = []): void
+    {
+        $this->log('emergency', $message, $context);
+    }
+
+    /**
+     * @param array<mixed> $context
+     */
+    public function alert(string|\Stringable $message, array $context = []): void
+    {
+        $this->log('alert', $message, $context);
+    }
+
+    /**
+     * @param array<mixed> $context
+     */
+    public function critical(string|\Stringable $message, array $context = []): void
+    {
+        $this->log('critical', $message, $context);
+    }
+
+    /**
+     * @param array<mixed> $context
+     */
+    public function error(string|\Stringable $message, array $context = []): void
+    {
+        $this->log('error', $message, $context);
+    }
+
+    /**
+     * @param array<mixed> $context
+     */
+    public function warning(string|\Stringable $message, array $context = []): void
+    {
+        $this->log('warning', $message, $context);
+    }
+
+    /**
+     * @param array<mixed> $context
+     */
+    public function notice(string|\Stringable $message, array $context = []): void
+    {
+        $this->log('notice', $message, $context);
+    }
+
+    /**
+     * @param array<mixed> $context
+     */
+    public function info(string|\Stringable $message, array $context = []): void
+    {
+        $this->log('info', $message, $context);
+    }
+
+    /**
+     * @param array<mixed> $context
+     */
+    public function debug(string|\Stringable $message, array $context = []): void
+    {
+        $this->log('debug', $message, $context);
     }
 
     /**

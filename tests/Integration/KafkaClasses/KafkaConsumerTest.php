@@ -32,7 +32,7 @@ final class KafkaConsumerTest extends TestCase
 
         $consumer = new KafkaConsumer($config);
 
-        $this->assertInstanceOf(KafkaConsumer::class, $consumer);
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
         $consumer->close();
     }
 
@@ -177,7 +177,7 @@ final class KafkaConsumerTest extends TestCase
         $consumer->close();
 
         // Проверяем, что один из callback'ов был вызван
-        $this->assertTrue($messageCalled || $timeoutCalled || $eofCalled);
+        self::assertTrue($messageCalled || $timeoutCalled || $eofCalled);
     }
 
     public function testConstructorWithDebugEnabled(): void
@@ -191,7 +191,7 @@ final class KafkaConsumerTest extends TestCase
 
         $consumer = new KafkaConsumer($config);
 
-        $this->assertInstanceOf(KafkaConsumer::class, $consumer);
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
         $consumer->close();
     }
 
@@ -206,7 +206,7 @@ final class KafkaConsumerTest extends TestCase
 
         $consumer = new KafkaConsumer($config);
 
-        $this->assertInstanceOf(KafkaConsumer::class, $consumer);
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
         $consumer->close();
     }
 
@@ -221,7 +221,7 @@ final class KafkaConsumerTest extends TestCase
 
         $consumer = new KafkaConsumer($config);
 
-        $this->assertInstanceOf(KafkaConsumer::class, $consumer);
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
         $consumer->close();
     }
 
@@ -236,7 +236,7 @@ final class KafkaConsumerTest extends TestCase
 
         $consumer = new KafkaConsumer($config);
 
-        $this->assertInstanceOf(KafkaConsumer::class, $consumer);
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
         $consumer->close();
     }
 

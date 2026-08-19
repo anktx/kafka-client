@@ -17,8 +17,8 @@ final class KafkaPartitionEofTest extends TestCase
             offset: 100,
         );
 
-        $this->assertSame('test-topic', $eof->topic);
-        $this->assertSame(1, $eof->partition);
-        $this->assertSame(100, $eof->offset);
+        self::assertSame('test-topic', $eof->topic);
+        self::assertSame(1, $eof->partition);
+        self::assertSame(100, $eof->offset);
     }
 }

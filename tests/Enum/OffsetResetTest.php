@@ -13,28 +13,28 @@ final class OffsetResetTest extends TestCase
     {
         $cases = OffsetReset::cases();
 
-        $this->assertCount(3, $cases);
+        self::assertCount(3, $cases);
     }
 
     public function testEarliestCase(): void
     {
         $case = OffsetReset::earliest;
 
-        $this->assertSame('earliest', $case->name);
+        self::assertSame('earliest', $case->name);
     }
 
     public function testLatestCase(): void
     {
         $case = OffsetReset::latest;
 
-        $this->assertSame('latest', $case->name);
+        self::assertSame('latest', $case->name);
     }
 
     public function testNoneCase(): void
     {
         $case = OffsetReset::none;
 
-        $this->assertSame('none', $case->name);
+        self::assertSame('none', $case->name);
     }
 
     public function testCasesContainAllTypes(): void
@@ -42,8 +42,8 @@ final class OffsetResetTest extends TestCase
         $cases = OffsetReset::cases();
         $names = array_map(static fn($case) => $case->name, $cases);
 
-        $this->assertContains('earliest', $names);
-        $this->assertContains('latest', $names);
-        $this->assertContains('none', $names);
+        self::assertContains('earliest', $names);
+        self::assertContains('latest', $names);
+        self::assertContains('none', $names);
     }
 }

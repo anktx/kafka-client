@@ -20,7 +20,7 @@ final class KafkaProducerTest extends TestCase
 
         $producer = new KafkaProducer($config);
 
-        $this->assertInstanceOf(KafkaProducer::class, $producer);
+        self::assertInstanceOf(KafkaProducer::class, $producer);
     }
 
     public function testConstructorWithCustomPollStrategy(): void
@@ -30,7 +30,7 @@ final class KafkaProducerTest extends TestCase
 
         $producer = new KafkaProducer($config, $strategy);
 
-        $this->assertInstanceOf(KafkaProducer::class, $producer);
+        self::assertInstanceOf(KafkaProducer::class, $producer);
     }
 
     public function testProduce(): void
@@ -160,7 +160,7 @@ final class KafkaProducerTest extends TestCase
 
         $producer = new KafkaProducer($config);
 
-        $this->assertInstanceOf(KafkaProducer::class, $producer);
+        self::assertInstanceOf(KafkaProducer::class, $producer);
     }
 
     public function testConstructorWithCustomBatchSize(): void
@@ -172,7 +172,7 @@ final class KafkaProducerTest extends TestCase
 
         $producer = new KafkaProducer($config);
 
-        $this->assertInstanceOf(KafkaProducer::class, $producer);
+        self::assertInstanceOf(KafkaProducer::class, $producer);
     }
 
     public function testProduceAndFlush(): void

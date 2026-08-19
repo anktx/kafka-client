@@ -17,8 +17,8 @@ final class KafkaExceptionTest extends TestCase
     {
         $exception = new class ('Test message', 123, null) extends KafkaException {};
 
-        $this->assertSame('Test message', $exception->getMessage());
-        $this->assertSame(123, $exception->getCode());
+        self::assertSame('Test message', $exception->getMessage());
+        self::assertSame(123, $exception->getCode());
     }
 
     public function testKafkaExceptionFromKafkaException(): void
@@ -28,8 +28,8 @@ final class KafkaExceptionTest extends TestCase
 
         $result = $exception::fromKafkaException($previous);
 
-        $this->assertSame('Original error', $result->getMessage());
-        $this->assertSame(456, $result->getCode());
+        self::assertSame('Original error', $result->getMessage());
+        self::assertSame(456, $result->getCode());
     }
 
     public function testKafkaExceptionFromKafkaExceptionWithPrevious(): void
@@ -40,12 +40,12 @@ final class KafkaExceptionTest extends TestCase
         $exception = new class extends KafkaException {};
         $result = $exception::fromKafkaException($rdKafkaException);
 
-        $this->assertSame('Kafka error', $result->getMessage());
-        $this->assertSame(789, $result->getCode());
+        self::assertSame('Kafka error', $result->getMessage());
+        self::assertSame(789, $result->getCode());
 
         $previous = $result->getPrevious();
-        $this->assertSame($rdKafkaException, $previous);
-        $this->assertSame($originalPrevious, $previous->getPrevious());
+        self::assertSame($rdKafkaException, $previous);
+        self::assertSame($originalPrevious, $previous->getPrevious());
     }
 
     public function testKafkaConsumerException(): void
@@ -54,10 +54,10 @@ final class KafkaExceptionTest extends TestCase
             new \RdKafka\Exception('Consumer error', 100),
         );
 
-        $this->assertInstanceOf(KafkaException::class, $exception);
-        $this->assertInstanceOf(KafkaConsumerException::class, $exception);
-        $this->assertSame('Consumer error', $exception->getMessage());
-        $this->assertSame(100, $exception->getCode());
+        self::assertInstanceOf(KafkaException::class, $exception);
+        self::assertInstanceOf(KafkaConsumerException::class, $exception);
+        self::assertSame('Consumer error', $exception->getMessage());
+        self::assertSame(100, $exception->getCode());
     }
 
     public function testKafkaProducerException(): void
@@ -66,10 +66,10 @@ final class KafkaExceptionTest extends TestCase
             new \RdKafka\Exception('Producer error', 200),
         );
 
-        $this->assertInstanceOf(KafkaException::class, $exception);
-        $this->assertInstanceOf(KafkaProducerException::class, $exception);
-        $this->assertSame('Producer error', $exception->getMessage());
-        $this->assertSame(200, $exception->getCode());
+        self::assertInstanceOf(KafkaException::class, $exception);
+        self::assertInstanceOf(KafkaProducerException::class, $exception);
+        self::assertSame('Producer error', $exception->getMessage());
+        self::assertSame(200, $exception->getCode());
     }
 
     public function testKafkaConnectionException(): void
@@ -78,71 +78,71 @@ final class KafkaExceptionTest extends TestCase
             new \RdKafka\Exception('Connection error', 300),
         );
 
-        $this->assertInstanceOf(KafkaException::class, $exception);
-        $this->assertInstanceOf(KafkaConnectionException::class, $exception);
-        $this->assertSame('Connection error', $exception->getMessage());
-        $this->assertSame(300, $exception->getCode());
+        self::assertInstanceOf(KafkaException::class, $exception);
+        self::assertInstanceOf(KafkaConnectionException::class, $exception);
+        self::assertSame('Connection error', $exception->getMessage());
+        self::assertSame(300, $exception->getCode());
     }
 
     public function testKafkaConsumerExceptionConstructorIsFinal(): void
     {
         $exception = new KafkaConsumerException('Test message');
 
-        $this->assertSame('Test message', $exception->getMessage());
-        $this->assertSame(0, $exception->getCode());
+        self::assertSame('Test message', $exception->getMessage());
+        self::assertSame(0, $exception->getCode());
     }
 
     public function testKafkaProducerExceptionConstructorIsFinal(): void
     {
         $exception = new KafkaProducerException('Test message', 123);
 
-        $this->assertSame('Test message', $exception->getMessage());
-        $this->assertSame(123, $exception->getCode());
+        self::assertSame('Test message', $exception->getMessage());
+        self::assertSame(123, $exception->getCode());
     }
 
     public function testKafkaConnectionExceptionConstructorIsFinal(): void
     {
         $exception = new KafkaConnectionException('Test message', 456);
 
-        $this->assertSame('Test message', $exception->getMessage());
-        $this->assertSame(456, $exception->getCode());
+        self::assertSame('Test message', $exception->getMessage());
+        self::assertSame(456, $exception->getCode());
     }
 
     public function testKafkaConsumerExceptionCreate(): void
     {
         $exception = KafkaConsumerException::create('Kafka error message');
 
-        $this->assertInstanceOf(KafkaException::class, $exception);
-        $this->assertInstanceOf(KafkaConsumerException::class, $exception);
-        $this->assertSame('Kafka error message', $exception->getMessage());
-        $this->assertSame(0, $exception->getCode());
+        self::assertInstanceOf(KafkaException::class, $exception);
+        self::assertInstanceOf(KafkaConsumerException::class, $exception);
+        self::assertSame('Kafka error message', $exception->getMessage());
+        self::assertSame(0, $exception->getCode());
     }
 
     public function testKafkaConnectionExceptionFlushTimeout(): void
     {
         $exception = KafkaConnectionException::flushTimeout(5000);
 
-        $this->assertInstanceOf(KafkaException::class, $exception);
-        $this->assertInstanceOf(KafkaConnectionException::class, $exception);
-        $this->assertSame('Flush timed out in 5000ms', $exception->getMessage());
+        self::assertInstanceOf(KafkaException::class, $exception);
+        self::assertInstanceOf(KafkaConnectionException::class, $exception);
+        self::assertSame('Flush timed out in 5000ms', $exception->getMessage());
     }
 
     public function testKafkaProducerExceptionFlushFailed(): void
     {
         $exception = KafkaProducerException::flushFailed(123);
 
-        $this->assertInstanceOf(KafkaException::class, $exception);
-        $this->assertInstanceOf(KafkaProducerException::class, $exception);
-        $this->assertSame('Flush failed: Err-123? (123)', $exception->getMessage());
+        self::assertInstanceOf(KafkaException::class, $exception);
+        self::assertInstanceOf(KafkaProducerException::class, $exception);
+        self::assertSame('Flush failed: Err-123? (123)', $exception->getMessage());
     }
 
     public function testKafkaUnavailableException(): void
     {
         $exception = KafkaUnavailableException::create(30, 45.5);
 
-        $this->assertInstanceOf(KafkaException::class, $exception);
-        $this->assertInstanceOf(KafkaUnavailableException::class, $exception);
-        $this->assertSame(
+        self::assertInstanceOf(KafkaException::class, $exception);
+        self::assertInstanceOf(KafkaUnavailableException::class, $exception);
+        self::assertSame(
             'Kafka has been unavailable for 45.5 seconds (threshold: 30 seconds)',
             $exception->getMessage(),
         );
@@ -152,7 +152,7 @@ final class KafkaExceptionTest extends TestCase
     {
         $exception = KafkaUnavailableException::create(10, 12.3456);
 
-        $this->assertSame(
+        self::assertSame(
             'Kafka has been unavailable for 12.3 seconds (threshold: 10 seconds)',
             $exception->getMessage(),
         );

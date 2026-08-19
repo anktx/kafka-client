@@ -23,7 +23,7 @@ final class KafkaMessageStreamTest extends TestCase
         $consumer = new KafkaConsumer($config);
         $stream = new KafkaMessageStream($consumer);
 
-        $this->assertInstanceOf(KafkaMessageStream::class, $stream);
+        self::assertInstanceOf(KafkaMessageStream::class, $stream);
 
         $consumer->close();
     }
@@ -39,7 +39,7 @@ final class KafkaMessageStreamTest extends TestCase
         $consumer = new KafkaConsumer($config);
         $stream = new KafkaMessageStream($consumer, 2000);
 
-        $this->assertInstanceOf(KafkaMessageStream::class, $stream);
+        self::assertInstanceOf(KafkaMessageStream::class, $stream);
 
         $consumer->close();
     }
@@ -57,7 +57,7 @@ final class KafkaMessageStreamTest extends TestCase
 
         $generator = $stream->stream();
 
-        $this->assertInstanceOf(\Generator::class, $generator);
+        self::assertInstanceOf(\Generator::class, $generator);
 
         // Закрываем генератор
         $generator->valid();
@@ -82,7 +82,7 @@ final class KafkaMessageStreamTest extends TestCase
         $stream = new KafkaMessageStream($consumer);
         $generator = $stream->stream();
 
-        $this->assertInstanceOf(\Generator::class, $generator);
+        self::assertInstanceOf(\Generator::class, $generator);
 
         // Закрываем генератор
         $generator->valid();
@@ -104,7 +104,7 @@ final class KafkaMessageStreamTest extends TestCase
 
         $generator = $stream->stream();
 
-        $this->assertInstanceOf(\Generator::class, $generator);
+        self::assertInstanceOf(\Generator::class, $generator);
 
         // Закрываем генератор
         $generator->valid();

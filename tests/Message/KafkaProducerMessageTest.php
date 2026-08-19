@@ -13,8 +13,8 @@ final class KafkaProducerMessageTest extends TestCase
     {
         $message = new KafkaProducerMessage(topic: 'test-topic');
 
-        $this->assertSame('test-topic', $message->topic);
-        $this->assertNull($message->body);
+        self::assertSame('test-topic', $message->topic);
+        self::assertNull($message->body);
     }
 
     public function testCreateWithAllParameters(): void
@@ -29,18 +29,18 @@ final class KafkaProducerMessageTest extends TestCase
             timestampMs: 123456789,
         );
 
-        $this->assertSame('test-topic', $message->topic);
-        $this->assertSame('test body', $message->body);
-        $this->assertSame(1, $message->partition);
-        $this->assertSame('test-key', $message->key);
-        $this->assertSame($headers, $message->headers);
-        $this->assertSame(123456789, $message->timestampMs);
+        self::assertSame('test-topic', $message->topic);
+        self::assertSame('test body', $message->body);
+        self::assertSame(1, $message->partition);
+        self::assertSame('test-key', $message->key);
+        self::assertSame($headers, $message->headers);
+        self::assertSame(123456789, $message->timestampMs);
     }
 
     public function testDefaultTimestamp(): void
     {
         $message = new KafkaProducerMessage(topic: 'test-topic');
 
-        $this->assertSame(0, $message->timestampMs);
+        self::assertSame(0, $message->timestampMs);
     }
 }

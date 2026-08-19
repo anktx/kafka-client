@@ -13,7 +13,7 @@ final class TimeoutPollStrategyTest extends TestCase
     {
         $strategy = new TimeoutPollStrategy(pollIntervalSec: 5);
 
-        $this->assertSame(5, $strategy->pollIntervalSec);
+        self::assertSame(5, $strategy->pollIntervalSec);
     }
 
     public function testNegativeIntervalIsRejected(): void
@@ -28,8 +28,8 @@ final class TimeoutPollStrategyTest extends TestCase
     {
         $strategy = new TimeoutPollStrategy(pollIntervalSec: 10);
 
-        $this->assertTrue($strategy->shouldPoll());
-        $this->assertFalse($strategy->shouldPoll());
+        self::assertTrue($strategy->shouldPoll());
+        self::assertFalse($strategy->shouldPoll());
     }
 
     public function testShouldPollWithZeroInterval(): void
@@ -37,8 +37,8 @@ final class TimeoutPollStrategyTest extends TestCase
         $strategy = new TimeoutPollStrategy(pollIntervalSec: 0);
 
         // С нулевым интервалом каждый вызов должен возвращать true
-        $this->assertTrue($strategy->shouldPoll());
-        $this->assertTrue($strategy->shouldPoll());
+        self::assertTrue($strategy->shouldPoll());
+        self::assertTrue($strategy->shouldPoll());
     }
 
     public function testShouldPollWhenExactlyIntervalPassed(): void
@@ -51,7 +51,7 @@ final class TimeoutPollStrategyTest extends TestCase
         // Мокаем время так, чтобы прошло ровно pollIntervalSec
         // Но это сложно без dependency injection
         // Проверим только базовое поведение
-        $this->assertFalse($strategy->shouldPoll());
+        self::assertFalse($strategy->shouldPoll());
     }
 
     public function testGreaterOrEqual(): void
@@ -61,7 +61,7 @@ final class TimeoutPollStrategyTest extends TestCase
         $strategy = new TimeoutPollStrategy(pollIntervalSec: 100);
 
         // Первый вызов должен вернуть true (timestamp >= 0 + 100 всегда true для текущего времени)
-        $this->assertTrue($strategy->shouldPoll());
+        self::assertTrue($strategy->shouldPoll());
     }
 
     public function testInitialLastPollTimestampIsZero(): void
@@ -72,6 +72,6 @@ final class TimeoutPollStrategyTest extends TestCase
         $property = $reflection->getProperty('lastPollTimestamp');
         $property->setAccessible(true);
 
-        $this->assertSame(0, $property->getValue($strategy));
+        self::assertSame(0, $property->getValue($strategy));
     }
 }

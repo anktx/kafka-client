@@ -13,8 +13,8 @@ final class KafkaConsumerMessageTest extends TestCase
     {
         $message = new KafkaConsumerMessage(topic: 'test-topic');
 
-        $this->assertSame('test-topic', $message->topic);
-        $this->assertNull($message->body);
+        self::assertSame('test-topic', $message->topic);
+        self::assertNull($message->body);
     }
 
     public function testCreateWithAllParameters(): void
@@ -30,12 +30,12 @@ final class KafkaConsumerMessageTest extends TestCase
             timestampMs: 123456789,
         );
 
-        $this->assertSame('test-topic', $message->topic);
-        $this->assertSame('test body', $message->body);
-        $this->assertSame(1, $message->partition);
-        $this->assertSame(100, $message->offset);
-        $this->assertSame('test-key', $message->key);
-        $this->assertSame($headers, $message->headers);
-        $this->assertSame(123456789, $message->timestampMs);
+        self::assertSame('test-topic', $message->topic);
+        self::assertSame('test body', $message->body);
+        self::assertSame(1, $message->partition);
+        self::assertSame(100, $message->offset);
+        self::assertSame('test-key', $message->key);
+        self::assertSame($headers, $message->headers);
+        self::assertSame(123456789, $message->timestampMs);
     }
 }

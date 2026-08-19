@@ -13,6 +13,6 @@ final class NeverPollStrategyTest extends TestCase
     {
         $strategy = new NeverPollStrategy();
 
-        $this->assertFalse($strategy->shouldPoll());
+        self::assertFalse($strategy->shouldPoll());
     }
 }

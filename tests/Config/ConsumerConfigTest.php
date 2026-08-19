@@ -19,9 +19,9 @@ final class ConsumerConfigTest extends TestCase
             instanceId: 'test-instance',
         );
 
-        $this->assertSame('kafka:9092', $config->brokers);
-        $this->assertSame('test-group', $config->groupId);
-        $this->assertSame('test-instance', $config->instanceId);
+        self::assertSame('kafka:9092', $config->brokers);
+        self::assertSame('test-group', $config->groupId);
+        self::assertSame('test-instance', $config->instanceId);
     }
 
     public function testAsKafkaConfig(): void
@@ -33,7 +33,7 @@ final class ConsumerConfigTest extends TestCase
         );
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
     public function testDefaults(): void
@@ -44,13 +44,13 @@ final class ConsumerConfigTest extends TestCase
             instanceId: 'test-instance',
         );
 
-        $this->assertFalse($config->isDebug);
-        $this->assertSame(OffsetReset::earliest, $config->offsetReset);
-        $this->assertNull($config->autoCommitMs);
-        $this->assertNull($config->sessionTimeoutMs);
-        $this->assertNull($config->reconnectBackoffMs);
-        $this->assertNull($config->reconnectBackoffMaxMs);
-        $this->assertTrue($config->socketKeepaliveEnable);
+        self::assertFalse($config->isDebug);
+        self::assertSame(OffsetReset::earliest, $config->offsetReset);
+        self::assertNull($config->autoCommitMs);
+        self::assertNull($config->sessionTimeoutMs);
+        self::assertNull($config->reconnectBackoffMs);
+        self::assertNull($config->reconnectBackoffMaxMs);
+        self::assertTrue($config->socketKeepaliveEnable);
     }
 
     public function testInstanceIdIsOptional(): void
@@ -60,8 +60,8 @@ final class ConsumerConfigTest extends TestCase
             groupId: 'test-group',
         );
 
-        $this->assertNull($config->instanceId);
-        $this->assertInstanceOf(Conf::class, $config->asKafkaConfig());
+        self::assertNull($config->instanceId);
+        self::assertInstanceOf(Conf::class, $config->asKafkaConfig());
     }
 
     public function testWithDebugEnabled(): void
@@ -73,7 +73,7 @@ final class ConsumerConfigTest extends TestCase
             isDebug: true,
         );
 
-        $this->assertTrue($config->isDebug);
+        self::assertTrue($config->isDebug);
     }
 
     public function testWithAutoCommitEnabled(): void
@@ -85,7 +85,7 @@ final class ConsumerConfigTest extends TestCase
             autoCommitMs: 5000,
         );
 
-        $this->assertSame(5000, $config->autoCommitMs);
+        self::assertSame(5000, $config->autoCommitMs);
     }
 
     public function testWithSessionTimeout(): void
@@ -97,7 +97,7 @@ final class ConsumerConfigTest extends TestCase
             sessionTimeoutMs: 10000,
         );
 
-        $this->assertSame(10000, $config->sessionTimeoutMs);
+        self::assertSame(10000, $config->sessionTimeoutMs);
     }
 
     public function testWithLatestOffsetReset(): void
@@ -109,7 +109,7 @@ final class ConsumerConfigTest extends TestCase
             offsetReset: OffsetReset::latest,
         );
 
-        $this->assertSame(OffsetReset::latest, $config->offsetReset);
+        self::assertSame(OffsetReset::latest, $config->offsetReset);
     }
 
     public function testAsKafkaConfigWithAutoCommit(): void
@@ -123,7 +123,7 @@ final class ConsumerConfigTest extends TestCase
 
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
     public function testAsKafkaConfigWithSessionTimeout(): void
@@ -137,7 +137,7 @@ final class ConsumerConfigTest extends TestCase
 
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
     public function testAsKafkaConfigWithDebugEnabled(): void
@@ -151,7 +151,7 @@ final class ConsumerConfigTest extends TestCase
 
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
     public function testAsKafkaConfigWithLatestOffsetReset(): void
@@ -165,7 +165,7 @@ final class ConsumerConfigTest extends TestCase
 
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
     public function testAsKafkaConfigWithAllOptions(): void
@@ -182,7 +182,7 @@ final class ConsumerConfigTest extends TestCase
 
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
     public function testDefaultSocketKeepaliveEnableIsTrue(): void
@@ -190,7 +190,7 @@ final class ConsumerConfigTest extends TestCase
         $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g');
         $dump = $config->asKafkaConfig()->dump();
 
-        $this->assertSame('true', $dump['socket.keepalive.enable']);
+        self::assertSame('true', $dump['socket.keepalive.enable']);
     }
 
     public function testSocketKeepaliveDisabled(): void
@@ -202,7 +202,7 @@ final class ConsumerConfigTest extends TestCase
         );
         $dump = $config->asKafkaConfig()->dump();
 
-        $this->assertSame('false', $dump['socket.keepalive.enable']);
+        self::assertSame('false', $dump['socket.keepalive.enable']);
     }
 
     public function testReconnectBackoffConfiguredWhenSet(): void
@@ -215,7 +215,7 @@ final class ConsumerConfigTest extends TestCase
         );
         $dump = $config->asKafkaConfig()->dump();
 
-        $this->assertSame('50', $dump['reconnect.backoff.ms']);
-        $this->assertSame('5000', $dump['reconnect.backoff.max.ms']);
+        self::assertSame('50', $dump['reconnect.backoff.ms']);
+        self::assertSame('5000', $dump['reconnect.backoff.max.ms']);
     }
 }

@@ -19,7 +19,7 @@ final class SubscriptionListTest extends TestCase
             new TopicSubscription('topic3'),
         );
 
-        $this->assertSame(['topic1', 'topic2', 'topic3'], $subscriptionList->topicNames());
+        self::assertSame(['topic1', 'topic2', 'topic3'], $subscriptionList->topicNames());
     }
 
     public function testTopicNamesRemovesDuplicates(): void
@@ -30,14 +30,14 @@ final class SubscriptionListTest extends TestCase
             new TopicSubscription('topic2'),
         );
 
-        $this->assertSame(['topic1', 'topic2'], $subscriptionList->topicNames());
+        self::assertSame(['topic1', 'topic2'], $subscriptionList->topicNames());
     }
 
     public function testIsEmpty(): void
     {
         $subscriptionList = new TopicSubscriptionList();
 
-        $this->assertTrue($subscriptionList->isEmpty());
+        self::assertTrue($subscriptionList->isEmpty());
     }
 
     public function testIsNotEmpty(): void
@@ -46,23 +46,23 @@ final class SubscriptionListTest extends TestCase
             new TopicSubscription('topic1'),
         );
 
-        $this->assertFalse($subscriptionList->isEmpty());
+        self::assertFalse($subscriptionList->isEmpty());
     }
 
     public function testCreate(): void
     {
         $subscriptionList = TopicSubscriptionList::create('topic1', 'topic2');
 
-        $this->assertSame(['topic1', 'topic2'], $subscriptionList->topicNames());
-        $this->assertCount(2, $subscriptionList->items);
+        self::assertSame(['topic1', 'topic2'], $subscriptionList->topicNames());
+        self::assertCount(2, $subscriptionList->items);
     }
 
     public function testCreateEmpty(): void
     {
         $subscriptionList = TopicSubscriptionList::create();
 
-        $this->assertTrue($subscriptionList->isEmpty());
-        $this->assertCount(0, $subscriptionList->items);
+        self::assertTrue($subscriptionList->isEmpty());
+        self::assertCount(0, $subscriptionList->items);
     }
 
     public function testFromKafkaTopicPartition(): void
@@ -72,16 +72,16 @@ final class SubscriptionListTest extends TestCase
 
         $subscriptionList = TopicSubscriptionList::fromKafkaTopicPartition($tp1, $tp2);
 
-        $this->assertCount(2, $subscriptionList->items);
-        $this->assertSame('topic1', $subscriptionList->items[0]->topic);
-        $this->assertSame('topic2', $subscriptionList->items[1]->topic);
+        self::assertCount(2, $subscriptionList->items);
+        self::assertSame('topic1', $subscriptionList->items[0]->topic);
+        self::assertSame('topic2', $subscriptionList->items[1]->topic);
     }
 
     public function testFromKafkaTopicPartitionEmpty(): void
     {
         $subscriptionList = TopicSubscriptionList::fromKafkaTopicPartition();
 
-        $this->assertTrue($subscriptionList->isEmpty());
+        self::assertTrue($subscriptionList->isEmpty());
     }
 
     public function testAsKafkaTopicPartitionArray(): void
@@ -93,10 +93,10 @@ final class SubscriptionListTest extends TestCase
 
         $topicPartitions = $subscriptionList->asKafkaTopicPartitionArray();
 
-        $this->assertCount(2, $topicPartitions);
-        $this->assertSame('topic1', $topicPartitions[0]->getTopic());
-        $this->assertSame(0, $topicPartitions[0]->getPartition());
-        $this->assertSame(100, $topicPartitions[0]->getOffset());
+        self::assertCount(2, $topicPartitions);
+        self::assertSame('topic1', $topicPartitions[0]->getTopic());
+        self::assertSame(0, $topicPartitions[0]->getPartition());
+        self::assertSame(100, $topicPartitions[0]->getOffset());
     }
 
     public function testAsKafkaTopicPartitionArrayFiltersSubscriptionsWithoutPartition(): void
@@ -109,9 +109,9 @@ final class SubscriptionListTest extends TestCase
 
         $topicPartitions = $subscriptionList->asKafkaTopicPartitionArray();
 
-        $this->assertCount(2, $topicPartitions);
-        $this->assertSame('topic1', $topicPartitions[0]->getTopic());
-        $this->assertSame('topic3', $topicPartitions[1]->getTopic());
+        self::assertCount(2, $topicPartitions);
+        self::assertSame('topic1', $topicPartitions[0]->getTopic());
+        self::assertSame('topic3', $topicPartitions[1]->getTopic());
     }
 
     public function testAsKafkaTopicPartitionArrayEmpty(): void
@@ -122,7 +122,7 @@ final class SubscriptionListTest extends TestCase
 
         $topicPartitions = $subscriptionList->asKafkaTopicPartitionArray();
 
-        $this->assertCount(0, $topicPartitions);
+        self::assertCount(0, $topicPartitions);
     }
 
     public function testConstructorWithItems(): void
@@ -132,9 +132,9 @@ final class SubscriptionListTest extends TestCase
 
         $subscriptionList = new TopicSubscriptionList($item1, $item2);
 
-        $this->assertCount(2, $subscriptionList->items);
-        $this->assertSame($item1, $subscriptionList->items[0]);
-        $this->assertSame($item2, $subscriptionList->items[1]);
+        self::assertCount(2, $subscriptionList->items);
+        self::assertSame($item1, $subscriptionList->items[0]);
+        self::assertSame($item2, $subscriptionList->items[1]);
     }
 
     public function testTopicNamesPreservesOrder(): void
@@ -145,7 +145,7 @@ final class SubscriptionListTest extends TestCase
             new TopicSubscription('topic2'),
         );
 
-        $this->assertSame(['topic3', 'topic1', 'topic2'], $subscriptionList->topicNames());
+        self::assertSame(['topic3', 'topic1', 'topic2'], $subscriptionList->topicNames());
     }
 
     public function testTopicNamesWithPartitionsAndWithout(): void
@@ -156,6 +156,6 @@ final class SubscriptionListTest extends TestCase
             new TopicSubscription('topic2'),
         );
 
-        $this->assertSame(['topic1', 'topic2'], $subscriptionList->topicNames());
+        self::assertSame(['topic1', 'topic2'], $subscriptionList->topicNames());
     }
 }

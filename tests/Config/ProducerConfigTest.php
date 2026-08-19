@@ -15,7 +15,7 @@ final class ProducerConfigTest extends TestCase
     {
         $config = new ProducerConfig('kafka:9092');
 
-        $this->assertSame('kafka:9092', $config->brokers);
+        self::assertSame('kafka:9092', $config->brokers);
     }
 
     public function testAsKafkaConfig(): void
@@ -23,18 +23,18 @@ final class ProducerConfigTest extends TestCase
         $config = new ProducerConfig('kafka:9092');
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
     public function testDefaults(): void
     {
         $config = new ProducerConfig('kafka:9092');
 
-        $this->assertSame(20480, $config->queueBufferingMaxKBytes);
-        $this->assertSame(102400, $config->batchSize);
-        $this->assertSame(10, $config->lingerMs);
-        $this->assertSame(CompressionType::snappy, $config->compressionType);
-        $this->assertFalse($config->isDebug);
+        self::assertSame(20480, $config->queueBufferingMaxKBytes);
+        self::assertSame(102400, $config->batchSize);
+        self::assertSame(10, $config->lingerMs);
+        self::assertSame(CompressionType::snappy, $config->compressionType);
+        self::assertFalse($config->isDebug);
     }
 
     public function testWithCustomQueueBufferingMaxKBytes(): void
@@ -44,7 +44,7 @@ final class ProducerConfigTest extends TestCase
             queueBufferingMaxKBytes: 10240,
         );
 
-        $this->assertSame(10240, $config->queueBufferingMaxKBytes);
+        self::assertSame(10240, $config->queueBufferingMaxKBytes);
     }
 
     public function testWithCustomBatchSize(): void
@@ -54,7 +54,7 @@ final class ProducerConfigTest extends TestCase
             batchSize: 51200,
         );
 
-        $this->assertSame(51200, $config->batchSize);
+        self::assertSame(51200, $config->batchSize);
     }
 
     public function testWithCustomLingerMs(): void
@@ -64,7 +64,7 @@ final class ProducerConfigTest extends TestCase
             lingerMs: 100,
         );
 
-        $this->assertSame(100, $config->lingerMs);
+        self::assertSame(100, $config->lingerMs);
     }
 
     public function testWithGzipCompression(): void
@@ -74,7 +74,7 @@ final class ProducerConfigTest extends TestCase
             compressionType: CompressionType::gzip,
         );
 
-        $this->assertSame(CompressionType::gzip, $config->compressionType);
+        self::assertSame(CompressionType::gzip, $config->compressionType);
     }
 
     public function testWithLz4Compression(): void
@@ -84,7 +84,7 @@ final class ProducerConfigTest extends TestCase
             compressionType: CompressionType::lz4,
         );
 
-        $this->assertSame(CompressionType::lz4, $config->compressionType);
+        self::assertSame(CompressionType::lz4, $config->compressionType);
     }
 
     public function testWithZstdCompression(): void
@@ -94,7 +94,7 @@ final class ProducerConfigTest extends TestCase
             compressionType: CompressionType::zstd,
         );
 
-        $this->assertSame(CompressionType::zstd, $config->compressionType);
+        self::assertSame(CompressionType::zstd, $config->compressionType);
     }
 
     public function testWithDebugEnabled(): void
@@ -104,7 +104,7 @@ final class ProducerConfigTest extends TestCase
             isDebug: true,
         );
 
-        $this->assertTrue($config->isDebug);
+        self::assertTrue($config->isDebug);
     }
 
     public function testAsKafkaConfigWithAllOptions(): void
@@ -120,7 +120,7 @@ final class ProducerConfigTest extends TestCase
 
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
     public function testAsKafkaConfigWithGzipCompression(): void
@@ -132,7 +132,7 @@ final class ProducerConfigTest extends TestCase
 
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
     public function testAsKafkaConfigWithLz4Compression(): void
@@ -144,7 +144,7 @@ final class ProducerConfigTest extends TestCase
 
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
     public function testAsKafkaConfigWithZstdCompression(): void
@@ -156,6 +156,6 @@ final class ProducerConfigTest extends TestCase
 
         $kafkaConfig = $config->asKafkaConfig();
 
-        $this->assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 }

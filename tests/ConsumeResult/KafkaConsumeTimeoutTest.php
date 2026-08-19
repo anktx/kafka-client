@@ -16,7 +16,7 @@ final class KafkaConsumeTimeoutTest extends TestCase
             offset: 100,
         );
 
-        $this->assertSame(1, $timeout->partition);
-        $this->assertSame(100, $timeout->offset);
+        self::assertSame(1, $timeout->partition);
+        self::assertSame(100, $timeout->offset);
     }
 }

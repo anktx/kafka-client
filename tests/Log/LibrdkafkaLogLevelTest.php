@@ -14,7 +14,7 @@ final class LibrdkafkaLogLevelTest extends TestCase
     #[DataProvider('provideToPsrLevelCases')]
     public function testToPsrLevel(int $severity, string $expectedLevel): void
     {
-        $this->assertSame($expectedLevel, LibrdkafkaLogLevel::toPsrLevel($severity));
+        self::assertSame($expectedLevel, LibrdkafkaLogLevel::toPsrLevel($severity));
     }
 
     /**
@@ -41,7 +41,7 @@ final class LibrdkafkaLogLevelTest extends TestCase
 
     public function testOutOfRangeSeverityFallsBackToError(): void
     {
-        $this->assertSame(LogLevel::ERROR, LibrdkafkaLogLevel::toPsrLevel(8));
-        $this->assertSame(LogLevel::ERROR, LibrdkafkaLogLevel::toPsrLevel(-1));
+        self::assertSame(LogLevel::ERROR, LibrdkafkaLogLevel::toPsrLevel(8));
+        self::assertSame(LogLevel::ERROR, LibrdkafkaLogLevel::toPsrLevel(-1));
     }
 }
