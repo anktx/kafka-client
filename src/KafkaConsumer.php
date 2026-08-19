@@ -249,7 +249,7 @@ final class KafkaConsumer
         \Closure $onMessage,
         \Closure $onTimeout,
         \Closure $onEof,
-        int $timeoutMs = 1000,
+        int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS,
     ): mixed {
         $result = $this->consume($timeoutMs);
 
