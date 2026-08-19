@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Anktx\Kafka\Client\Tests\Subscription;
+namespace Anktx\Kafka\Client\Tests\TopicSubscription;
 
 use Anktx\Kafka\Client\Exception\Logic\InvalidSubscriptionException;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
 use PHPUnit\Framework\TestCase;
 
-final class SubscriptionTest extends TestCase
+final class TopicSubscriptionTest extends TestCase
 {
     public function testCreate(): void
     {

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Anktx\Kafka\Client\Tests\Config\Subscription;
+namespace Anktx\Kafka\Client\Tests\TopicSubscription;
 
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\TestCase;
 
-final class SubscriptionListTest extends TestCase
+final class TopicSubscriptionListTest extends TestCase
 {
     public function testTopicNames(): void
     {
