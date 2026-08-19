@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
+use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
@@ -23,7 +24,8 @@ use RdKafka\Message;
  * Фиксируется контракт: таймауты и EOF не выдаются наружу (poll
  * продолжается), сообщения yield'ятся с последовательными int-ключами,
  * таймаут опроса пробрасывается в consume(), исключения консьюмера
- * пробрасываются из генератора при первой итерации.
+ * пробрасываются из генератора при первой итерации, закрытый консьюмер
+ * отвергается ClientClosedException до единого вызова RdKafka.
  */
 final class KafkaMessageStreamTest extends TestCase
 {
@@ -185,6 +187,27 @@ final class KafkaMessageStreamTest extends TestCase
             self::fail('Expected KafkaConsumerException');
         } catch (KafkaConsumerException $e) {
             self::assertSame('transport failure', $e->getMessage());
+        }
+    }
+
+    public function testStreamThrowsClientClosedFromClosedConsumer(): void
+    {
+        // stream() декларирует ClientClosedException: guard закрытого
+        // состояния срабатывает до единого вызова RdKafka.
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->expects($this->once())->method('close');
+        $rdKafka->expects($this->never())->method('getSubscription');
+        $rdKafka->expects($this->never())->method('consume');
+
+        $consumer = $this->buildConsumer($rdKafka);
+        $consumer->close();
+
+        $generator = (new KafkaMessageStream($consumer))->stream();
+
+        try {
+            $generator->current();
+            self::fail('Expected ClientClosedException');
+        } catch (ClientClosedException) {
         }
     }
 

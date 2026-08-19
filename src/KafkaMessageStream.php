@@ -7,6 +7,7 @@ namespace Anktx\Kafka\Client;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
+use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 
@@ -50,8 +51,18 @@ final readonly class KafkaMessageStream
      *
      * Генератор бесконечен - для остановки нужно прервать цикл.
      *
+     * Полная потеря связи с брокерами намеренно неотличима от таймаута:
+     * {@see KafkaConsumer::consume()} возвращает KafkaConsumeTimeout и при
+     * RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN, поэтому генератор просто
+     * продолжает опрос (не дольше pollTimeoutMs на итерацию) и
+     * самовосстанавливается, когда librdkafka переподключится в фоновых
+     * потоках. «Вечное» отсутствие брокеров через этот API не наблюдаемо —
+     * fail-fast контроль доступности (error-callback в логах, внешний
+     * таймаут итераций, health-check) выполняйте на уровне приложения.
+     *
      * @return \Generator<int, KafkaConsumerMessage> Генератор сообщений
      *
+     * @throws ClientClosedException  Если консьюмер закрыт через close()
      * @throws KafkaConsumerException Если произошла ошибка при чтении
      * @throws NotSubscribedException Если консьюмер не подписан на топики
      */

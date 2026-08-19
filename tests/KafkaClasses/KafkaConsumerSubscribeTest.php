@@ -91,6 +91,36 @@ final class KafkaConsumerSubscribeTest extends TestCase
         $this->buildConsumer($rdKafka)->subscribe($list);
     }
 
+    public function testSecondSubscribeReplacesPreviousSubscription(): void
+    {
+        // Повторный subscribe() — замена, а не объединение и не ошибка:
+        // librdkafka принимает новый список как полный набор топиков
+        // (старые отписываются, запускается rebalance). Обёртка не
+        // добавляет своего guard'а — семантика делегирована librdkafka.
+        $calls = [];
+
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->expects($this->exactly(2))
+            ->method('subscribe')
+            ->with(self::callback(static function (array $topics) use (&$calls): bool {
+                $calls[] = $topics;
+
+                return true;
+            }))
+        ;
+        $rdKafka->expects($this->never())->method('assign');
+
+        $consumer = $this->buildConsumer($rdKafka);
+
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicSubscriptionList::create('other-topic', 'notifications'));
+
+        self::assertSame(
+            [['test-topic'], ['other-topic', 'notifications']],
+            $calls,
+        );
+    }
+
     public function testSubscribeWritesInfoLogContextAndEnablesConsumption(): void
     {
         // Интеграция трёх контрактов subscribe(): (1) ровно один RdKafka::subscribe(),
