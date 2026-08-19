@@ -27,7 +27,7 @@ final readonly class ProducerConfig
         }
 
         $conf->set('bootstrap.servers', $this->brokers);
-        $conf->set('compression.type', $this->compressionType->name);
+        $conf->set('compression.type', $this->compressionType->value);
         $conf->set('queue.buffering.max.kbytes', (string) $this->queueBufferingMaxKBytes);
         $conf->set('batch.size', (string) $this->batchSize);
         $conf->set('linger.ms', (string) $this->lingerMs);

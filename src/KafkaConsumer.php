@@ -70,7 +70,7 @@ final readonly class KafkaConsumer
             'brokers' => $config->brokers,
             'group_id' => $config->groupId,
             'instance_id' => $config->instanceId,
-            'offset_reset' => $config->offsetReset->name,
+            'offset_reset' => $config->offsetReset->value,
             'auto_commit_ms' => $config->autoCommitMs,
             'session_timeout_ms' => $config->sessionTimeoutMs,
         ]);

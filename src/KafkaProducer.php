@@ -64,7 +64,7 @@ final class KafkaProducer
 
         $this->logger->info('KafkaProducer created', [
             'brokers' => $config->brokers,
-            'compression' => $config->compressionType->name,
+            'compression' => $config->compressionType->value,
             'poll_strategy' => $pollStrategy::class,
         ]);
     }

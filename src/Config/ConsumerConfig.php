@@ -51,7 +51,7 @@ final readonly class ConsumerConfig
             $conf->set('group.instance.id', $this->instanceId);
         }
 
-        $conf->set('auto.offset.reset', $this->offsetReset->name);
+        $conf->set('auto.offset.reset', $this->offsetReset->value);
         $conf->set('enable.partition.eof', 'true');
     }
 
