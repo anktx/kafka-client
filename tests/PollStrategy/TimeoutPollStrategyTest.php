@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\PollStrategy;
 
+use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
 use Anktx\Kafka\Client\PollStrategy\TimeoutPollStrategy;
 use PHPUnit\Framework\TestCase;
 
@@ -18,8 +19,8 @@ final class TimeoutPollStrategyTest extends TestCase
 
     public function testNegativeIntervalIsRejected(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Poll interval must be non-negative');
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "pollIntervalSec" must not be negative, -1 given');
 
         new TimeoutPollStrategy(pollIntervalSec: -1);
     }

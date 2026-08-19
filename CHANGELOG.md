@@ -16,6 +16,12 @@
   бросает исключение только после исчерпания дедлайна. Ошибки, отличные от
   таймаута, по-прежнему фейлят сразу. В контексты логов добавлены
   `out_queue_len` (остаток очереди) и `attempts`.
+- **BC:** стратегии `TimeoutPollStrategy`/`ProbabilityPollStrategy` валидируют
+  параметры через `InvalidConfigException` (единый контракт с конфигами)
+  вместо голого `\InvalidArgumentException`: сообщения
+  `Config parameter "pollIntervalSec" must not be negative, …` и
+  `Config parameter "probability" must be between 0 and 1, …`
+  (новая фабрика `InvalidConfigException::probability()`).
 
 ## [0.8.0] - 2026-08-19
 

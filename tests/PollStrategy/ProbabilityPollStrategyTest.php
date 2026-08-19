@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\PollStrategy;
 
+use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
 use Anktx\Kafka\Client\PollStrategy\ProbabilityPollStrategy;
 use PHPUnit\Framework\TestCase;
 use Random\Engine\Xoshiro256StarStar;
@@ -33,14 +34,16 @@ final class ProbabilityPollStrategyTest extends TestCase
 
     public function testInvalidProbability(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "probability" must be between 0 and 1, -0.1 given');
 
         new ProbabilityPollStrategy(probability: -0.1);
     }
 
     public function testInvalidProbabilityAboveOne(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "probability" must be between 0 and 1, 1.1 given');
 
         new ProbabilityPollStrategy(probability: 1.1);
     }

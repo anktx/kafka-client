@@ -21,6 +21,11 @@ final class InvalidConfigException extends KafkaException
         return new self(\sprintf('Config parameter "%s" must not be negative, %d given', $parameter, $value));
     }
 
+    public static function probability(string $parameter, float $value): self
+    {
+        return new self(\sprintf('Config parameter "%s" must be between 0 and 1, %g given', $parameter, $value));
+    }
+
     public static function backoffRange(int $backoffMs, int $backoffMaxMs): self
     {
         return new self(\sprintf(
