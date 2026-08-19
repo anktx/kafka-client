@@ -69,6 +69,13 @@
 
 ### Added
 
+- Маркерный интерфейс `ConsumeResult` с дискриминатором
+  `kind(): ConsumeResultKind` (enum `Message`/`Timeout`/`PartitionEof`):
+  три результата `consume()` получили общий supertype для хелперов,
+  логгеров и метрик, а `kind()->name` — стабильный словарь вариантов.
+  Сигнатура `consume()` не изменилась: точный union сохранён для
+  narrowing через `match ($result::class)`/`instanceof` (`kind()`
+  тип в ветках не сужает — в PHP нет ADT).
 - Жизненный цикл закрытия консьюмера: повторный `KafkaConsumer::close()` —
   no-op (раньше делегировался в RdKafka повторно и падал), а
   `subscribe()`/`unsubscribe()`/`consume()`/`commit()` после закрытия

@@ -177,23 +177,29 @@ $consumer = new KafkaConsumer($config, logger: $logger);
 
 ## Типы возвращаемых значений
 
-Метод `consume()` возвращает union type:
-- `KafkaConsumerMessage` — успешно полученное сообщение
-- `KafkaConsumeTimeout` — таймаут (нет новых сообщений)
-- `KafkaPartitionEof` — достигнут конец партиции
+Метод `consume()` возвращает union type (все варианты реализуют интерфейс
+`ConsumeResult` с дискриминатором `kind(): ConsumeResultKind`):
+- `KafkaConsumerMessage` — успешно полученное сообщение (`ConsumeResultKind::Message`)
+- `KafkaConsumeTimeout` — таймаут (нет новых сообщений) (`ConsumeResultKind::Timeout`)
+- `KafkaPartitionEof` — достигнут конец партиции (`ConsumeResultKind::PartitionEof`)
 
-Пример обработки:
+Пример обработки — `match` по классу даёт исчерпывающую диспетчеризацию
+(при появлении нового варианта union будет `UnhandledMatchError`, а не
+молчаливый пропуск) и сужение типа внутри веток:
 
 ```php
 $result = $consumer->consume(1000);
 
-if ($result instanceof KafkaConsumerMessage) {
-    // Обработка сообщения
-    $consumer->commit($result);
-} elseif ($result instanceof KafkaConsumeTimeout) {
-    // Нет сообщений, можно продолжить работу
-}
+match ($result::class) {
+    KafkaConsumerMessage::class => $consumer->commit($result),
+    KafkaConsumeTimeout::class => null, // нет сообщений, можно продолжить работу
+    KafkaPartitionEof::class => null,   // достигнут конец партиции
+};
 ```
+
+`kind()` удобен там, где суженный тип не нужен: метрики (`$result->kind()->name`),
+логи и хелперы, принимающие `ConsumeResult` целиком. Если нужна только
+обработка сообщений без ветвления — см. [Message Stream](#message-stream).
 
 ## Структура проекта
 

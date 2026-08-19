@@ -10,4 +10,10 @@ namespace Anktx\Kafka\Client\ConsumeResult;
  * Раньше объект нёс partition/offset из служебного Message librdkafka,
  * но для таймаута это мусорные значения (-1/-1001), вводившие в заблуждение.
  */
-final readonly class KafkaConsumeTimeout {}
+final readonly class KafkaConsumeTimeout implements ConsumeResult
+{
+    public function kind(): ConsumeResultKind
+    {
+        return ConsumeResultKind::Timeout;
+    }
+}
