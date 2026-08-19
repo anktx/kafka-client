@@ -2,237 +2,192 @@
 
 declare(strict_types=1);
 
-namespace Anktx\Kafka\Client\Tests\Kafka;
+namespace Anktx\Kafka\Client\Tests\Integration\KafkaClasses;
 
+use Anktx\Kafka\Client\Config\Enum\CompressionType;
 use Anktx\Kafka\Client\Config\ProducerConfig;
-use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
-use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaProducer;
 use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;
+use Anktx\Kafka\Client\PollStrategy\TimeoutPollStrategy;
+use Anktx\Kafka\Client\Tests\Integration\Support\KafkaBroker;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Интеграционные тесты {@see KafkaProducer} против реального брокера
+ * (адрес — KAFKA_BROKERS, без брокера тесты помечаются skipped).
+ */
 final class KafkaProducerTest extends TestCase
 {
+    private string $brokers;
+
+    protected function setUp(): void
+    {
+        $this->brokers = KafkaBroker::requireBroker();
+    }
+
     public function testConstructor(): void
     {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
-
-        $producer = new KafkaProducer($config);
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
 
         self::assertInstanceOf(KafkaProducer::class, $producer);
     }
 
     public function testConstructorWithCustomPollStrategy(): void
     {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
-        $strategy = new NeverPollStrategy();
-
-        $producer = new KafkaProducer($config, $strategy);
+        $producer = new KafkaProducer(
+            new ProducerConfig(brokers: $this->brokers),
+            new TimeoutPollStrategy(pollIntervalSec: 1),
+        );
 
         self::assertInstanceOf(KafkaProducer::class, $producer);
     }
 
-    public function testProduce(): void
+    public function testConstructorWithNeverPollStrategy(): void
     {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
-
-        $producer = new KafkaProducer($config);
-
-        $message = new KafkaProducerMessage(
-            topic: 'test-topic',
-            body: 'test message',
-            partition: 0,
+        $producer = new KafkaProducer(
+            new ProducerConfig(brokers: $this->brokers),
+            new NeverPollStrategy(),
         );
 
-        try {
-            $producer->produce($message);
-        } catch (KafkaProducerException $e) {
-            // Ошибки могут возникать, если Kafka недоступен
-        }
-
-        // Test passes if no exception is thrown
-    }
-
-    public function testProduceWithAllParameters(): void
-    {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
-
-        $producer = new KafkaProducer($config);
-
-        $message = new KafkaProducerMessage(
-            topic: 'test-topic',
-            body: 'test message',
-            partition: 1,
-            key: 'test-key',
-            headers: ['content-type' => 'application/json'],
-            timestampMs: 123456789,
-        );
-
-        try {
-            $producer->produce($message);
-        } catch (KafkaProducerException $e) {
-            // Ошибки могут возникать, если Kafka недоступен
-        }
-
-        // Test passes if no exception is thrown
-    }
-
-    public function testProduceWithUnassignedPartition(): void
-    {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
-
-        $producer = new KafkaProducer($config);
-
-        $message = new KafkaProducerMessage(
-            topic: 'test-topic',
-            body: 'test message',
-        );
-
-        try {
-            $producer->produce($message);
-        } catch (KafkaProducerException $e) {
-            // Ошибки могут возникать, если Kafka недоступен
-        }
-
-        // Test passes if no exception is thrown
-    }
-
-    public function testFlush(): void
-    {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
-
-        $producer = new KafkaProducer($config);
-
-        try {
-            $producer->flush();
-        } catch (KafkaConnectionException|KafkaProducerException $e) {
-            // Ошибки могут возникать, если Kafka недоступна
-        }
-
-        // Test passes if no exception is thrown
-    }
-
-    public function testFlushWithCustomTimeout(): void
-    {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
-
-        $producer = new KafkaProducer($config);
-
-        try {
-            $producer->flush(5000);
-        } catch (KafkaConnectionException|KafkaProducerException $e) {
-            // Ошибки могут возникать, если Kafka недоступна
-        }
-
-        // Test passes if no exception is thrown
-    }
-
-    public function testProduceMultipleMessages(): void
-    {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
-
-        $producer = new KafkaProducer($config);
-
-        for ($i = 0; $i < 10; ++$i) {
-            $message = new KafkaProducerMessage(
-                topic: 'test-topic',
-                body: "message {$i}",
-                partition: 0,
-            );
-
-            try {
-                $producer->produce($message);
-            } catch (KafkaProducerException $e) {
-                // Ошибки могут возникать, если Kafka недоступен
-            }
-        }
-
-        // Test passes if no exception is thrown
+        self::assertInstanceOf(KafkaProducer::class, $producer);
     }
 
     public function testConstructorWithDebugEnabled(): void
     {
-        $config = new ProducerConfig(
-            brokers: 'localhost:9092',
+        $producer = new KafkaProducer(new ProducerConfig(
+            brokers: $this->brokers,
             isDebug: true,
-        );
-
-        $producer = new KafkaProducer($config);
+        ));
 
         self::assertInstanceOf(KafkaProducer::class, $producer);
     }
 
     public function testConstructorWithCustomBatchSize(): void
     {
-        $config = new ProducerConfig(
-            brokers: 'localhost:9092',
+        $producer = new KafkaProducer(new ProducerConfig(
+            brokers: $this->brokers,
             batchSize: 51200,
-        );
-
-        $producer = new KafkaProducer($config);
+        ));
 
         self::assertInstanceOf(KafkaProducer::class, $producer);
     }
 
-    public function testProduceAndFlush(): void
+    public function testConstructorWithCompression(): void
     {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
+        $producer = new KafkaProducer(new ProducerConfig(
+            brokers: $this->brokers,
+            compressionType: CompressionType::gzip,
+        ));
 
-        $producer = new KafkaProducer($config);
+        self::assertInstanceOf(KafkaProducer::class, $producer);
+    }
 
-        $message = new KafkaProducerMessage(
+    public function testProduce(): void
+    {
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        self::assertInstanceOf(KafkaProducer::class, $producer);
+
+        $producer->produce(new KafkaProducerMessage(
             topic: 'test-topic',
             body: 'test message',
-        );
+            partition: 0,
+        ));
 
-        try {
-            $producer->produce($message);
-            $producer->flush();
-        } catch (KafkaConnectionException|KafkaProducerException $e) {
-            // Ошибки могут возникать, если Kafka недоступна
-        }
+        $producer->flush(5000);
+    }
 
-        // Test passes if no exception is thrown
+    public function testProduceWithAllParameters(): void
+    {
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        self::assertInstanceOf(KafkaProducer::class, $producer);
+
+        $producer->produce(new KafkaProducerMessage(
+            topic: 'test-topic',
+            body: 'test message',
+            partition: 0,
+            key: 'test-key',
+            headers: ['content-type' => 'application/json'],
+            timestampMs: 123456789,
+        ));
+
+        $producer->flush(5000);
+    }
+
+    public function testProduceWithUnassignedPartition(): void
+    {
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        self::assertInstanceOf(KafkaProducer::class, $producer);
+
+        $producer->produce(new KafkaProducerMessage(
+            topic: 'test-topic',
+            body: 'test message',
+        ));
+
+        $producer->flush(5000);
     }
 
     public function testProduceWithNullBody(): void
     {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        self::assertInstanceOf(KafkaProducer::class, $producer);
 
-        $producer = new KafkaProducer($config);
+        $producer->produce(new KafkaProducerMessage(topic: 'test-topic'));
 
-        $message = new KafkaProducerMessage(
-            topic: 'test-topic',
-        );
-
-        try {
-            $producer->produce($message);
-        } catch (KafkaProducerException $e) {
-            // Ошибки могут возникать, если Kafka недоступен
-        }
-
-        // Test passes if no exception is thrown
+        $producer->flush(5000);
     }
 
     public function testProduceWithEmptyHeaders(): void
     {
-        $config = new ProducerConfig(brokers: 'localhost:9092');
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        self::assertInstanceOf(KafkaProducer::class, $producer);
 
-        $producer = new KafkaProducer($config);
-
-        $message = new KafkaProducerMessage(
+        $producer->produce(new KafkaProducerMessage(
             topic: 'test-topic',
             body: 'test',
             headers: [],
-        );
+        ));
 
-        try {
-            $producer->produce($message);
-        } catch (KafkaProducerException $e) {
-            // Ошибки могут возникать, если Kafka недоступен
+        $producer->flush(5000);
+    }
+
+    public function testProduceMultipleMessages(): void
+    {
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        self::assertInstanceOf(KafkaProducer::class, $producer);
+
+        for ($i = 0; $i < 10; ++$i) {
+            $producer->produce(new KafkaProducerMessage(
+                topic: 'test-topic',
+                body: "message {$i}",
+                partition: 0,
+            ));
         }
 
-        // Test passes if no exception is thrown
+        $producer->flush(5000);
+    }
+
+    public function testProduceAndFlush(): void
+    {
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        self::assertInstanceOf(KafkaProducer::class, $producer);
+
+        $producer->produce(new KafkaProducerMessage(
+            topic: 'test-topic',
+            body: 'test message',
+        ));
+        $producer->flush(5000);
+    }
+
+    public function testFlushWithCustomTimeout(): void
+    {
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        self::assertInstanceOf(KafkaProducer::class, $producer);
+
+        $producer->produce(new KafkaProducerMessage(
+            topic: 'test-topic',
+            body: 'test message',
+        ));
+        $producer->flush(10000);
     }
 }

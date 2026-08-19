@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Anktx\Kafka\Client\Tests\Kafka;
+namespace Anktx\Kafka\Client\Tests\Integration\KafkaClasses;
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
@@ -10,27 +10,64 @@ use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
-use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaProducer;
+use Anktx\Kafka\Client\Tests\Integration\Support\KafkaBroker;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Интеграционные тесты {@see KafkaConsumer} против реального брокера
+ * (адрес — KAFKA_BROKERS, без брокера тесты помечаются skipped).
+ */
 final class KafkaConsumerTest extends TestCase
 {
+    private string $brokers;
+
+    protected function setUp(): void
+    {
+        $this->brokers = KafkaBroker::requireBroker();
+    }
+
     public function testConstructor(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
+        $consumer = new KafkaConsumer($this->consumerConfig());
 
-        $consumer = new KafkaConsumer($config);
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
+        $consumer->close();
+    }
+
+    public function testConstructorWithDebugEnabled(): void
+    {
+        $consumer = new KafkaConsumer($this->consumerConfig(isDebug: true));
+
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
+        $consumer->close();
+    }
+
+    public function testConstructorWithAutoCommit(): void
+    {
+        $consumer = new KafkaConsumer($this->consumerConfig(autoCommitMs: 5000));
+
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
+        $consumer->close();
+    }
+
+    public function testConstructorWithSessionTimeout(): void
+    {
+        $consumer = new KafkaConsumer($this->consumerConfig(sessionTimeoutMs: 10000));
+
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
+        $consumer->close();
+    }
+
+    public function testConstructorWithLatestOffsetReset(): void
+    {
+        $consumer = new KafkaConsumer($this->consumerConfig(offsetReset: OffsetReset::latest));
 
         self::assertInstanceOf(KafkaConsumer::class, $consumer);
         $consumer->close();
@@ -38,39 +75,38 @@ final class KafkaConsumerTest extends TestCase
 
     public function testSubscribe(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
+        $consumer = new KafkaConsumer($this->consumerConfig());
 
-        $consumer = new KafkaConsumer($config);
-        $subscriptionList = TopicSubscriptionList::create('test-topic');
-
-        $consumer->subscribe($subscriptionList);
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
         $consumer->unsubscribe();
         $consumer->close();
 
-        // Test passes if no exception is thrown
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
+    }
+
+    public function testSubscribeWithPartition(): void
+    {
+        $consumer = new KafkaConsumer($this->consumerConfig());
+
+        $consumer->subscribe(new TopicSubscriptionList(
+            new TopicSubscription('test-topic', 0),
+        ));
+        $consumer->unsubscribe();
+        $consumer->close();
+
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
     }
 
     public function testSubscribeWithEmptyListThrowsException(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
-
-        $consumer = new KafkaConsumer($config);
-        $emptyList = new TopicSubscriptionList();
+        $consumer = new KafkaConsumer($this->consumerConfig());
 
         $this->expectException(EmptySubscriptionsException::class);
         $this->expectExceptionMessage('At least one subscription is required');
 
         try {
-            $consumer->subscribe($emptyList);
+            $consumer->subscribe(new TopicSubscriptionList());
         } finally {
             $consumer->close();
         }
@@ -78,31 +114,18 @@ final class KafkaConsumerTest extends TestCase
 
     public function testUnsubscribe(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
+        $consumer = new KafkaConsumer($this->consumerConfig());
 
-        $consumer = new KafkaConsumer($config);
-        $subscriptionList = TopicSubscriptionList::create('test-topic');
-
-        $consumer->subscribe($subscriptionList);
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
         $consumer->unsubscribe();
         $consumer->close();
 
-        // Test passes if no exception is thrown
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
     }
 
     public function testConsumeWithoutSubscriptionThrowsException(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
-
-        $consumer = new KafkaConsumer($config);
+        $consumer = new KafkaConsumer($this->consumerConfig());
 
         $this->expectException(NotSubscribedException::class);
 
@@ -115,43 +138,25 @@ final class KafkaConsumerTest extends TestCase
 
     public function testCommit(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
+        $consumer = new KafkaConsumer($this->consumerConfig());
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
-        $consumer = new KafkaConsumer($config);
-        $subscriptionList = TopicSubscriptionList::create('test-topic');
-
-        $consumer->subscribe($subscriptionList);
-
-        $message = new KafkaConsumerMessage(
+        $consumer->commit(new KafkaConsumerMessage(
             topic: 'test-topic',
             body: 'test',
             partition: 0,
             offset: 100,
-        );
-
-        $consumer->commit($message);
+        ));
 
         $consumer->close();
 
-        // Test passes if no exception is thrown
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
     }
 
     public function testConsumeMatch(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
-
-        $consumer = new KafkaConsumer($config);
-        $subscriptionList = TopicSubscriptionList::create('test-topic');
-
-        $consumer->subscribe($subscriptionList);
+        $consumer = new KafkaConsumer($this->consumerConfig());
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
         $messageCalled = false;
         $timeoutCalled = false;
@@ -170,110 +175,13 @@ final class KafkaConsumerTest extends TestCase
                 },
                 timeoutMs: 100,
             );
-        } catch (KafkaConsumerException $e) {
-            // Ошибки могут возникать при чтении из несуществующего топика
+        } finally {
+            $consumer->close();
         }
 
-        $consumer->close();
-
-        // Проверяем, что один из callback'ов был вызван
+        // Один из callback'ов обязан был сработать: пустой топик после
+        // auto-create отдаёт таймаут, конец партиции — EOF.
         self::assertTrue($messageCalled || $timeoutCalled || $eofCalled);
-    }
-
-    public function testConstructorWithDebugEnabled(): void
-    {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-            isDebug: true,
-        );
-
-        $consumer = new KafkaConsumer($config);
-
-        self::assertInstanceOf(KafkaConsumer::class, $consumer);
-        $consumer->close();
-    }
-
-    public function testConstructorWithAutoCommit(): void
-    {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-            autoCommitMs: 5000,
-        );
-
-        $consumer = new KafkaConsumer($config);
-
-        self::assertInstanceOf(KafkaConsumer::class, $consumer);
-        $consumer->close();
-    }
-
-    public function testConstructorWithSessionTimeout(): void
-    {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-            sessionTimeoutMs: 10000,
-        );
-
-        $consumer = new KafkaConsumer($config);
-
-        self::assertInstanceOf(KafkaConsumer::class, $consumer);
-        $consumer->close();
-    }
-
-    public function testConstructorWithLatestOffsetReset(): void
-    {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-            offsetReset: OffsetReset::latest,
-        );
-
-        $consumer = new KafkaConsumer($config);
-
-        self::assertInstanceOf(KafkaConsumer::class, $consumer);
-        $consumer->close();
-    }
-
-    public function testClose(): void
-    {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
-
-        $consumer = new KafkaConsumer($config);
-
-        $consumer->close();
-
-        // Test passes if no exception is thrown
-    }
-
-    public function testSubscribeWithPartition(): void
-    {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
-
-        $consumer = new KafkaConsumer($config);
-        $subscriptionList = new TopicSubscriptionList(
-            new TopicSubscription('test-topic', 0),
-        );
-
-        $consumer->subscribe($subscriptionList);
-
-        $consumer->unsubscribe();
-        $consumer->close();
-
-        // Test passes if no exception is thrown
     }
 
     /**
@@ -296,7 +204,7 @@ final class KafkaConsumerTest extends TestCase
 
         // Producer: пишем сообщения с разными ключами, чтобы librdkafka распределил
         // их по всем доступным partition'ам (для multi-partition topic).
-        $producer = new KafkaProducer(new ProducerConfig(brokers: 'localhost:9092'));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
         for ($i = 0; $i < $messageCount; ++$i) {
             $producer->produce(new KafkaProducerMessage(
                 topic: $topic,
@@ -309,7 +217,7 @@ final class KafkaConsumerTest extends TestCase
         // Consumer: уникальная group.id → committed offsets пустые, earliest
         // гарантирует чтение с начала partition'а.
         $consumer = new KafkaConsumer(new ConsumerConfig(
-            brokers: 'localhost:9092',
+            brokers: $this->brokers,
             groupId: 'subscribe-regression-' . uniqid('', true),
             offsetReset: OffsetReset::earliest,
         ));
@@ -357,5 +265,25 @@ final class KafkaConsumerTest extends TestCase
         } finally {
             $consumer->close();
         }
+    }
+
+    private function consumerConfig(
+        OffsetReset $offsetReset = OffsetReset::earliest,
+        ?int $autoCommitMs = null,
+        ?int $sessionTimeoutMs = null,
+        bool $isDebug = false,
+    ): ConsumerConfig {
+        // Уникальные group.id/instance.id на каждый тест: статические члены
+        // (KIP-345) не покидают группу при close(), и переиспользование пары
+        // group+instance в соседнем тесте приводит к фенсингу консьюмера.
+        return new ConsumerConfig(
+            brokers: $this->brokers,
+            groupId: 'test-group-' . uniqid('', true),
+            instanceId: 'test-instance-' . uniqid('', true),
+            offsetReset: $offsetReset,
+            autoCommitMs: $autoCommitMs,
+            sessionTimeoutMs: $sessionTimeoutMs,
+            isDebug: $isDebug,
+        );
     }
 }

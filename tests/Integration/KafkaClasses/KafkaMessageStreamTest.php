@@ -2,25 +2,40 @@
 
 declare(strict_types=1);
 
-namespace Anktx\Kafka\Client\Tests\Kafka;
+namespace Anktx\Kafka\Client\Tests\Integration\KafkaClasses;
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
+use Anktx\Kafka\Client\Config\Enum\OffsetReset;
+use Anktx\Kafka\Client\Config\ProducerConfig;
+use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
+use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaMessageStream;
+use Anktx\Kafka\Client\KafkaProducer;
+use Anktx\Kafka\Client\Tests\Integration\Support\KafkaBroker;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Интеграционные тесты {@see KafkaMessageStream} против реального брокера
+ * (адрес — KAFKA_BROKERS, без брокера тесты помечаются skipped).
+ */
 final class KafkaMessageStreamTest extends TestCase
 {
+    private string $brokers;
+
+    protected function setUp(): void
+    {
+        $this->brokers = KafkaBroker::requireBroker();
+    }
+
     public function testConstructor(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
+        $consumer = new KafkaConsumer(new ConsumerConfig(
+            brokers: $this->brokers,
+            groupId: 'stream-test-' . uniqid('', true),
+        ));
 
-        $consumer = new KafkaConsumer($config);
         $stream = new KafkaMessageStream($consumer);
 
         self::assertInstanceOf(KafkaMessageStream::class, $stream);
@@ -30,13 +45,11 @@ final class KafkaMessageStreamTest extends TestCase
 
     public function testConstructorWithCustomTimeout(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
+        $consumer = new KafkaConsumer(new ConsumerConfig(
+            brokers: $this->brokers,
+            groupId: 'stream-test-' . uniqid('', true),
+        ));
 
-        $consumer = new KafkaConsumer($config);
         $stream = new KafkaMessageStream($consumer, 2000);
 
         self::assertInstanceOf(KafkaMessageStream::class, $stream);
@@ -44,71 +57,61 @@ final class KafkaMessageStreamTest extends TestCase
         $consumer->close();
     }
 
-    public function testStreamReturnsGenerator(): void
+    public function testStreamRequiresSubscription(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
+        // stream() делегирует consume(), который без подписки бросает
+        // NotSubscribedException — контракт задокументирован в @throws.
+        $consumer = new KafkaConsumer(new ConsumerConfig(
+            brokers: $this->brokers,
+            groupId: 'stream-test-' . uniqid('', true),
+        ));
 
-        $consumer = new KafkaConsumer($config);
-        $stream = new KafkaMessageStream($consumer);
+        $stream = new KafkaMessageStream($consumer, 100);
 
-        $generator = $stream->stream();
+        try {
+            $this->expectException(NotSubscribedException::class);
 
-        self::assertInstanceOf(\Generator::class, $generator);
-
-        // Закрываем генератор
-        $generator->valid();
-        $generator->send(null);
-
-        $consumer->close();
+            $stream->stream()->current();
+        } finally {
+            $consumer->close();
+        }
     }
 
-    public function testStreamWithSubscription(): void
+    public function testStreamYieldsProducedMessage(): void
     {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
+        // end-to-end: produce → subscribe (earliest, уникальная группа)
+        // → stream() отдаёт ровно отправленное сообщение.
+        $topic = 'stream-test-topic-' . uniqid('', true);
 
-        $consumer = new KafkaConsumer($config);
-        $subscriptionList = TopicSubscriptionList::create('test-topic');
+        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer->produce(new KafkaProducerMessage(
+            topic: $topic,
+            body: 'streamed',
+            key: 'k',
+        ));
+        $producer->flush(5000);
 
-        $consumer->subscribe($subscriptionList);
+        $consumer = new KafkaConsumer(new ConsumerConfig(
+            brokers: $this->brokers,
+            groupId: 'stream-test-' . uniqid('', true),
+            offsetReset: OffsetReset::earliest,
+        ));
 
-        $stream = new KafkaMessageStream($consumer);
-        $generator = $stream->stream();
+        try {
+            $consumer->subscribe(TopicSubscriptionList::create($topic));
 
-        self::assertInstanceOf(\Generator::class, $generator);
+            $received = 0;
 
-        // Закрываем генератор
-        $generator->valid();
+            foreach ((new KafkaMessageStream($consumer, 500))->stream() as $message) {
+                self::assertSame('streamed', $message->body);
+                ++$received;
 
-        $consumer->unsubscribe();
-        $consumer->close();
-    }
+                break;
+            }
 
-    public function testStreamWithCustomPollTimeout(): void
-    {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
-
-        $consumer = new KafkaConsumer($config);
-        $stream = new KafkaMessageStream($consumer, 500);
-
-        $generator = $stream->stream();
-
-        self::assertInstanceOf(\Generator::class, $generator);
-
-        // Закрываем генератор
-        $generator->valid();
-
-        $consumer->close();
+            self::assertSame(1, $received, 'Stream did not yield the produced message');
+        } finally {
+            $consumer->close();
+        }
     }
 }
