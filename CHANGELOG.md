@@ -23,6 +23,17 @@
 
 ### Removed
 
+- Проверка доступности брокеров перед подпиской (`assertBrokersAreAlive()` на
+  основе `getMetadata()`) удалена из `KafkaConsumer::subscribe()`. Подписка —
+  локальная операция: подключение и запрос метаданных librdkafka выполняет
+  асинхронно в фоновых потоках, а гарантий проверка не давала (брокеры могли
+  упасть сразу после неё). Недоступность брокеров и так наблюдаема через
+  `consume()` (возврат `KafkaConsumeTimeout`) и error-callback в логах;
+  fail-fast health-check при старте — зона ответственности приложения.
+- Параметр `int $timeoutMs` (default `5000`) удалён из конструктора
+  `KafkaConsumer` вместе с приватным свойством `$connectTimeoutMs`:
+  использовался только удалённой проверкой. Сигнатура конструктора снова
+  DI-дружелюбна: `__construct(ConsumerConfig $config)`.
 - Класс `BrokerHealthState` и пространство имён `Connection` удалены. После
   устранения `assertKafkaAvailable()` класс стал write-only: состояние записывалось
   через error callback и `consume()`, но не читалось ни одним production-кодом.

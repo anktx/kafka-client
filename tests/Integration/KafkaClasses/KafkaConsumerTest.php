@@ -180,20 +180,6 @@ final class KafkaConsumerTest extends TestCase
         $this->assertTrue($messageCalled || $timeoutCalled || $eofCalled);
     }
 
-    public function testConstructorWithCustomTimeout(): void
-    {
-        $config = new ConsumerConfig(
-            brokers: 'localhost:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-        );
-
-        $consumer = new KafkaConsumer($config, 10000);
-
-        $this->assertInstanceOf(KafkaConsumer::class, $consumer);
-        $consumer->close();
-    }
-
     public function testConstructorWithDebugEnabled(): void
     {
         $config = new ConsumerConfig(

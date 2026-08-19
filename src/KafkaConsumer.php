@@ -8,7 +8,6 @@ use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
-use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
@@ -18,17 +17,17 @@ use RdKafka\Exception as RdKafkaException;
 use RdKafka\TopicPartition;
 
 /**
- * Kafka Consumer для чтения сообщений из Kafka.
+ * Консьюмер для чтения сообщений из Apache Kafka.
  *
- * Потребитель работает в группе (consumer group), что позволяет распределять
- * нагрузку между несколькими экземплярами консьюмера.
+ * Работает в составе consumer group: партиции топиков распределяются между
+ * экземплярами группы, позволяя масштабировать потребление горизонтально.
  *
  * @see https://github.com/edenhill/librdkafka/blob/master/README.md
  */
 final class KafkaConsumer
 {
     /**
-     * Коды ошибок librdkafka, свидетельствующие о потере соединения с брокером.
+     * Коды ошибок librdkafka, означающие потерю соединения с брокерами.
      *
      * @var list<int>
      */
@@ -42,20 +41,18 @@ final class KafkaConsumer
     private bool $isSubscribed = false;
 
     /**
-     * Создаёт новый экземпляр Kafka Consumer.
+     * Создаёт консьюмера, не подключаясь к брокерам.
      *
-     * При создании проверяется доступность брокеров Kafka.
+     * Все сетевые операции (подключение, rebalance) librdkafka выполняет
+     * в фоновых потоках после первого {@see subscribe()} — объект безопасен
+     * для ленивого резолва в DI-контейнере.
      *
-     * @param ConsumerConfig $config    Конфигурация консьюмера
-     * @param int            $timeoutMs Таймаут проверки соединения с брокерами (по умолчанию 5000 мс)
+     * @param ConsumerConfig $config Конфигурация консьюмера
      *
-     * @throws KafkaConnectionException Если не удалось подключиться к брокерам
-     * @throws KafkaConsumerException   Если произошла ошибка при создании консьюмера
+     * @throws KafkaConsumerException Если не удалось создать консьюмера
      */
-    public function __construct(
-        ConsumerConfig $config,
-        int $timeoutMs = 5000,
-    ) {
+    public function __construct(ConsumerConfig $config)
+    {
         $this->logger = $config->logger;
 
         $conf = $config->asKafkaConfig();
@@ -70,22 +67,26 @@ final class KafkaConsumer
             'auto_commit_ms' => $config->autoCommitMs,
             'session_timeout_ms' => $config->sessionTimeoutMs,
         ]);
-
-        $this->assertBrokersAreAlive($timeoutMs);
     }
 
     /**
-     * Подписывается на топики для потребления сообщений.
+     * Подписывается на топики.
      *
-     * Назначение партиций и восстановление смещений (offsets) выполняет сам
-     * librdkafka через внутренний rebalance-callback: внешний assign() после
-     * subscribe() переключает консьюмер в manual mode и затирает то, что
-     * выставил rebalance, что приводит к рассинхрону partition/offset.
+     * Операция локальная: подключение к брокерам и запрос метаданных librdkafka
+     * выполняет асинхронно в фоновых потоках, поэтому недоступность брокеров
+     * здесь не видна — она проявится позже через {@see consume()} (таймаут)
+     * и error-callback в логах. Fail-fast проверку доступности при старте
+     * выполняйте на уровне приложения.
+     *
+     * Партиции и смещения назначает сам librdkafka через внутренний
+     * rebalance-callback. Внешний assign() после subscribe() переключает
+     * консьюмера в ручной режим и затирает выставленные rebalance'ом
+     * партиции и смещения.
      *
      * @param TopicSubscriptionList $subscriptionList Список подписок на топики/партиции
      *
      * @throws EmptySubscriptionsException Если список подписок пуст
-     * @throws KafkaConsumerException      Если не удалось подписаться на топики
+     * @throws KafkaConsumerException      Если librdkafka не принял подписку
      */
     public function subscribe(TopicSubscriptionList $subscriptionList): void
     {
@@ -139,28 +140,25 @@ final class KafkaConsumer
     }
 
     /**
-     * Читает одно сообщение из Kafka.
+     * Читает одно сообщение, блокируясь до его получения или истечения таймаута.
      *
-     * Метод блокирует выполнение до получения сообщения или истечения таймаута.
-     * В зависимости от результата может вернуть:
-     * - {@see KafkaConsumerMessage} - успешно полученное сообщение
-     * - {@see KafkaConsumeTimeout} - таймаут (нет новых сообщений, либо все
-     *   брокеры временно недоступны — librdkafka продолжит попытки переподключения)
-     * - {@see KafkaPartitionEof} - достигнут конец партиции
+     * Возможные результаты:
+     * - {@see KafkaConsumerMessage} - сообщение;
+     * - {@see KafkaConsumeTimeout} - таймаут; сюда же попадает полная потеря
+     *   связи с брокерами (ALL_BROKERS_DOWN): переподключение librdkafka
+     *   продолжает в фоновых потоках;
+     * - {@see KafkaPartitionEof} - достигнут конец партиции.
      *
-     * Внимание: метод НЕ блокирует consume() при недоступности брокера. Раньше
-     * проверка порога недоступности стояла перед librdkafka consume() и не давала
-     * ему прокачивать rebalance-события (JoinGroup/SyncGroup), что приводило к
-     * зависанию consumer-group в состоянии Empty навсегда. Теперь librdkafka
-     * сам управляет переподключением: при полной потере связи он вернёт
-     * RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN, который обрабатывается как таймаут.
+     * Чтение всегда делегируется librdkafka: через consume() также доставляются
+     * rebalance-события группы, поэтому предварительных проверок доступности
+     * метод не выполняет.
      *
-     * @param int $timeoutMs Таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
+     * @param int $timeoutMs Таймаут ожидания в миллисекундах
      *
-     * @return KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат потребления
+     * @return KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат чтения
      *
      * @throws NotSubscribedException Если консьюмер не подписан на топики
-     * @throws KafkaConsumerException Если произошла ошибка при чтении
+     * @throws KafkaConsumerException Если чтение завершилось ошибкой
      */
     public function consume(int $timeoutMs = 1000): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
     {
@@ -215,19 +213,17 @@ final class KafkaConsumer
     }
 
     /**
-     * Читает сообщение и обрабатывает результат через pattern matching.
+     * Читает сообщение и передаёт его в callback, соответствующий типу результата.
      *
-     * Удобный метод для обработки результатов {@see consume()} через callback'и.
+     * @param \Closure(KafkaConsumerMessage): mixed $onMessage Обработчик сообщения
+     * @param \Closure(KafkaConsumeTimeout): mixed  $onTimeout Обработчик таймаута
+     * @param \Closure(KafkaPartitionEof): mixed    $onEof     Обработчик конца партиции
+     * @param int                                   $timeoutMs Таймаут ожидания в миллисекундах
      *
-     * @param \Closure(KafkaConsumerMessage): mixed $onMessage Callback для обработки сообщения
-     * @param \Closure(KafkaConsumeTimeout): mixed  $onTimeout Callback для обработки таймаута
-     * @param \Closure(KafkaPartitionEof): mixed    $onEof     Callback для обработки конца партиции
-     * @param int                                   $timeoutMs Таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
-     *
-     * @return mixed Значение, возвращённое выполненным callback'ом
+     * @return mixed Значение, возвращённое сработавшим callback'ом
      *
      * @throws NotSubscribedException Если консьюмер не подписан на топики
-     * @throws KafkaConsumerException Если произошла ошибка при чтении
+     * @throws KafkaConsumerException Если чтение завершилось ошибкой
      */
     public function consumeMatch(
         \Closure $onMessage,
@@ -245,14 +241,14 @@ final class KafkaConsumer
     }
 
     /**
-     * Подтверждает успешную обработку сообщения.
+     * Коммитит смещение обработанного сообщения.
      *
-     * Фиксирует смещение (offset) в Kafka, после которого сообщение не будет повторно доставлено.
-     * Вызывайте этот метод после успешной обработки сообщения.
+     * Фиксирует в Kafka offset, следующий за сообщением, — после этого группа
+     * не получит его повторно.
      *
-     * @param KafkaConsumerMessage $message Сообщение для коммита
+     * @param KafkaConsumerMessage $message Обработанное сообщение
      *
-     * @throws KafkaConsumerException Если не закоммитить сообщение
+     * @throws KafkaConsumerException Если коммит не удался
      */
     public function commit(KafkaConsumerMessage $message): void
     {
@@ -287,39 +283,14 @@ final class KafkaConsumer
     }
 
     /**
-     * Проверяет доступность брокеров Kafka.
+     * Error-callback librdkafka: логирует потерю соединения с брокерами.
      *
-     * @param int $timeoutMs Таймаут ожидания (по умолчанию из конструктора)
+     * Выполняется синхронно в C-коде ext-rdkafka, поэтому бросать исключения
+     * отсюда нельзя. Переподключением librdkafka занимается сам.
      *
-     * @throws KafkaConnectionException Если не удалось подключиться к брокерам
-     * @throws KafkaConsumerException   Если произошла ошибка при получении метаданных
-     */
-    private function assertBrokersAreAlive(int $timeoutMs): void
-    {
-        try {
-            $this->consumer->getMetadata(
-                all_topics: true,
-                only_topic: null,
-                timeout_ms: $timeoutMs,
-            );
-        } catch (RdKafkaException $e) {
-            throw match ($e->getCode()) {
-                \RD_KAFKA_RESP_ERR__TRANSPORT => KafkaConnectionException::fromKafkaException($e),
-                default => KafkaConsumerException::fromKafkaException($e),
-            };
-        }
-    }
-
-    /**
-     * Error callback librdkafka — логирует ошибки соединения с брокерами.
-     *
-     * Callback исполняется синхронно внутри C-кода ext-rdkafka, поэтому
-     * бросать исключение отсюда нельзя. Переподключение происходит автоматически
-     * в фоновых потоках librdkafka.
-     *
-     * @param \RdKafka\KafkaConsumer $kafka  Экземпляр consumer'а (не используется)
+     * @param \RdKafka\KafkaConsumer $kafka  Консьюмер (не используется)
      * @param int                    $err    Код ошибки RD_KAFKA_RESP_ERR__*
-     * @param string                 $reason Текстовое описание ошибки
+     * @param string                 $reason Описание ошибки
      */
     private function onBrokerError(\RdKafka\KafkaConsumer $kafka, int $err, string $reason): void
     {

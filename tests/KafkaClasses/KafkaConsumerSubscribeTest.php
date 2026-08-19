@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
+use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -27,9 +28,42 @@ use RdKafka\Message as RdKafkaMessage;
  * librdkafka. Тесты фиксируют контракт: subscribe() вызывает ровно один
  * RdKafka\KafkaConsumer::subscribe() и ноль раз assign(), корректно пишет
  * контекст в лог и выставляет флаг isSubscribed.
+ *
+ * Также фиксируется контракт отложенного подключения: конструктор и
+ * subscribe() не выполняют сетевых вызовов — подключение к брокерам
+ * librdkafka выполняет асинхронно в фоновых потоках.
  */
 final class KafkaConsumerSubscribeTest extends TestCase
 {
+    public function testConstructorDoesNotProbeBrokersAndNeverThrows(): void
+    {
+        // Конструктор — неблокирующая операция, безопасная для DI-резолва:
+        // никаких getMetadata()/probe брокеров до первого consume().
+        $logger = new InMemoryLogger();
+
+        $consumer = new KafkaConsumer(new ConsumerConfig(
+            brokers: 'localhost:1',
+            groupId: 'contract-test',
+            logger: $logger,
+        ));
+
+        self::assertInstanceOf(KafkaConsumer::class, $consumer);
+
+        // Единственный observable-эффект конструктора — info-лог с конфигурацией.
+        $createdRecords = $logger->findByMessage('KafkaConsumer created');
+        self::assertCount(1, $createdRecords);
+        self::assertSame([
+            'brokers' => 'localhost:1',
+            'group_id' => 'contract-test',
+            'instance_id' => null,
+            'offset_reset' => 'earliest',
+            'auto_commit_ms' => null,
+            'session_timeout_ms' => null,
+        ], $createdRecords[0]['context']);
+
+        $consumer->close();
+    }
+
     public function testSubscribeCallsRdKafkaSubscribeOnceAndNeverAssigns(): void
     {
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
