@@ -39,8 +39,8 @@ final class ProbabilityPollStrategyTest extends TestCase
 
     public function testShouldPollBoundary(): void
     {
-        // Проверяем граничные значения для mt_rand(0, 10000)
-        // Максимальное значение 10000 должно быть строго меньше probability * 10000
+        // Проверяем граничное значение: при probability = 1.0 ответ всегда true,
+        // независимо от результата random_int(0, PRECISION - 1)
         $strategy = new ProbabilityPollStrategy(probability: 1.0);
 
         for ($i = 0; $i < 100; ++$i) {
@@ -53,8 +53,8 @@ final class ProbabilityPollStrategyTest extends TestCase
         // С вероятностью 0.0001, из 10000 только 1 должен быть true
         $strategy = new ProbabilityPollStrategy(probability: 0.0001);
 
-        // mt_rand(0, 10000) < 0.0001 * 10000 = 1
-        // Только когда mt_rand вернет 0, будет true
+        // random_int(0, 9999) < 0.0001 * 10000 = 1
+        // Только когда random_int вернет 0, будет true
         $trueCount = 0;
         for ($i = 0; $i < 10000; ++$i) {
             if ($strategy->shouldPoll()) {
@@ -71,7 +71,7 @@ final class ProbabilityPollStrategyTest extends TestCase
         // С вероятностью 0.9999, из 10000 только 1 должен быть false
         $strategy = new ProbabilityPollStrategy(probability: 0.9999);
 
-        // mt_rand(0, 10000) < 0.9999 * 10000 = 9999
+        // random_int(0, 9999) < 0.9999 * 10000 = 9999
         // Все значения от 0 до 9998 должны быть true
         $trueCount = 0;
         for ($i = 0; $i < 10000; ++$i) {
@@ -87,7 +87,7 @@ final class ProbabilityPollStrategyTest extends TestCase
     public function testStrictLessThan(): void
     {
         // Проверяем, что используется < а не <=
-        // При probability = 0.001, условие: mt_rand(0, 10000) < 10
+        // При probability = 0.001, условие: random_int(0, 9999) < 10
         // Значения 0-9 дают true
         $strategy = new ProbabilityPollStrategy(probability: 0.001);
 
@@ -107,7 +107,7 @@ final class ProbabilityPollStrategyTest extends TestCase
 
     public function testMtRandRangeZeroToTenThousand(): void
     {
-        // Проверяем, что mt_rand(0, 10000) используется правильно
+        // Проверяем, что random_int(0, 9999) используется правильно
         // Мутанты изменяют диапазон, что сломает распределение
         $strategy = new ProbabilityPollStrategy(probability: 0.5);
 
@@ -148,11 +148,11 @@ final class ProbabilityPollStrategyTest extends TestCase
 
     public function testProbabilityRangeBounds(): void
     {
-        // Проверяем, что диапазон mt_rand(0, 10000) соблюдается
+        // Проверяем, что диапазон random_int(0, 9999) соблюдается
         // Если мутант изменит диапазон, это повлияет на распределение
 
-        // Для probability = 0.001, условие: mt_rand(0, 10000) < 10
-        // Значения 0-9 дают true (10/10001 шанс ≈ 0.1%)
+        // Для probability = 0.001, условие: random_int(0, 9999) < 10
+        // Значения 0-9 дают true (10/10000 шанс ≈ 0.1%)
         $strategy = new ProbabilityPollStrategy(probability: 0.001);
 
         // Запускаем много раз
@@ -173,16 +173,16 @@ final class ProbabilityPollStrategyTest extends TestCase
 
     public function testMutantDetectionRangeZero(): void
     {
-        // Детектирует мутанта mt_rand(1, 10000) вместо mt_rand(0, 10000)
-        // С probability=1.0, условие: mt_rand(0, 10000) < 10000
-        // При mt_rand(1, 10000) диапазон теряет 0, но результат всё равно тот же
+        // Детектирует мутанта random_int(1, 9999) вместо random_int(0, 9999)
+        // С probability=1.0, условие: random_int(0, 9999) < 10000
+        // При random_int(1, 9999) диапазон теряет 0, но результат всё равно тот же
         // Этот тест проверяет, что крайние значения работают корректно
         $strategy = new ProbabilityPollStrategy(probability: 0.0001);
 
-        // mt_rand(0, 10000) < 1 - только при 0 будет true
-        // Если мутант изменит 0 на 1: mt_rand(1, 10000) < 1 - всегда false
-        // Если мутант изменит 10000 на 9999: mt_rand(0, 9999) < 1 - только при 0
-        // Для детекции нужен мутант <= : mt_rand(0, 10000) <= 1 - при 0 и 1 будет true
+        // random_int(0, 9999) < 1 - только при 0 будет true
+        // Если мутант изменит 0 на 1: random_int(1, 9999) < 1 - всегда false
+        // Если мутант изменит 10000 на 9999: random_int(0, 9998) < 1 - только при 0
+        // Для детекции нужен мутант <= : random_int(0, 9999) <= 1 - при 0 и 1 будет true
         $hasTrue = false;
         for ($i = 0; $i < 100000; ++$i) {
             if ($strategy->shouldPoll()) {
@@ -209,7 +209,7 @@ final class ProbabilityPollStrategyTest extends TestCase
 
     public function testMutantDetectionLowerBound(): void
     {
-        // Детектирует мутанта mt_rand(-1, 10000)
+        // Детектирует мутанта random_int(-1, 9999)
         // При probability = 0.0 должен всегда возвращать false
         $strategy = new ProbabilityPollStrategy(probability: 0.0);
 
@@ -221,14 +221,14 @@ final class ProbabilityPollStrategyTest extends TestCase
     public function testStrictLessThanDetection(): void
     {
         // Детектирует мутанта < на <=
-        // При probability = 0.0001: mt_rand(0, 10000) < 1
-        // С мутантом: mt_rand(0, 10000) <= 1
+        // При probability = 0.0001: random_int(0, 9999) < 1
+        // С мутантом: random_int(0, 9999) <= 1
         // Мутант даёт в 2 раза больше true (0 и 1 вместо только 0)
         // Но это трудно детектировать без очень большого количества итераций
 
         // Вместо этого проверяем probability = 0.9999
-        // mt_rand(0, 10000) < 9999 - значения 0-9998 дают true
-        // С мутантом: mt_rand(0, 10000) <= 9999 - значения 0-9999 дают true
+        // random_int(0, 9999) < 9999 - значения 0-9998 дают true
+        // С мутантом: random_int(0, 9999) <= 9999 - значения 0-9999 дают true
         // Мутант добавляет одно значение (9999) в true
 
         $strategy = new ProbabilityPollStrategy(probability: 0.9999);
@@ -242,7 +242,7 @@ final class ProbabilityPollStrategyTest extends TestCase
             }
         }
 
-        // С оригиналом: false только при 10000 (1/10001 ≈ 0.01%)
+        // С оригиналом: false только при 10000 (1/10000 ≈ 0.01%)
         // Ожидаем ≈ 5 false за 50000
         // С мутантом: нет false (0/10001)
         // Если нашли хотя бы один false, значит мутанта нет
@@ -253,9 +253,9 @@ final class ProbabilityPollStrategyTest extends TestCase
     public function testPreciseUpperBound(): void
     {
         // Детектирует мутантов, изменяющих верхнюю границу умножения
-        // При probability = 0.0001: mt_rand(0, 10000) < 1
-        // Мутант * 9999: mt_rand(0, 10000) < 0.9999 -> 0 (всегда false)
-        // Мутант * 10001: mt_rand(0, 10000) < 1.0001 -> 1 (почти то же)
+        // При probability = 0.0001: random_int(0, 9999) < 1
+        // Мутант * 9999: random_int(0, 9999) < 0.9999 -> 0 (всегда false)
+        // Мутант * 10001: random_int(0, 9999) < 1.0001 -> 1 (почти то же)
 
         $strategy = new ProbabilityPollStrategy(probability: 0.0001);
 
@@ -268,7 +268,7 @@ final class ProbabilityPollStrategyTest extends TestCase
             }
         }
 
-        // С оригиналом: true при 0 (1/10001 шанс)
+        // С оригиналом: true при 0 (1/10000 шанс)
         // Ожидаем ≈ 20 true за 200000
         // С мутантом * 9999: всегда false (0/10001)
         $this->assertGreaterThan(10, $trueCount, 'Expected some true results with probability 0.0001');
@@ -276,7 +276,7 @@ final class ProbabilityPollStrategyTest extends TestCase
 
     public function testVeryHighPrecision(): void
     {
-        // Детектирует мутантов с изменением диапазона mt_rand
+        // Детектирует мутантов с изменением диапазона random_int
         // Используем probability = 0.5 для лучшей детекции
 
         $strategy = new ProbabilityPollStrategy(probability: 0.5);
@@ -290,16 +290,16 @@ final class ProbabilityPollStrategyTest extends TestCase
             }
         }
 
-        // С оригиналом: mt_rand(0, 10000) < 5000
-        // Значения 0-4999 дают true (5000/10001 ≈ 49.995%)
+        // С оригиналом: random_int(0, 9999) < 5000
+        // Значения 0-4999 дают true (5000/10000 ≈ 49.995%)
         // Ожидаем ≈ 49995 true за 100000
 
         // Мутанты:
-        // mt_rand(0, 9999) < 5000 - 5000/10000 = 50.0%
-        // mt_rand(0, 10001) < 5000 - 5000/10002 ≈ 49.99%
-        // mt_rand(-1, 10000) < 5000 - 5001/10002 ≈ 49.995%
-        // * 9999: mt_rand(0, 10000) < 4999.5 -> 4999 (4999.5/10001 ≈ 49.99%)
-        // * 10001: mt_rand(0, 10000) < 5000.5 -> 5000 (5000.5/10001 ≈ 49.997%)
+        // random_int(0, 9998) < 5000 - 5000/10000 = 50.0%
+        // random_int(0, 10000) < 5000 - 5000/10002 ≈ 49.99%
+        // random_int(-1, 9999) < 5000 - 5001/10000 ≈ 49.995%
+        // * 9999: random_int(0, 9999) < 4999.5 -> 4999 (4999.5/10000 ≈ 49.99%)
+        // * 10001: random_int(0, 9999) < 5000.5 -> 5000 (5000.5/10000 ≈ 49.997%)
 
         // Все мутанты дают близкие результаты, поэтому используем узкий диапазон
         $this->assertGreaterThan(49000, $trueCount);
@@ -309,8 +309,8 @@ final class ProbabilityPollStrategyTest extends TestCase
     public function testEdgeCaseOneMinusEpsilon(): void
     {
         // Детектирует мутанта <= вместо <
-        // При probability = 0.9999: mt_rand(0, 10000) < 9999
-        // Мутант: mt_rand(0, 10000) <= 9999 - всегда true!
+        // При probability = 0.9999: random_int(0, 9999) < 9999
+        // Мутант: random_int(0, 9999) <= 9999 - всегда true!
 
         $strategy = new ProbabilityPollStrategy(probability: 0.9999);
 

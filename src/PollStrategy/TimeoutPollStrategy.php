@@ -11,19 +11,23 @@ final class TimeoutPollStrategy implements PollStrategy
     public function __construct(
         public readonly int $pollIntervalSec,
     ) {
+        if ($this->pollIntervalSec < 0) {
+            throw new \InvalidArgumentException('Poll interval must be non-negative');
+        }
+
         $this->lastPollTimestamp = 0;
     }
 
     public function shouldPoll(): bool
     {
-        $timestamp = (int) date('U');
+        $timestamp = time();
 
-        $rst = $timestamp >= $this->lastPollTimestamp + $this->pollIntervalSec;
+        $result = $timestamp >= $this->lastPollTimestamp + $this->pollIntervalSec;
 
-        if ($rst === true) {
+        if ($result === true) {
             $this->lastPollTimestamp = $timestamp;
         }
 
-        return $rst;
+        return $result;
     }
 }

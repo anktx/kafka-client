@@ -6,6 +6,8 @@ namespace Anktx\Kafka\Client\PollStrategy;
 
 final class ProbabilityPollStrategy implements PollStrategy
 {
+    private const int PRECISION = 10000;
+
     public function __construct(
         public readonly float $probability,
     ) {
@@ -16,6 +18,6 @@ final class ProbabilityPollStrategy implements PollStrategy
 
     public function shouldPoll(): bool
     {
-        return mt_rand(0, 10000) < $this->probability * 10000;
+        return random_int(0, self::PRECISION - 1) < $this->probability * self::PRECISION;
     }
 }

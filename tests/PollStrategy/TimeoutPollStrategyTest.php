@@ -16,6 +16,14 @@ final class TimeoutPollStrategyTest extends TestCase
         $this->assertSame(5, $strategy->pollIntervalSec);
     }
 
+    public function testNegativeIntervalIsRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Poll interval must be non-negative');
+
+        new TimeoutPollStrategy(pollIntervalSec: -1);
+    }
+
     public function testShouldPoll(): void
     {
         $strategy = new TimeoutPollStrategy(pollIntervalSec: 10);
