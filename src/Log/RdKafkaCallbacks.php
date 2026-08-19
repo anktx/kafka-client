@@ -8,7 +8,9 @@ use Anktx\Kafka\Client\PollStrategy\TimeoutPollStrategy;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RdKafka\Conf;
+use RdKafka\KafkaConsumer;
 use RdKafka\Message;
+use RdKafka\Producer;
 
 /**
  * Callback'и librdkafka для RdKafka\Conf и единая политика их логирования
@@ -21,7 +23,7 @@ use RdKafka\Message;
  * Все callback'и выполняются синхронно в C-коде ext-rdkafka, поэтому
  * бросать исключения из них нельзя.
  */
-final readonly class LibrdkafkaCallbacks
+final readonly class RdKafkaCallbacks
 {
     /**
      * Коды ошибок librdkafka, означающие потерю соединения с брокерами.
@@ -69,14 +71,14 @@ final readonly class LibrdkafkaCallbacks
      * Log-callback librdkafka: перенаправляет внутренние сообщения библиотеки
      * в PSR-3 лог, преобразуя syslog severity в строковый уровень PSR-3.
      *
-     * @param object $client   RdKafka\Producer или RdKafka\KafkaConsumer (не используется)
-     * @param int    $level    Уровень логирования (syslog severity 0–7)
-     * @param string $facility Источник сообщения
-     * @param string $message  Текст сообщения
+     * @param KafkaConsumer|Producer $client   Клиент, вызвавший callback (не используется)
+     * @param int                    $level    Уровень логирования (syslog severity 0–7)
+     * @param string                 $facility Источник сообщения
+     * @param string                 $message  Текст сообщения
      */
-    private function onLog(object $client, int $level, string $facility, string $message): void
+    private function onLog(KafkaConsumer|Producer $client, int $level, string $facility, string $message): void
     {
-        $this->logger->log(LibrdkafkaLogLevel::toPsrLevel($level), $message, ['facility' => $facility]);
+        $this->logger->log(RdKafkaLogLevel::toPsrLevel($level), $message, ['facility' => $facility]);
     }
 
     /**
@@ -85,11 +87,11 @@ final readonly class LibrdkafkaCallbacks
      * Выполняется синхронно в C-коде ext-rdkafka, поэтому бросать исключения
      * отсюда нельзя. Переподключением librdkafka занимается сам.
      *
-     * @param object $client RdKafka\Producer или RdKafka\KafkaConsumer (не используется)
-     * @param int    $err    Код ошибки RD_KAFKA_RESP_ERR__*
-     * @param string $reason Описание ошибки
+     * @param KafkaConsumer|Producer $client Клиент, вызвавший callback (не используется)
+     * @param int                    $err    Код ошибки RD_KAFKA_RESP_ERR__*
+     * @param string                 $reason Описание ошибки
      */
-    private function onBrokerError(object $client, int $err, string $reason): void
+    private function onBrokerError(KafkaConsumer|Producer $client, int $err, string $reason): void
     {
         if (!\in_array($err, self::CONNECTION_ERROR_CODES, true)) {
             return;
@@ -111,10 +113,10 @@ final readonly class LibrdkafkaCallbacks
      * PollStrategy с опросом ({@see TimeoutPollStrategy})
      * доставляет отчёты в фоне, NeverPollStrategy — только в момент flush().
      *
-     * @param object  $client  RdKafka\Producer (не используется)
-     * @param Message $message Отчёт о доставке сообщения
+     * @param Producer $client  Продюсер, вызвавший callback (не используется)
+     * @param Message  $message Отчёт о доставке сообщения
      */
-    private function onDeliveryReport(object $client, Message $message): void
+    private function onDeliveryReport(Producer $client, Message $message): void
     {
         if ($message->err === \RD_KAFKA_RESP_ERR_NO_ERROR) {
             $this->logger->debug('Message delivered', [

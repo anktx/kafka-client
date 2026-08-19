@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Log;
 
-use Anktx\Kafka\Client\Log\LibrdkafkaLogLevel;
+use Anktx\Kafka\Client\Log\RdKafkaLogLevel;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 
-final class LibrdkafkaLogLevelTest extends TestCase
+final class RdKafkaLogLevelTest extends TestCase
 {
     #[DataProvider('provideToPsrLevelCases')]
     public function testToPsrLevel(int $severity, string $expectedLevel): void
     {
-        self::assertSame($expectedLevel, LibrdkafkaLogLevel::toPsrLevel($severity));
+        self::assertSame($expectedLevel, RdKafkaLogLevel::toPsrLevel($severity));
     }
 
     /**
@@ -41,7 +41,7 @@ final class LibrdkafkaLogLevelTest extends TestCase
 
     public function testOutOfRangeSeverityFallsBackToError(): void
     {
-        self::assertSame(LogLevel::ERROR, LibrdkafkaLogLevel::toPsrLevel(8));
-        self::assertSame(LogLevel::ERROR, LibrdkafkaLogLevel::toPsrLevel(-1));
+        self::assertSame(LogLevel::ERROR, RdKafkaLogLevel::toPsrLevel(8));
+        self::assertSame(LogLevel::ERROR, RdKafkaLogLevel::toPsrLevel(-1));
     }
 }

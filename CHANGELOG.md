@@ -17,7 +17,7 @@
   содержат `facility` в контексте.
 - Дублированные колбэки `onLog`/`onBrokerError` (и producer-only
   `onDeliveryReport`) вынесены из `KafkaProducer`/`KafkaConsumer` в
-  `Anktx\Kafka\Client\Log\LibrdkafkaCallbacks`: attach-методы
+  `Anktx\Kafka\Client\Log\RdKafkaCallbacks`: attach-методы
   `attachLogCallback()`/`attachErrorCallback()`/`attachDeliveryReportCallback()`
   навешивают политику логирования на `RdKafka\Conf`. Публичный API клиентов
   не изменился.

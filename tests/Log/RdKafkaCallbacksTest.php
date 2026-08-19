@@ -4,23 +4,25 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Log;
 
-use Anktx\Kafka\Client\Log\LibrdkafkaCallbacks;
+use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 use RdKafka\Conf;
+use RdKafka\KafkaConsumer;
 use RdKafka\Message;
+use RdKafka\Producer;
 
 /**
- * Юнит-тесты callback'ов {@see LibrdkafkaCallbacks}.
+ * Юнит-тесты callback'ов {@see RdKafkaCallbacks}.
  *
  * Wiring attach*-методов проверяется через mock RdKafka\Conf: колбэк
  * захватывается из set*Cb() и вызывается напрямую — живой брокер не нужен.
  * Фиксируют контракт доставки: успех логируется как debug, сбой — как
  * error с кодом ошибки; потеря соединения с брокерами — как warning.
  */
-final class LibrdkafkaCallbacksTest extends TestCase
+final class RdKafkaCallbacksTest extends TestCase
 {
     #[AllowMockObjectsWithoutExpectations]
     public function testAttachLogCallbackForwardsLibrdkafkaLogToLogger(): void
@@ -29,10 +31,10 @@ final class LibrdkafkaCallbacksTest extends TestCase
         $onLog = $this->captureCallback(
             'setLogCb',
             $logger,
-            static fn(LibrdkafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachLogCallback($conf),
+            static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachLogCallback($conf),
         );
 
-        $onLog(new \stdClass(), 3, 'PRODUCE', 'message queued');
+        $onLog($this->createMock(KafkaConsumer::class), 3, 'PRODUCE', 'message queued');
 
         self::assertCount(1, $logger->records);
         self::assertSame(LogLevel::ERROR, $logger->records[0]['level']);
@@ -47,10 +49,10 @@ final class LibrdkafkaCallbacksTest extends TestCase
         $onBrokerError = $this->captureCallback(
             'setErrorCb',
             $logger,
-            static fn(LibrdkafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachErrorCallback($conf),
+            static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachErrorCallback($conf),
         );
 
-        $onBrokerError(new \stdClass(), \RD_KAFKA_RESP_ERR__TRANSPORT, 'connection refused');
+        $onBrokerError($this->createMock(KafkaConsumer::class), \RD_KAFKA_RESP_ERR__TRANSPORT, 'connection refused');
 
         $records = $logger->findByMessage('Kafka broker connection error');
         self::assertCount(1, $records);
@@ -66,10 +68,10 @@ final class LibrdkafkaCallbacksTest extends TestCase
         $onBrokerError = $this->captureCallback(
             'setErrorCb',
             $logger,
-            static fn(LibrdkafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachErrorCallback($conf),
+            static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachErrorCallback($conf),
         );
 
-        $onBrokerError(new \stdClass(), \RD_KAFKA_RESP_ERR__BAD_MSG, 'bad message format');
+        $onBrokerError($this->createMock(KafkaConsumer::class), \RD_KAFKA_RESP_ERR__BAD_MSG, 'bad message format');
 
         self::assertSame([], $logger->records);
     }
@@ -81,10 +83,10 @@ final class LibrdkafkaCallbacksTest extends TestCase
         $onDeliveryReport = $this->captureCallback(
             'setDrMsgCb',
             $logger,
-            static fn(LibrdkafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachDeliveryReportCallback($conf),
+            static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachDeliveryReportCallback($conf),
         );
 
-        $onDeliveryReport(new \stdClass(), self::message([
+        $onDeliveryReport($this->createMock(Producer::class), self::message([
             'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
             'topic_name' => 'test-topic',
             'partition' => 2,
@@ -106,10 +108,10 @@ final class LibrdkafkaCallbacksTest extends TestCase
         $onDeliveryReport = $this->captureCallback(
             'setDrMsgCb',
             $logger,
-            static fn(LibrdkafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachDeliveryReportCallback($conf),
+            static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachDeliveryReportCallback($conf),
         );
 
-        $onDeliveryReport(new \stdClass(), self::message([
+        $onDeliveryReport($this->createMock(Producer::class), self::message([
             'err' => \RD_KAFKA_RESP_ERR__MSG_TIMED_OUT,
             'topic_name' => 'test-topic',
             'partition' => 1,
@@ -128,8 +130,8 @@ final class LibrdkafkaCallbacksTest extends TestCase
      * Навешивает выбранный callback на mock RdKafka\Conf и возвращает
      * колбэк, захваченный из set*Cb(), для прямого вызова в тесте.
      *
-     * @param 'setDrMsgCb'|'setErrorCb'|'setLogCb'      $setter Метод RdKafka\Conf, регистрирующий callback
-     * @param \Closure(LibrdkafkaCallbacks, Conf): void $attach Действие, навешивающее callback на Conf
+     * @param 'setDrMsgCb'|'setErrorCb'|'setLogCb'   $setter Метод RdKafka\Conf, регистрирующий callback
+     * @param \Closure(RdKafkaCallbacks, Conf): void $attach Действие, навешивающее callback на Conf
      */
     private function captureCallback(string $setter, InMemoryLogger $logger, \Closure $attach): \Closure
     {
@@ -143,7 +145,7 @@ final class LibrdkafkaCallbacksTest extends TestCase
             })
         ;
 
-        $attach(new LibrdkafkaCallbacks($logger), $conf);
+        $attach(new RdKafkaCallbacks($logger), $conf);
 
         self::assertInstanceOf(\Closure::class, $captured);
 

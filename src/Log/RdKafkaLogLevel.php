@@ -12,7 +12,7 @@ use Psr\Log\LogLevel;
  * Log-callback librdkafka передаёт уровень как int, а PSR-3 требует
  * строковый уровень из {@see LogLevel}.
  */
-final class LibrdkafkaLogLevel
+final class RdKafkaLogLevel
 {
     /**
      * @var list<string> PSR-3 уровни, индексированные по syslog severity 0–7

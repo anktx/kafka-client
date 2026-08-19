@@ -8,7 +8,7 @@ use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
-use Anktx\Kafka\Client\Log\LibrdkafkaCallbacks;
+use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
 use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;
 use Anktx\Kafka\Client\PollStrategy\PollStrategy;
 use Psr\Log\LoggerInterface;
@@ -46,7 +46,7 @@ final class KafkaProducer
     ) {
         $conf = $config->asKafkaConfig();
 
-        $callbacks = new LibrdkafkaCallbacks($this->logger);
+        $callbacks = new RdKafkaCallbacks($this->logger);
         $callbacks->attachLogCallback($conf);
         $callbacks->attachErrorCallback($conf);
         $callbacks->attachDeliveryReportCallback($conf);

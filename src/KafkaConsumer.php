@@ -12,7 +12,7 @@ use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
-use Anktx\Kafka\Client\Log\LibrdkafkaCallbacks;
+use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -51,7 +51,7 @@ final readonly class KafkaConsumer
     ) {
         $conf = $config->asKafkaConfig();
 
-        $callbacks = new LibrdkafkaCallbacks($this->logger);
+        $callbacks = new RdKafkaCallbacks($this->logger);
         $callbacks->attachLogCallback($conf);
         $callbacks->attachErrorCallback($conf);
 
