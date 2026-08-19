@@ -22,6 +22,10 @@
   `Config parameter "pollIntervalSec" must not be negative, …` и
   `Config parameter "probability" must be between 0 and 1, …`
   (новая фабрика `InvalidConfigException::probability()`).
+- **BC:** `TopicSubscription` валидирует аргументы конструктора: пустой
+  `topic`, отрицательные `partition`/`offset` и `offset` без `partition`
+  отвергаются новым `InvalidSubscriptionException` (раньше мусорные значения
+  молча игнорировались при подписке).
 
 ## [0.8.0] - 2026-08-19
 

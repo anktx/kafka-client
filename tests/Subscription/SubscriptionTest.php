@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Subscription;
 
+use Anktx\Kafka\Client\Exception\Business\InvalidSubscriptionException;
 use Anktx\Kafka\Client\Exception\Business\TopicHasNoPartitionException;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
 use PHPUnit\Framework\TestCase;
@@ -88,8 +89,52 @@ final class SubscriptionTest extends TestCase
 
         self::assertSame('topic1', $subscription->topic);
         self::assertSame(0, $subscription->partition);
-        // TopicPartition без offset возвращает offset как int, но может быть RD_KAFKA_OFFSET_INVALID
-        self::assertIsInt($subscription->offset);
+        // TopicPartition без явного offset в ext-rdkafka 6.x отдаёт 0
+        // (дефолт конструктора), а не sentinel-значение.
+        self::assertSame(0, $subscription->offset);
+    }
+
+    public function testEmptyTopicIsRejected(): void
+    {
+        $this->expectException(InvalidSubscriptionException::class);
+        $this->expectExceptionMessage('Subscription topic must not be an empty string');
+
+        new TopicSubscription('');
+    }
+
+    public function testNegativePartitionIsRejected(): void
+    {
+        $this->expectException(InvalidSubscriptionException::class);
+        $this->expectExceptionMessage('Subscription partition must not be negative, -1 given');
+
+        new TopicSubscription('topic1', -1);
+    }
+
+    public function testNegativeOffsetIsRejected(): void
+    {
+        $this->expectException(InvalidSubscriptionException::class);
+        $this->expectExceptionMessage('Subscription offset must not be negative, -5 given');
+
+        new TopicSubscription('topic1', 0, -5);
+    }
+
+    public function testOffsetWithoutPartitionIsRejected(): void
+    {
+        // offset без partition бессмысленен: asKafkaTopicPartition() всё равно
+        // отверг бы такую подписку — фиксируем отказ уже в конструкторе.
+        $this->expectException(InvalidSubscriptionException::class);
+        $this->expectExceptionMessage('Subscription offset cannot be set without a partition');
+
+        new TopicSubscription('topic1', null, 100);
+    }
+
+    public function testZeroPartitionAndZeroOffsetAreValid(): void
+    {
+        // 0 — легитимные значения partition и offset (начало партиции).
+        $subscription = new TopicSubscription('topic1', 0, 0);
+
+        self::assertSame(0, $subscription->partition);
+        self::assertSame(0, $subscription->offset);
     }
 
     public function testConstructor(): void

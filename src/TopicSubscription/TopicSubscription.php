@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\TopicSubscription;
 
+use Anktx\Kafka\Client\Exception\Business\InvalidSubscriptionException;
 use Anktx\Kafka\Client\Exception\Business\TopicHasNoPartitionException;
 use RdKafka\TopicPartition;
 
@@ -13,7 +14,23 @@ final readonly class TopicSubscription
         public string $topic,
         public ?int $partition = null,
         public ?int $offset = null,
-    ) {}
+    ) {
+        if ($this->topic === '') {
+            throw InvalidSubscriptionException::emptyTopic();
+        }
+
+        if ($this->partition !== null && $this->partition < 0) {
+            throw InvalidSubscriptionException::negativePartition($this->partition);
+        }
+
+        if ($this->offset !== null && $this->offset < 0) {
+            throw InvalidSubscriptionException::negativeOffset($this->offset);
+        }
+
+        if ($this->offset !== null && $this->partition === null) {
+            throw InvalidSubscriptionException::offsetWithoutPartition();
+        }
+    }
 
     public static function create(string $topic, ?int $partition = null, ?int $offset = null): self
     {

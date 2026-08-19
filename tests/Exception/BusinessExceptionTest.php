@@ -6,6 +6,7 @@ namespace Anktx\Kafka\Client\Tests\Exception;
 
 use Anktx\Kafka\Client\Exception\Business\BusinessException;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
+use Anktx\Kafka\Client\Exception\Business\InvalidSubscriptionException;
 use Anktx\Kafka\Client\Exception\Business\TopicHasNoPartitionException;
 use PHPUnit\Framework\TestCase;
 
@@ -89,5 +90,31 @@ final class BusinessExceptionTest extends TestCase
         self::assertInstanceOf(BusinessException::class, $exception);
         self::assertInstanceOf(TopicHasNoPartitionException::class, $exception);
         self::assertSame('Topic "test-topic" has no partition', $exception->getMessage());
+    }
+
+    public function testInvalidSubscriptionExceptionFactories(): void
+    {
+        self::assertInstanceOf(BusinessException::class, InvalidSubscriptionException::emptyTopic());
+        self::assertSame(
+            'Subscription topic must not be an empty string',
+            InvalidSubscriptionException::emptyTopic()->getMessage(),
+        );
+        self::assertSame(
+            'Subscription partition must not be negative, -1 given',
+            InvalidSubscriptionException::negativePartition(-1)->getMessage(),
+        );
+        self::assertSame(
+            'Subscription offset must not be negative, -5 given',
+            InvalidSubscriptionException::negativeOffset(-5)->getMessage(),
+        );
+        self::assertSame(
+            'Subscription offset cannot be set without a partition',
+            InvalidSubscriptionException::offsetWithoutPartition()->getMessage(),
+        );
+    }
+
+    public function testInvalidSubscriptionExceptionIsDomainException(): void
+    {
+        self::assertInstanceOf(\DomainException::class, InvalidSubscriptionException::emptyTopic());
     }
 }

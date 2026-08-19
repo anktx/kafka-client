@@ -252,6 +252,7 @@ Exception
 │   └── InvalidMessageException       # Сообщение без offset и т.п.
 └── BusinessException                 # Бизнес-логика
     ├── EmptySubscriptionsException   # Пустой список подписок
+    ├── InvalidSubscriptionException  # Неверные topic/partition/offset в подписке
     └── TopicHasNoPartitionException  # Топик не имеет партиций
 ```
 
@@ -267,3 +268,10 @@ try {
     // Ошибка отправки сообщения
 }
 ```
+
+### Жизненный цикл консьюмера
+
+`KafkaConsumer::close()` идемпотентен; операции после закрытия бросают
+`ClientClosedException` (ошибка программирования, не ретраить).
+Подробно, с обоснованием и примером шаблона:
+[docs/lifecycle.md](docs/lifecycle.md).
