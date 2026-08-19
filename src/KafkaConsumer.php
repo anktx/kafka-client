@@ -9,6 +9,7 @@ use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\Log\LibrdkafkaLogLevel;
@@ -246,10 +247,20 @@ final readonly class KafkaConsumer
      *
      * @param KafkaConsumerMessage $message Обработанное сообщение
      *
-     * @throws KafkaConsumerException Если коммит не удался
+     * @throws InvalidMessageException Если у сообщения нет смещения
+     * @throws KafkaConsumerException  Если коммит не удался
      */
     public function commit(KafkaConsumerMessage $message): void
     {
+        if ($message->offset === null) {
+            $this->logger->error('Attempted to commit a message without offset', [
+                'topic' => $message->topic,
+                'partition' => $message->partition,
+            ]);
+
+            throw InvalidMessageException::noOffset($message);
+        }
+
         try {
             $this->consumer->commit([
                 new TopicPartition($message->topic, $message->partition, $message->offset + 1),

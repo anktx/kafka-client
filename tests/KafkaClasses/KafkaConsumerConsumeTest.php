@@ -7,6 +7,7 @@ namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
@@ -17,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 use RdKafka\Exception;
 use RdKafka\Message;
+use RdKafka\TopicPartition;
 
 /**
  * Юнит-тесты для {@see KafkaConsumer::consume()} на mock'е RdKafka\KafkaConsumer.
@@ -278,6 +280,69 @@ final class KafkaConsumerConsumeTest extends TestCase
         );
 
         self::assertSame([], $logger->records);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testCommitWithoutOffsetThrowsInvalidMessageException(): void
+    {
+        // Сообщение без offset нельзя закоммитить: commit() фиксировал бы
+        // фиктивное смещение (null + 1).
+        $logger = new InMemoryLogger();
+        $consumer = $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class), logger: $logger);
+
+        $message = new KafkaConsumerMessage(topic: 'test-topic', body: 'hello');
+
+        try {
+            $consumer->commit($message);
+            self::fail('Expected InvalidMessageException');
+        } catch (InvalidMessageException $e) {
+            self::assertSame(
+                'Message from topic "test-topic" (partition -1) has no offset and cannot be committed',
+                $e->getMessage(),
+            );
+        }
+
+        $errorRecords = $logger->findByMessage('Attempted to commit a message without offset');
+        self::assertCount(1, $errorRecords);
+        self::assertSame('test-topic', $errorRecords[0]['context']['topic']);
+    }
+
+    public function testCommitCommitsNextOffset(): void
+    {
+        // commit() фиксирует offset + 1 — следующий за обработанным сообщением.
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->expects($this->once())->method('commit')->with([
+            new TopicPartition('test-topic', 3, 43),
+        ]);
+
+        $consumer = $this->buildConsumer($rdKafka);
+        $consumer->commit(new KafkaConsumerMessage(
+            topic: 'test-topic',
+            body: 'hello',
+            partition: 3,
+            offset: 42,
+        ));
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testCommitRethrowsRdKafkaExceptionAsKafkaConsumerException(): void
+    {
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->method('commit')
+            ->willThrowException(new Exception('commit failed'))
+        ;
+
+        $consumer = $this->buildConsumer($rdKafka);
+
+        $this->expectException(KafkaConsumerException::class);
+        $this->expectExceptionMessage('commit failed');
+
+        $consumer->commit(new KafkaConsumerMessage(
+            topic: 'test-topic',
+            body: 'hello',
+            partition: 3,
+            offset: 42,
+        ));
     }
 
     /**
