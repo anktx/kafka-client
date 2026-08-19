@@ -138,7 +138,7 @@ $config = new ProducerConfig(
     queueBufferingMaxKBytes: int,       // По умолчанию: 20480
     batchSize: int,                     // По умолчанию: 102400
     lingerMs: int,                      // По умолчанию: 10
-    compressionType: CompressionType,   // По умолчанию: snappy
+    compressionType: CompressionType,   // По умолчанию: snappy; none — отключить сжатие
     isDebug: bool,                      // По умолчанию: false
 );
 ```
@@ -209,8 +209,8 @@ src/
 │   ├── ConsumerConfig.php           # Конфигурация консьюмера
 │   ├── ProducerConfig.php           # Конфигурация продюсера
 │   └── Enum/                        # Перечисления
-│       ├── CompressionType.php      # Типы компрессии (snappy, gzip, lz4, zstd)
-│       └── OffsetReset.php          # Стратегия сброса оффсета (latest, earliest)
+│       ├── CompressionType.php      # Типы компрессии (none, snappy, gzip, lz4, zstd)
+│       └── OffsetReset.php          # Стратегия сброса оффсета (earliest, latest, none)
 │
 ├── ConsumeResult/                   # Результаты консьюминга
 │   ├── KafkaConsumeTimeout.php      # Таймаут (нет сообщений)

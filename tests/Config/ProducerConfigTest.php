@@ -8,7 +8,6 @@ use Anktx\Kafka\Client\Config\Enum\CompressionType;
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use PHPUnit\Framework\TestCase;
-use RdKafka\Conf;
 
 final class ProducerConfigTest extends TestCase
 {
@@ -22,9 +21,34 @@ final class ProducerConfigTest extends TestCase
     public function testAsKafkaConfig(): void
     {
         $config = new ProducerConfig('kafka:9092');
-        $kafkaConfig = $config->asKafkaConfig();
+        $dump = $config->asKafkaConfig()->dump();
 
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
+        // bootstrap.servers / linger.ms — алиасы: dump() отдаёт
+        // канонические имена metadata.broker.list / queue.buffering.max.ms
+        self::assertSame('kafka:9092', $dump['metadata.broker.list']);
+        self::assertSame('20480', $dump['queue.buffering.max.kbytes']);
+        self::assertSame('102400', $dump['batch.size']);
+        self::assertSame('10', $dump['queue.buffering.max.ms']);
+        self::assertSame('', $dump['debug']);
+    }
+
+    public function testAsKafkaConfigMapsDefaultCompressionType(): void
+    {
+        $config = new ProducerConfig('kafka:9092');
+        $dump = $config->asKafkaConfig()->dump();
+
+        // compression.type — алиас: dump() отдаёт канонический compression.codec
+        self::assertSame('snappy', $dump['compression.codec']);
+    }
+
+    public function testAsKafkaConfigAcceptsAllCompressionTypeBackingValues(): void
+    {
+        foreach (CompressionType::cases() as $compressionType) {
+            $config = new ProducerConfig('kafka:9092', compressionType: $compressionType);
+            $dump = $config->asKafkaConfig()->dump();
+
+            self::assertSame($compressionType->value, $dump['compression.codec']);
+        }
     }
 
     public function testAsKafkaConfigWrapsRdKafkaExceptionIntoInvalidConfigException(): void
@@ -114,6 +138,16 @@ final class ProducerConfigTest extends TestCase
         self::assertSame(CompressionType::zstd, $config->compressionType);
     }
 
+    public function testWithNoneCompression(): void
+    {
+        $config = new ProducerConfig(
+            'kafka:9092',
+            compressionType: CompressionType::none,
+        );
+
+        self::assertSame(CompressionType::none, $config->compressionType);
+    }
+
     public function testWithDebugEnabled(): void
     {
         $config = new ProducerConfig(
@@ -135,45 +169,15 @@ final class ProducerConfigTest extends TestCase
             isDebug: true,
         );
 
-        $kafkaConfig = $config->asKafkaConfig();
+        $dump = $config->asKafkaConfig()->dump();
 
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
-    }
-
-    public function testAsKafkaConfigWithGzipCompression(): void
-    {
-        $config = new ProducerConfig(
-            'kafka:9092',
-            compressionType: CompressionType::gzip,
-        );
-
-        $kafkaConfig = $config->asKafkaConfig();
-
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
-    }
-
-    public function testAsKafkaConfigWithLz4Compression(): void
-    {
-        $config = new ProducerConfig(
-            'kafka:9092',
-            compressionType: CompressionType::lz4,
-        );
-
-        $kafkaConfig = $config->asKafkaConfig();
-
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
-    }
-
-    public function testAsKafkaConfigWithZstdCompression(): void
-    {
-        $config = new ProducerConfig(
-            'kafka:9092',
-            compressionType: CompressionType::zstd,
-        );
-
-        $kafkaConfig = $config->asKafkaConfig();
-
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertSame('kafka:9092', $dump['metadata.broker.list']);
+        self::assertSame('10240', $dump['queue.buffering.max.kbytes']);
+        self::assertSame('51200', $dump['batch.size']);
+        self::assertSame('100', $dump['queue.buffering.max.ms']);
+        self::assertSame('gzip', $dump['compression.codec']);
+        // librdkafka разворачивает 'all' в полный список флагов
+        self::assertStringContainsString('all', $dump['debug']);
     }
 
     public function testEmptyBrokersThrowsInvalidConfigException(): void

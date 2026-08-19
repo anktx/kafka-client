@@ -33,9 +33,26 @@ final class ConsumerConfigTest extends TestCase
             groupId: 'test-group',
             instanceId: 'test-instance',
         );
-        $kafkaConfig = $config->asKafkaConfig();
+        $dump = $config->asKafkaConfig()->dump();
 
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertSame('kafka:9092', $dump['metadata.broker.list']);
+        self::assertSame('test-group', $dump['group.id']);
+        self::assertSame('test-instance', $dump['group.instance.id']);
+        self::assertSame('false', $dump['enable.auto.commit']);
+        self::assertSame('true', $dump['enable.partition.eof']);
+        self::assertSame('', $dump['debug']);
+    }
+
+    public function testAsKafkaConfigAcceptsAllOffsetResetBackingValues(): void
+    {
+        // auto.offset.reset — topic-level свойство: в Conf::dump() не виден,
+        // но librdkafka валидирует значение при set(), поэтому «asKafkaConfig()
+        // не бросил» означает, что бэкинг-значение принято.
+        foreach (OffsetReset::cases() as $offsetReset) {
+            $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', offsetReset: $offsetReset);
+
+            self::assertInstanceOf(Conf::class, $config->asKafkaConfig());
+        }
     }
 
     public function testDefaults(): void
@@ -63,7 +80,10 @@ final class ConsumerConfigTest extends TestCase
         );
 
         self::assertNull($config->instanceId);
-        self::assertInstanceOf(Conf::class, $config->asKafkaConfig());
+
+        $dump = $config->asKafkaConfig()->dump();
+
+        self::assertArrayNotHasKey('group.instance.id', $dump);
     }
 
     public function testEmptyInstanceIdThrowsInvalidConfigException(): void
@@ -154,9 +174,10 @@ final class ConsumerConfigTest extends TestCase
             autoCommitMs: 5000,
         );
 
-        $kafkaConfig = $config->asKafkaConfig();
+        $dump = $config->asKafkaConfig()->dump();
 
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertSame('true', $dump['enable.auto.commit']);
+        self::assertSame('5000', $dump['auto.commit.interval.ms']);
     }
 
     public function testAsKafkaConfigWithSessionTimeout(): void
@@ -168,9 +189,9 @@ final class ConsumerConfigTest extends TestCase
             sessionTimeoutMs: 10000,
         );
 
-        $kafkaConfig = $config->asKafkaConfig();
+        $dump = $config->asKafkaConfig()->dump();
 
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertSame('10000', $dump['session.timeout.ms']);
     }
 
     public function testAsKafkaConfigWithDebugEnabled(): void
@@ -182,9 +203,10 @@ final class ConsumerConfigTest extends TestCase
             isDebug: true,
         );
 
-        $kafkaConfig = $config->asKafkaConfig();
+        $dump = $config->asKafkaConfig()->dump();
 
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
+        // librdkafka разворачивает 'all' в полный список флагов
+        self::assertStringContainsString('all', $dump['debug']);
     }
 
     public function testAsKafkaConfigWithLatestOffsetReset(): void
@@ -196,9 +218,10 @@ final class ConsumerConfigTest extends TestCase
             offsetReset: OffsetReset::latest,
         );
 
-        $kafkaConfig = $config->asKafkaConfig();
-
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
+        // auto.offset.reset — topic-level свойство, в dump() не виден;
+        // успешный вызов означает, что librdkafka принял значение.
+        // Полный маппинг всех кейсов — testAsKafkaConfigAcceptsAllOffsetResetBackingValues
+        self::assertInstanceOf(Conf::class, $config->asKafkaConfig());
     }
 
     public function testAsKafkaConfigWithAllOptions(): void
@@ -213,9 +236,16 @@ final class ConsumerConfigTest extends TestCase
             isDebug: true,
         );
 
-        $kafkaConfig = $config->asKafkaConfig();
+        $dump = $config->asKafkaConfig()->dump();
 
-        self::assertInstanceOf(Conf::class, $kafkaConfig);
+        self::assertSame('kafka:9092', $dump['metadata.broker.list']);
+        self::assertSame('test-group', $dump['group.id']);
+        self::assertSame('test-instance', $dump['group.instance.id']);
+        self::assertSame('true', $dump['enable.auto.commit']);
+        self::assertSame('5000', $dump['auto.commit.interval.ms']);
+        self::assertSame('10000', $dump['session.timeout.ms']);
+        // librdkafka разворачивает 'all' в полный список флагов
+        self::assertStringContainsString('all', $dump['debug']);
     }
 
     public function testDefaultSocketKeepaliveEnableIsTrue(): void

@@ -7,6 +7,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- `CompressionType::none` (`compression.type=none`): типизированный API
+  теперь позволяет отключить сжатие сообщений продюсера (до этого enum
+  содержал только компрессирующие кодеки).
+
+### Fixed
+
+- `OffsetReset::none` передавал в librdkafka бэкинг-значение `none`,
+  которое тот не принимает (`Invalid value "none" for configuration
+  property "auto.offset.reset"`) — любой `ConsumerConfig` с этим кейсом
+  бросал `InvalidConfigException` из `asKafkaConfig()`. Бэкинг-значение
+  исправлено на каноничное для librdkafka `error` (семантика Kafka-протокола
+  `none` сохранена в имени кейса); поведение `earliest`/`latest` не изменилось.
+
 ### Changed
 
 - **BC:** иерархия исключений переработана в два семейства + маркерный

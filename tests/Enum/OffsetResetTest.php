@@ -21,6 +21,7 @@ final class OffsetResetTest extends TestCase
         $case = OffsetReset::earliest;
 
         self::assertSame('earliest', $case->name);
+        self::assertSame('earliest', $case->value);
     }
 
     public function testLatestCase(): void
@@ -28,6 +29,7 @@ final class OffsetResetTest extends TestCase
         $case = OffsetReset::latest;
 
         self::assertSame('latest', $case->name);
+        self::assertSame('latest', $case->value);
     }
 
     public function testNoneCase(): void
@@ -35,6 +37,9 @@ final class OffsetResetTest extends TestCase
         $case = OffsetReset::none;
 
         self::assertSame('none', $case->name);
+        // Бэкинг-значение — контракт с librdkafka: семантика `none`
+        // Kafka-протокола там называется `error`.
+        self::assertSame('error', $case->value);
     }
 
     public function testCasesContainAllTypes(): void
@@ -45,5 +50,14 @@ final class OffsetResetTest extends TestCase
         self::assertContains('earliest', $names);
         self::assertContains('latest', $names);
         self::assertContains('none', $names);
+    }
+
+    public function testFromBackingValueRoundTrip(): void
+    {
+        // Бэкинг-значения — контракт с librdkafka (auto.offset.reset):
+        // каждое должно резолвиться обратно в свой кейс.
+        foreach (OffsetReset::cases() as $case) {
+            self::assertSame($case, OffsetReset::from($case->value));
+        }
     }
 }

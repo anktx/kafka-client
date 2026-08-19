@@ -8,5 +8,10 @@ enum OffsetReset: string
 {
     case earliest = 'earliest';
     case latest = 'latest';
-    case none = 'none';
+
+    /**
+     * Семантика Kafka-протокола none: без сохранённого смещения — ошибка.
+     * librdkafka называет это значение `error`.
+     */
+    case none = 'error';
 }
