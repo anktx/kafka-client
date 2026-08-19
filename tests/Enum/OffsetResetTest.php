@@ -42,16 +42,6 @@ final class OffsetResetTest extends TestCase
         self::assertSame('error', $case->value);
     }
 
-    public function testCasesContainAllTypes(): void
-    {
-        $cases = OffsetReset::cases();
-        $names = array_map(static fn($case) => $case->name, $cases);
-
-        self::assertContains('Earliest', $names);
-        self::assertContains('Latest', $names);
-        self::assertContains('Error', $names);
-    }
-
     public function testFromBackingValueRoundTrip(): void
     {
         // Бэкинг-значения — контракт с librdkafka (auto.offset.reset):

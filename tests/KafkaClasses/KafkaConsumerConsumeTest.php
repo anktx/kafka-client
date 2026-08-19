@@ -41,7 +41,7 @@ final class KafkaConsumerConsumeTest extends TestCase
             'offset' => 42,
             'payload' => 'hello',
             'key' => 'k',
-            'headers' => ['h' => 'v'],
+            'headers' => ['h' => 'v', 'n' => 42],
             'timestamp' => 1234,
         ]));
 
@@ -56,7 +56,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         self::assertSame(3, $result->partition);
         self::assertSame(42, $result->offset);
         self::assertSame('k', $result->key);
-        self::assertSame(['h' => 'v'], $result->headers);
+        self::assertSame(['h' => 'v', 'n' => 42], $result->headers);
         self::assertSame(1234, $result->timestampMs);
     }
 

@@ -56,18 +56,6 @@ final class CompressionTypeTest extends TestCase
         self::assertSame('zstd', $case->value);
     }
 
-    public function testCasesContainAllTypes(): void
-    {
-        $cases = CompressionType::cases();
-        $names = array_map(static fn($case) => $case->name, $cases);
-
-        self::assertContains('None', $names);
-        self::assertContains('Snappy', $names);
-        self::assertContains('Gzip', $names);
-        self::assertContains('Lz4', $names);
-        self::assertContains('Zstd', $names);
-    }
-
     public function testFromBackingValueRoundTrip(): void
     {
         // Бэкинг-значения — контракт с librdkafka (compression.type):

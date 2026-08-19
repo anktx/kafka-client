@@ -25,7 +25,7 @@ final class KafkaConsumerMessageTest extends TestCase
 
     public function testCreateWithAllParameters(): void
     {
-        $headers = ['content-type' => 'application/json'];
+        $headers = ['content-type' => 'application/json', 'retry-count' => 3];
         $message = new KafkaConsumerMessage(
             topic: 'test-topic',
             partition: 1,

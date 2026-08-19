@@ -24,7 +24,7 @@ final class KafkaProducerMessageTest extends TestCase
 
     public function testCreateWithAllParameters(): void
     {
-        $headers = ['content-type' => 'application/json'];
+        $headers = ['content-type' => 'application/json', 'retry-count' => 3];
         $message = new KafkaProducerMessage(
             topic: 'test-topic',
             body: 'test body',

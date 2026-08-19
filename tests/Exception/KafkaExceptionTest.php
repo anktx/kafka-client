@@ -83,7 +83,7 @@ final class KafkaExceptionTest extends TestCase
         self::assertSame(300, $exception->getCode());
     }
 
-    public function testKafkaConsumerExceptionConstructorIsFinal(): void
+    public function testKafkaConsumerExceptionConstructor(): void
     {
         $exception = new KafkaConsumerException('Test message');
 
@@ -91,7 +91,7 @@ final class KafkaExceptionTest extends TestCase
         self::assertSame(0, $exception->getCode());
     }
 
-    public function testKafkaProducerExceptionConstructorIsFinal(): void
+    public function testKafkaProducerExceptionConstructor(): void
     {
         $exception = new KafkaProducerException('Test message', 123);
 
@@ -99,7 +99,7 @@ final class KafkaExceptionTest extends TestCase
         self::assertSame(123, $exception->getCode());
     }
 
-    public function testKafkaFlushTimeoutExceptionConstructorIsFinal(): void
+    public function testKafkaFlushTimeoutExceptionConstructor(): void
     {
         $exception = new KafkaFlushTimeoutException('Test message', 456);
 
@@ -129,11 +129,19 @@ final class KafkaExceptionTest extends TestCase
 
     public function testKafkaProducerExceptionFlushFailed(): void
     {
-        $exception = KafkaProducerException::flushFailed(123);
+        // Реальный код ошибки вместо литерального 123: текст для неизвестного
+        // librdkafka кода ('Err-123?') — деталь реализации librdkafka и меняется
+        // между версиями. Проверяется формат, а не вывод err2str().
+        $errorCode = \RD_KAFKA_RESP_ERR__TRANSPORT;
+
+        $exception = KafkaProducerException::flushFailed($errorCode);
 
         self::assertInstanceOf(KafkaException::class, $exception);
         self::assertInstanceOf(KafkaProducerException::class, $exception);
-        self::assertSame('Flush failed: Err-123? (123)', $exception->getMessage());
-        self::assertSame(123, $exception->getCode());
+        self::assertSame(
+            \sprintf('Flush failed: %s (%d)', rd_kafka_err2str($errorCode), $errorCode),
+            $exception->getMessage(),
+        );
+        self::assertSame($errorCode, $exception->getCode());
     }
 }
