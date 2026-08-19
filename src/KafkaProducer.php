@@ -139,11 +139,16 @@ final class KafkaProducer
      *
      * @param int $timeoutMs Суммарный таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
      *
+     * @throws InvalidConfigException     Если таймаут отрицательный
      * @throws KafkaFlushTimeoutException Если истёк суммарный таймаут ожидания
      * @throws KafkaProducerException     Если произошла ошибка при отправке
      */
     public function flush(int $timeoutMs = self::DEFAULT_FLUSH_TIMEOUT_MS): void
     {
+        if ($timeoutMs < 0) {
+            throw InvalidConfigException::nonNegativeInt('timeoutMs', $timeoutMs);
+        }
+
         $startedAtNs = hrtime(true);
         $attempts = 0;
 

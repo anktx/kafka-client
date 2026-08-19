@@ -183,17 +183,22 @@ final class KafkaConsumer
      * librdkafka через getSubscription() — без librdkafka consume() без
      * подписки бесконечно возвращает таймауты, неотличимые от пустого топика.
      *
-     * @param int $timeoutMs Таймаут ожидания в миллисекундах
+     * @param int $timeoutMs Таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
      *
      * @return KafkaBrokersDown|KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат чтения
      *
      * @throws ClientClosedException  Если консьюмер закрыт через close()
+     * @throws InvalidConfigException Если таймаут отрицательный
      * @throws NotSubscribedException Если консьюмер не подписан на топики
      * @throws KafkaConsumerException Если чтение завершилось ошибкой
      */
     public function consume(int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS): KafkaBrokersDown|KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
     {
         $this->assertNotClosed(__METHOD__);
+
+        if ($timeoutMs < 0) {
+            throw InvalidConfigException::nonNegativeInt('timeoutMs', $timeoutMs);
+        }
 
         try {
             $subscription = $this->consumer->getSubscription();

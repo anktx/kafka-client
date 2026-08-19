@@ -8,6 +8,7 @@ use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
@@ -58,6 +59,40 @@ final class KafkaConsumerConsumeTest extends TestCase
         self::assertSame('k', $result->key);
         self::assertSame(['h' => 'v', 'n' => 42], $result->headers);
         self::assertSame(1234, $result->timestampMs);
+    }
+
+    public function testConsumeRejectsNegativeTimeout(): void
+    {
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->expects($this->never())->method('getSubscription');
+        $rdKafka->expects($this->never())->method('consume');
+
+        $consumer = $this->buildConsumer($rdKafka);
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+
+        try {
+            $consumer->consume(-1);
+            self::fail('Expected InvalidConfigException');
+        } catch (InvalidConfigException $e) {
+            self::assertSame('Config parameter "timeoutMs" must not be negative, -1 given', $e->getMessage());
+        }
+    }
+
+    public function testConsumeAllowsZeroNonBlockingTimeout(): void
+    {
+        // Граница валидации: 0 — легитимный неблокирующий опрос очереди.
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
+        $rdKafka->expects($this->once())->method('consume')->with(0)->willReturn(self::message([
+            'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
+            'partition' => 0,
+            'offset' => 0,
+        ]));
+
+        $consumer = $this->buildConsumer($rdKafka);
+        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+
+        self::assertInstanceOf(KafkaConsumeTimeout::class, $consumer->consume(0));
     }
 
     #[DataProvider('provideConsumeNormalizesUnknownTimestampToNullCases')]

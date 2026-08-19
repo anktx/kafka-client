@@ -7,6 +7,7 @@ namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaFlushTimeoutException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaProducer;
 use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;
@@ -270,6 +271,28 @@ final class KafkaProducerTest extends TestCase
         self::assertSame(1000, $errorRecords[0]['context']['timeout_ms']);
         self::assertSame(1, $errorRecords[0]['context']['attempts']);
         self::assertSame(2, $errorRecords[0]['context']['out_queue_len']);
+    }
+
+    public function testFlushRejectsNegativeTimeout(): void
+    {
+        $producer = $this->createMock(Producer::class);
+        $producer->expects($this->never())->method('flush');
+
+        try {
+            $this->buildProducer($producer)->flush(-1);
+            self::fail('Expected InvalidConfigException');
+        } catch (InvalidConfigException $e) {
+            self::assertSame('Config parameter "timeoutMs" must not be negative, -1 given', $e->getMessage());
+        }
+    }
+
+    public function testFlushAllowsZeroNonBlockingBudget(): void
+    {
+        // Граница валидации: 0 — одна неблокирующая попытка drain очереди.
+        $producer = $this->createMock(Producer::class);
+        $producer->expects($this->once())->method('flush')->with(0)->willReturn(\RD_KAFKA_RESP_ERR_NO_ERROR);
+
+        $this->buildProducer($producer)->flush(0);
     }
 
     private static function message(): KafkaProducerMessage

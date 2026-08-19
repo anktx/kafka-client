@@ -1,0 +1,13 @@
+# Dev-only контент не попадает в dist-архив пакета (packagist / composer require):
+# потребителю остаются только src/, README, CHANGELOG, LICENSE и composer.json.
+/.github export-ignore
+/bin export-ignore
+/docs export-ignore
+/tests export-ignore
+/AGENTS.md export-ignore
+/Makefile export-ignore
+/.gitignore export-ignore
+/.php-cs-fixer.dist.php export-ignore
+/phpstan.neon.dist export-ignore
+/phpunit.dist.xml export-ignore
+/infection.json5.dist export-ignore

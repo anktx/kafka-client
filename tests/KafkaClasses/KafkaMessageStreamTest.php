@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
+use Anktx\Kafka\Client\ConsumeResult\ConsumeResult;
 use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
@@ -16,6 +18,7 @@ use Anktx\Kafka\Client\KafkaMessageStream;
 use Anktx\Kafka\Client\StreamObserver\StreamObserver;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
 use Anktx\Kafka\Client\Tests\Support\SpyStreamObserver;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Exception;
 use RdKafka\Message;
@@ -37,6 +40,53 @@ use RdKafka\Message;
  */
 final class KafkaMessageStreamTest extends TestCase
 {
+    #[AllowMockObjectsWithoutExpectations]
+    public function testConstructorRejectsNegativePollTimeout(): void
+    {
+        try {
+            new KafkaMessageStream($this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class)), -1);
+            self::fail('Expected InvalidConfigException');
+        } catch (InvalidConfigException $e) {
+            self::assertSame('Config parameter "pollTimeoutMs" must not be negative, -1 given', $e->getMessage());
+        }
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testConstructorAllowsZeroPollTimeout(): void
+    {
+        // Граница валидации: 0 — легитимный неблокирующий опрос consume(0).
+        $stream = new KafkaMessageStream(
+            $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class)),
+            0,
+        );
+
+        self::assertInstanceOf(KafkaMessageStream::class, $stream);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testDispatchThrowsOnUnknownConsumeResultImplementation(): void
+    {
+        // Дрейф-защита: результат consume() вне известного union — типизированный
+        // отказ вместо \UnhandledMatchError из match без default. Через публичный
+        // API недостижимо (KafkaConsumer::consume() возвращает только union), —
+        // поэтому диспетчер вызывается напрямую.
+        $unexpected = new class implements ConsumeResult {};
+
+        $stream = new KafkaMessageStream(
+            $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class)),
+        );
+
+        try {
+            (new \ReflectionMethod(KafkaMessageStream::class, 'dispatchToObserver'))->invoke($stream, $unexpected);
+            self::fail('Expected KafkaConsumerException');
+        } catch (KafkaConsumerException $e) {
+            self::assertSame(
+                'Unexpected ConsumeResult implementation: ' . $unexpected::class,
+                $e->getMessage(),
+            );
+        }
+    }
+
     public function testStreamYieldsOnlyMessagesSkippingTimeoutBrokersDownAndEof(): void
     {
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);

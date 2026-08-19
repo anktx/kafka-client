@@ -45,6 +45,20 @@
   потерю брокеров) закрывает `KafkaMessageStream` с кастомным
   `StreamObserver`.
 
+### Fixed
+
+- Отрицательные таймауты публичного API (`KafkaMessageStream` pollTimeoutMs,
+  `KafkaConsumer::consume()`, `KafkaProducer::flush()`) отвергаются
+  `InvalidConfigException` вместо передачи некорректного значения в RdKafka
+  с неопределённым поведением.
+- `KafkaMessageStream` на результате `consume()` вне известного union
+  бросает типизированный `KafkaConsumerException` вместо
+  `\UnhandledMatchError`; соответствие union ↔ ветви `match` стрима
+  зафиксировано рефлексионным тестом (защита от дрейфа при добавлении
+  новых результатов).
+- Dev-контент (tests, docs, bin, CI, Makefile, конфиги инструментов)
+  больше не попадает в dist-архив пакета (`.gitattributes`).
+
 ## [0.9.0] - 2026-08-20
 
 ### Added
