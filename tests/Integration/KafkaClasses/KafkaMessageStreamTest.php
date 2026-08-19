@@ -94,7 +94,7 @@ final class KafkaMessageStreamTest extends TestCase
         $consumer = new KafkaConsumer(new ConsumerConfig(
             brokers: $this->brokers,
             groupId: 'stream-test-' . uniqid('', true),
-            offsetReset: OffsetReset::earliest,
+            offsetReset: OffsetReset::Earliest,
         ));
 
         try {

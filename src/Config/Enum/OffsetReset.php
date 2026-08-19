@@ -6,12 +6,23 @@ namespace Anktx\Kafka\Client\Config\Enum;
 
 enum OffsetReset: string
 {
-    case earliest = 'earliest';
-    case latest = 'latest';
+    case Earliest = 'earliest';
+    case Latest = 'latest';
 
     /**
-     * Семантика Kafka-протокола none: без сохранённого смещения — ошибка.
-     * librdkafka называет это значение `error`.
+     * Запрещает автоматический сброс смещения (strict-режим).
+     *
+     * Политика активируется только если у группы нет валидного
+     * закоммиченного смещения — новая группа (в т.ч. опечатка в groupId),
+     * офсет удалён retention-политикой или истёк offsets.retention.minutes.
+     * В этом случае партиция переводится в состояние ошибки
+     * RD_KAFKA_RESP_ERR__AUTO_OFFSET_RESET, и consume() бросает
+     * KafkaConsumerException вместо молчаливого пропуска истории (Latest)
+     * или повторного чтения с начала (Earliest).
+     *
+     * Бэкинг-значение `error` — канон для librdkafka; в терминологии
+     * Kafka-протокола и Java-клиента та же политика называется `none`,
+     * но librdkafka значение `none` отвергает как невалидное.
      */
-    case none = 'error';
+    case Error = 'error';
 }

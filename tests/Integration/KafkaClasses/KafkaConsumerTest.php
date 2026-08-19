@@ -66,7 +66,7 @@ final class KafkaConsumerTest extends TestCase
 
     public function testConstructorWithLatestOffsetReset(): void
     {
-        $consumer = new KafkaConsumer($this->consumerConfig(offsetReset: OffsetReset::latest));
+        $consumer = new KafkaConsumer($this->consumerConfig(offsetReset: OffsetReset::Latest));
 
         self::assertInstanceOf(KafkaConsumer::class, $consumer);
         $consumer->close();
@@ -205,7 +205,7 @@ final class KafkaConsumerTest extends TestCase
         $consumer = new KafkaConsumer(new ConsumerConfig(
             brokers: $this->brokers,
             groupId: 'subscribe-regression-' . uniqid('', true),
-            offsetReset: OffsetReset::earliest,
+            offsetReset: OffsetReset::Earliest,
         ));
 
         try {
@@ -254,7 +254,7 @@ final class KafkaConsumerTest extends TestCase
     }
 
     private function consumerConfig(
-        OffsetReset $offsetReset = OffsetReset::earliest,
+        OffsetReset $offsetReset = OffsetReset::Earliest,
         ?int $autoCommitMs = null,
         ?int $sessionTimeoutMs = null,
         bool $isDebug = false,

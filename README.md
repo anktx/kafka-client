@@ -26,7 +26,7 @@ use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 $producer = new KafkaProducer(
     new ProducerConfig(
         brokers: 'kafka:9092',
-        compressionType: CompressionType::snappy,
+        compressionType: CompressionType::Snappy,
     )
 );
 
@@ -58,7 +58,7 @@ $consumer = new KafkaConsumer(
         brokers: 'kafka:9092',
         groupId: 'order-processor',
         instanceId: 'worker-1',
-        offsetReset: OffsetReset::latest,
+        offsetReset: OffsetReset::Latest,
     )
 );
 
@@ -164,6 +164,36 @@ $config = new ConsumerConfig(
 `reconnectBackoffMaxMs < reconnectBackoffMs`) отбрасываются в конструкторе
 исключением `InvalidConfigException`.
 
+#### OffsetReset: политика при отсутствии закоммиченного смещения
+
+`offsetReset` отвечает на вопрос «с чего начать чтение, если у группы
+**нет** валидного закоммиченного смещения». Такое бывает, когда:
+
+- группа новая и коммитов ещё не было (частный случай — опечатка в `groupId`);
+- закоммиченный офсет устарел: данные под ним удалены retention-политикой
+  или истёк срок хранения офсетов группы (`offsets.retention.minutes`).
+
+Если валидный офсет есть — политика не активируется вовсе, все три
+значения работают одинаково.
+
+| Кейс | Значение для librdkafka | Поведение |
+|---|---|---|
+| `OffsetReset::Earliest` | `earliest` | сброс на начало партиции (перечитает всю историю) |
+| `OffsetReset::Latest` | `latest` | сброс на конец (молча пропустит всю историю) |
+| `OffsetReset::Error` | `error` | сброс запрещён: партиция переходит в ошибку `RD_KAFKA_RESP_ERR__AUTO_OFFSET_RESET`, `consume()` бросает `KafkaConsumerException` |
+
+`OffsetReset::Error` — это strict-режим: опечатка в `groupId`, потерянная
+история или невалидный офсет не проходят молча, а останавливают цикл
+потребления исключением.
+
+**Почему `Error`, а не `None`.** Одна и та же политика в разных клиентах
+называется по-разному: Java-клиент и документация Kafka называют её `none`,
+а librdkafka (и ext-rdkafka) — `error`; значение `none` librdkafka
+отвергает как невалидное (`Invalid value "none" for configuration
+property "auto.offset.reset"`). Библиотека работает через librdkafka,
+поэтому кейс назван по его канону: `Error = 'error'`. Отображение имён —
+в таблице выше.
+
 ### Логирование
 
 PSR-3 логгер передаётся напрямую в конструкторы клиентов (по умолчанию `NullLogger`):
@@ -210,7 +240,7 @@ src/
 │   ├── ProducerConfig.php           # Конфигурация продюсера
 │   └── Enum/                        # Перечисления
 │       ├── CompressionType.php      # Типы компрессии (none, snappy, gzip, lz4, zstd)
-│       └── OffsetReset.php          # Стратегия сброса оффсета (earliest, latest, none)
+│       └── OffsetReset.php          # Стратегия сброса оффсета (earliest, latest, error)
 │
 ├── ConsumeResult/                   # Результаты консьюминга
 │   ├── KafkaConsumeTimeout.php      # Таймаут (нет сообщений)

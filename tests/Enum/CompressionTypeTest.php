@@ -18,41 +18,41 @@ final class CompressionTypeTest extends TestCase
 
     public function testNoneCase(): void
     {
-        $case = CompressionType::none;
+        $case = CompressionType::None;
 
-        self::assertSame('none', $case->name);
+        self::assertSame('None', $case->name);
         self::assertSame('none', $case->value);
     }
 
     public function testSnappyCase(): void
     {
-        $case = CompressionType::snappy;
+        $case = CompressionType::Snappy;
 
-        self::assertSame('snappy', $case->name);
+        self::assertSame('Snappy', $case->name);
         self::assertSame('snappy', $case->value);
     }
 
     public function testGzipCase(): void
     {
-        $case = CompressionType::gzip;
+        $case = CompressionType::Gzip;
 
-        self::assertSame('gzip', $case->name);
+        self::assertSame('Gzip', $case->name);
         self::assertSame('gzip', $case->value);
     }
 
     public function testLz4Case(): void
     {
-        $case = CompressionType::lz4;
+        $case = CompressionType::Lz4;
 
-        self::assertSame('lz4', $case->name);
+        self::assertSame('Lz4', $case->name);
         self::assertSame('lz4', $case->value);
     }
 
     public function testZstdCase(): void
     {
-        $case = CompressionType::zstd;
+        $case = CompressionType::Zstd;
 
-        self::assertSame('zstd', $case->name);
+        self::assertSame('Zstd', $case->name);
         self::assertSame('zstd', $case->value);
     }
 
@@ -61,11 +61,11 @@ final class CompressionTypeTest extends TestCase
         $cases = CompressionType::cases();
         $names = array_map(static fn($case) => $case->name, $cases);
 
-        self::assertContains('none', $names);
-        self::assertContains('snappy', $names);
-        self::assertContains('gzip', $names);
-        self::assertContains('lz4', $names);
-        self::assertContains('zstd', $names);
+        self::assertContains('None', $names);
+        self::assertContains('Snappy', $names);
+        self::assertContains('Gzip', $names);
+        self::assertContains('Lz4', $names);
+        self::assertContains('Zstd', $names);
     }
 
     public function testFromBackingValueRoundTrip(): void

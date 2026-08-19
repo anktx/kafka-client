@@ -6,9 +6,9 @@ namespace Anktx\Kafka\Client\Config\Enum;
 
 enum CompressionType: string
 {
-    case none = 'none';
-    case snappy = 'snappy';
-    case gzip = 'gzip';
-    case lz4 = 'lz4';
-    case zstd = 'zstd';
+    case None = 'none';
+    case Snappy = 'snappy';
+    case Gzip = 'gzip';
+    case Lz4 = 'lz4';
+    case Zstd = 'zstd';
 }

@@ -9,20 +9,31 @@
 
 ### Added
 
-- `CompressionType::none` (`compression.type=none`): типизированный API
+- `CompressionType::None` (`compression.type=none`): типизированный API
   теперь позволяет отключить сжатие сообщений продюсера (до этого enum
   содержал только компрессирующие кодеки).
 
 ### Fixed
 
-- `OffsetReset::none` передавал в librdkafka бэкинг-значение `none`,
-  которое тот не принимает (`Invalid value "none" for configuration
+- `OffsetReset` с политикой «без сброса» передавал в librdkafka значение
+  `none`, которое тот не принимает (`Invalid value "none" for configuration
   property "auto.offset.reset"`) — любой `ConsumerConfig` с этим кейсом
-  бросал `InvalidConfigException` из `asKafkaConfig()`. Бэкинг-значение
-  исправлено на каноничное для librdkafka `error` (семантика Kafka-протокола
-  `none` сохранена в имени кейса); поведение `earliest`/`latest` не изменилось.
+  бросал `InvalidConfigException` из `asKafkaConfig()`. Кейс `none`
+  (бэкинг `'none'`) заменён на `Error = 'error'` — каноничное имя
+  librdkafka для этой политики (в терминологии Kafka-протокола — `none`):
+  при отсутствии валидного закоммиченного смещения партиция уходит в
+  ошибку `RD_KAFKA_RESP_ERR__AUTO_OFFSET_RESET`, и `consume()` бросает
+  `KafkaConsumerException` вместо молчаливого сброса; поведение
+  `earliest`/`latest` не изменилось.
 
 ### Changed
+
+- **BC:** кейсы `CompressionType` и `OffsetReset` переименованы в
+  PascalCase согласно конвенции PHP (`snappy` → `Snappy`, `lz4` → `Lz4`,
+  `earliest` → `Earliest` и т.д.); бэкинг-значения — стабильные
+  идентификаторы Kafka-протокола — не изменились, кроме случая
+  «без сброса» у `OffsetReset` (см. Fixed). В test-комплект добавлены
+  ассерты бэкинг-значений и маппинга `asKafkaConfig()` в термины librdkafka.
 
 - **BC:** иерархия исключений переработана в два семейства + маркерный
   интерфейс `Anktx\Kafka\Client\Exception\KafkaClientException`

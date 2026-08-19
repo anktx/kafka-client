@@ -64,7 +64,7 @@ final class ConsumerConfigTest extends TestCase
         );
 
         self::assertFalse($config->isDebug);
-        self::assertSame(OffsetReset::earliest, $config->offsetReset);
+        self::assertSame(OffsetReset::Earliest, $config->offsetReset);
         self::assertNull($config->autoCommitMs);
         self::assertNull($config->sessionTimeoutMs);
         self::assertNull($config->reconnectBackoffMs);
@@ -159,10 +159,10 @@ final class ConsumerConfigTest extends TestCase
             brokers: 'kafka:9092',
             groupId: 'test-group',
             instanceId: 'test-instance',
-            offsetReset: OffsetReset::latest,
+            offsetReset: OffsetReset::Latest,
         );
 
-        self::assertSame(OffsetReset::latest, $config->offsetReset);
+        self::assertSame(OffsetReset::Latest, $config->offsetReset);
     }
 
     public function testAsKafkaConfigWithAutoCommit(): void
@@ -215,7 +215,7 @@ final class ConsumerConfigTest extends TestCase
             brokers: 'kafka:9092',
             groupId: 'test-group',
             instanceId: 'test-instance',
-            offsetReset: OffsetReset::latest,
+            offsetReset: OffsetReset::Latest,
         );
 
         // auto.offset.reset — topic-level свойство, в dump() не виден;
@@ -230,7 +230,7 @@ final class ConsumerConfigTest extends TestCase
             brokers: 'kafka:9092',
             groupId: 'test-group',
             instanceId: 'test-instance',
-            offsetReset: OffsetReset::latest,
+            offsetReset: OffsetReset::Latest,
             autoCommitMs: 5000,
             sessionTimeoutMs: 10000,
             isDebug: true,

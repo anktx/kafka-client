@@ -74,7 +74,7 @@ final class ProducerConfigTest extends TestCase
         self::assertSame(20480, $config->queueBufferingMaxKBytes);
         self::assertSame(102400, $config->batchSize);
         self::assertSame(10, $config->lingerMs);
-        self::assertSame(CompressionType::snappy, $config->compressionType);
+        self::assertSame(CompressionType::Snappy, $config->compressionType);
         self::assertFalse($config->isDebug);
     }
 
@@ -112,40 +112,40 @@ final class ProducerConfigTest extends TestCase
     {
         $config = new ProducerConfig(
             'kafka:9092',
-            compressionType: CompressionType::gzip,
+            compressionType: CompressionType::Gzip,
         );
 
-        self::assertSame(CompressionType::gzip, $config->compressionType);
+        self::assertSame(CompressionType::Gzip, $config->compressionType);
     }
 
     public function testWithLz4Compression(): void
     {
         $config = new ProducerConfig(
             'kafka:9092',
-            compressionType: CompressionType::lz4,
+            compressionType: CompressionType::Lz4,
         );
 
-        self::assertSame(CompressionType::lz4, $config->compressionType);
+        self::assertSame(CompressionType::Lz4, $config->compressionType);
     }
 
     public function testWithZstdCompression(): void
     {
         $config = new ProducerConfig(
             'kafka:9092',
-            compressionType: CompressionType::zstd,
+            compressionType: CompressionType::Zstd,
         );
 
-        self::assertSame(CompressionType::zstd, $config->compressionType);
+        self::assertSame(CompressionType::Zstd, $config->compressionType);
     }
 
     public function testWithNoneCompression(): void
     {
         $config = new ProducerConfig(
             'kafka:9092',
-            compressionType: CompressionType::none,
+            compressionType: CompressionType::None,
         );
 
-        self::assertSame(CompressionType::none, $config->compressionType);
+        self::assertSame(CompressionType::None, $config->compressionType);
     }
 
     public function testWithDebugEnabled(): void
@@ -165,7 +165,7 @@ final class ProducerConfigTest extends TestCase
             queueBufferingMaxKBytes: 10240,
             batchSize: 51200,
             lingerMs: 100,
-            compressionType: CompressionType::gzip,
+            compressionType: CompressionType::Gzip,
             isDebug: true,
         );
 

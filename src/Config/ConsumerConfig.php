@@ -15,7 +15,7 @@ final readonly class ConsumerConfig
         public string $brokers,
         public string $groupId,
         public ?string $instanceId = null,
-        public OffsetReset $offsetReset = OffsetReset::earliest,
+        public OffsetReset $offsetReset = OffsetReset::Earliest,
         public ?int $autoCommitMs = null,
         public ?int $sessionTimeoutMs = null,
         public ?int $reconnectBackoffMs = null,

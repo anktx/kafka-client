@@ -18,27 +18,27 @@ final class OffsetResetTest extends TestCase
 
     public function testEarliestCase(): void
     {
-        $case = OffsetReset::earliest;
+        $case = OffsetReset::Earliest;
 
-        self::assertSame('earliest', $case->name);
+        self::assertSame('Earliest', $case->name);
         self::assertSame('earliest', $case->value);
     }
 
     public function testLatestCase(): void
     {
-        $case = OffsetReset::latest;
+        $case = OffsetReset::Latest;
 
-        self::assertSame('latest', $case->name);
+        self::assertSame('Latest', $case->name);
         self::assertSame('latest', $case->value);
     }
 
-    public function testNoneCase(): void
+    public function testErrorCase(): void
     {
-        $case = OffsetReset::none;
+        $case = OffsetReset::Error;
 
-        self::assertSame('none', $case->name);
-        // Бэкинг-значение — контракт с librdkafka: семантика `none`
-        // Kafka-протокола там называется `error`.
+        self::assertSame('Error', $case->name);
+        // Бэкинг-значение — контракт с librdkafka: политика «без сброса»
+        // (в Kafka-протоколе — `none`) там называется `error`.
         self::assertSame('error', $case->value);
     }
 
@@ -47,9 +47,9 @@ final class OffsetResetTest extends TestCase
         $cases = OffsetReset::cases();
         $names = array_map(static fn($case) => $case->name, $cases);
 
-        self::assertContains('earliest', $names);
-        self::assertContains('latest', $names);
-        self::assertContains('none', $names);
+        self::assertContains('Earliest', $names);
+        self::assertContains('Latest', $names);
+        self::assertContains('Error', $names);
     }
 
     public function testFromBackingValueRoundTrip(): void

@@ -77,7 +77,7 @@ final class KafkaProducerTest extends TestCase
     {
         $producer = new KafkaProducer(new ProducerConfig(
             brokers: $this->brokers,
-            compressionType: CompressionType::gzip,
+            compressionType: CompressionType::Gzip,
         ));
 
         self::assertInstanceOf(KafkaProducer::class, $producer);

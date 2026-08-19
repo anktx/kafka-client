@@ -16,7 +16,7 @@ final readonly class ProducerConfig
         public int $queueBufferingMaxKBytes = 20480,
         public int $batchSize = 102400,
         public int $lingerMs = 10,
-        public CompressionType $compressionType = CompressionType::snappy,
+        public CompressionType $compressionType = CompressionType::Snappy,
         public bool $isDebug = false,
     ) {
         if ($this->brokers === '') {
