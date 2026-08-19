@@ -6,14 +6,29 @@ namespace Anktx\Kafka\Client\Tests\PollStrategy;
 
 use Anktx\Kafka\Client\PollStrategy\ProbabilityPollStrategy;
 use PHPUnit\Framework\TestCase;
+use Random\Engine\Xoshiro256StarStar;
+use Random\Randomizer;
 
+/**
+ * Юнит-тесты для {@see ProbabilityPollStrategy}.
+ *
+ * Стратегия детерминирована через инъекцию {@see Randomizer} с
+ * фиксированным движком Xoshiro256StarStar: последовательность значений
+ * getInt(0, 9999) воспроизводима, поэтому граничные случаи (строгое <,
+ * точный порог probability * PRECISION, p=0/p=1) проверяются без
+ * статистических допущений.
+ *
+ * Опорные последовательности:
+ * - seed 42: 2214, 5630, 2849, 7329, 1476, ...
+ * - seed 7:  1610, 130, 9894, 4336, 5032, ...
+ */
 final class ProbabilityPollStrategyTest extends TestCase
 {
     public function testCreate(): void
     {
         $strategy = new ProbabilityPollStrategy(probability: 0.5);
 
-        $this->assertSame(0.5, $strategy->probability);
+        self::assertSame(0.5, $strategy->probability);
     }
 
     public function testInvalidProbability(): void
@@ -23,311 +38,87 @@ final class ProbabilityPollStrategyTest extends TestCase
         new ProbabilityPollStrategy(probability: -0.1);
     }
 
-    public function testShouldPollWithZeroProbability(): void
+    public function testInvalidProbabilityAboveOne(): void
     {
-        $strategy = new ProbabilityPollStrategy(probability: 0.0);
+        $this->expectException(\InvalidArgumentException::class);
 
-        $this->assertFalse($strategy->shouldPoll());
+        new ProbabilityPollStrategy(probability: 1.1);
     }
 
-    public function testShouldPollWithOneProbability(): void
+    public function testShouldPollUsesInjectedRandomizer(): void
     {
-        $strategy = new ProbabilityPollStrategy(probability: 1.0);
+        // seed 42: 2214 < 5000 → true; 5630 ≥ 5000 → false; 2849 < 5000 → true; 7329 ≥ 5000 → false.
+        $strategy = new ProbabilityPollStrategy(
+            probability: 0.5,
+            randomizer: new Randomizer(new Xoshiro256StarStar(42)),
+        );
 
-        $this->assertTrue($strategy->shouldPoll());
+        self::assertTrue($strategy->shouldPoll());
+        self::assertFalse($strategy->shouldPoll());
+        self::assertTrue($strategy->shouldPoll());
+        self::assertFalse($strategy->shouldPoll());
     }
 
-    public function testShouldPollBoundary(): void
+    public function testShouldPollUsesStrictLessThan(): void
     {
-        // Проверяем граничное значение: при probability = 1.0 ответ всегда true,
-        // независимо от результата random_int(0, PRECISION - 1)
-        $strategy = new ProbabilityPollStrategy(probability: 1.0);
+        // p = 0.2849 задаёт порог ровно 2849 (0.2849 * 10000 === 2849.0).
+        // Третье значение последовательности seed 42 равно 2849: строгий <
+        // даёт false, нестрогий <= дал бы true.
+        $strategy = new ProbabilityPollStrategy(
+            probability: 0.2849,
+            randomizer: new Randomizer(new Xoshiro256StarStar(42)),
+        );
 
-        for ($i = 0; $i < 100; ++$i) {
-            $this->assertTrue($strategy->shouldPoll());
+        self::assertTrue($strategy->shouldPoll());
+        self::assertFalse($strategy->shouldPoll());
+        self::assertFalse($strategy->shouldPoll());
+    }
+
+    public function testShouldPollWithZeroProbabilityAlwaysFalse(): void
+    {
+        $strategy = new ProbabilityPollStrategy(
+            probability: 0.0,
+            randomizer: new Randomizer(new Xoshiro256StarStar(7)),
+        );
+
+        for ($i = 0; $i < 10; ++$i) {
+            self::assertFalse($strategy->shouldPoll());
         }
     }
 
-    public function testShouldPollVeryCloseToZero(): void
+    public function testShouldPollWithOneProbabilityAlwaysTrue(): void
     {
-        // С вероятностью 0.0001, из 10000 только 1 должен быть true
-        $strategy = new ProbabilityPollStrategy(probability: 0.0001);
+        $strategy = new ProbabilityPollStrategy(
+            probability: 1.0,
+            randomizer: new Randomizer(new Xoshiro256StarStar(7)),
+        );
 
-        // random_int(0, 9999) < 0.0001 * 10000 = 1
-        // Только когда random_int вернет 0, будет true
-        $trueCount = 0;
-        for ($i = 0; $i < 10000; ++$i) {
-            if ($strategy->shouldPoll()) {
-                ++$trueCount;
-            }
-        }
-
-        // Должно быть очень мало true, но не 0 (хотя может быть случайно)
-        $this->assertLessThan(10, $trueCount);
-    }
-
-    public function testShouldPollVeryCloseToOne(): void
-    {
-        // С вероятностью 0.9999, из 10000 только 1 должен быть false
-        $strategy = new ProbabilityPollStrategy(probability: 0.9999);
-
-        // random_int(0, 9999) < 0.9999 * 10000 = 9999
-        // Все значения от 0 до 9998 должны быть true
-        $trueCount = 0;
-        for ($i = 0; $i < 10000; ++$i) {
-            if ($strategy->shouldPoll()) {
-                ++$trueCount;
-            }
-        }
-
-        // Почти все должны быть true
-        $this->assertGreaterThan(9990, $trueCount);
-    }
-
-    public function testStrictLessThan(): void
-    {
-        // Проверяем, что используется < а не <=
-        // При probability = 0.001, условие: random_int(0, 9999) < 10
-        // Значения 0-9 дают true
-        $strategy = new ProbabilityPollStrategy(probability: 0.001);
-
-        // Вызываем много раз, должно быть иногда true
-        $trueFound = false;
-        for ($i = 0; $i < 20000; ++$i) {
-            if ($strategy->shouldPoll()) {
-                $trueFound = true;
-
-                break;
-            }
-        }
-
-        // Должен быть хотя бы один true за счёт случайности
-        $this->assertTrue($trueFound, 'Expected at least one true result with probability 0.001');
-    }
-
-    public function testMtRandRangeZeroToTenThousand(): void
-    {
-        // Проверяем, что random_int(0, 9999) используется правильно
-        // Мутанты изменяют диапазон, что сломает распределение
-        $strategy = new ProbabilityPollStrategy(probability: 0.5);
-
-        $count = 0;
-        $iterations = 10000;
-
-        for ($i = 0; $i < $iterations; ++$i) {
-            if ($strategy->shouldPoll()) {
-                ++$count;
-            }
-        }
-
-        // С вероятностью 0.5, матожидание = 5000
-        // Допускаем отклонение ±10%
-        $this->assertGreaterThan(4000, $count);
-        $this->assertLessThan(6000, $count);
-    }
-
-    public function testVeryLargeIterations(): void
-    {
-        // Очень много итераций для проверки статистики
-        $strategy = new ProbabilityPollStrategy(probability: 0.1);
-
-        $count = 0;
-        $iterations = 10000;
-
-        for ($i = 0; $i < $iterations; ++$i) {
-            if ($strategy->shouldPoll()) {
-                ++$count;
-            }
-        }
-
-        // С вероятностью 0.1, матожидание = 1000
-        // Допускаем отклонение ±10%
-        $this->assertGreaterThan(800, $count);
-        $this->assertLessThan(1200, $count);
-    }
-
-    public function testProbabilityRangeBounds(): void
-    {
-        // Проверяем, что диапазон random_int(0, 9999) соблюдается
-        // Если мутант изменит диапазон, это повлияет на распределение
-
-        // Для probability = 0.001, условие: random_int(0, 9999) < 10
-        // Значения 0-9 дают true (10/10000 шанс ≈ 0.1%)
-        $strategy = new ProbabilityPollStrategy(probability: 0.001);
-
-        // Запускаем много раз
-        $trueCount = 0;
-        $iterations = 20000;
-
-        for ($i = 0; $i < $iterations; ++$i) {
-            if ($strategy->shouldPoll()) {
-                ++$trueCount;
-            }
-        }
-
-        // Матожидание ≈ 20 (20000 * 10/10001)
-        // Допускаем широкий диапазон из-за случайности
-        $this->assertGreaterThan(5, $trueCount);
-        $this->assertLessThan(50, $trueCount);
-    }
-
-    public function testMutantDetectionRangeZero(): void
-    {
-        // Детектирует мутанта random_int(1, 9999) вместо random_int(0, 9999)
-        // С probability=1.0, условие: random_int(0, 9999) < 10000
-        // При random_int(1, 9999) диапазон теряет 0, но результат всё равно тот же
-        // Этот тест проверяет, что крайние значения работают корректно
-        $strategy = new ProbabilityPollStrategy(probability: 0.0001);
-
-        // random_int(0, 9999) < 1 - только при 0 будет true
-        // Если мутант изменит 0 на 1: random_int(1, 9999) < 1 - всегда false
-        // Если мутант изменит 10000 на 9999: random_int(0, 9998) < 1 - только при 0
-        // Для детекции нужен мутант <= : random_int(0, 9999) <= 1 - при 0 и 1 будет true
-        $hasTrue = false;
-        for ($i = 0; $i < 100000; ++$i) {
-            if ($strategy->shouldPoll()) {
-                $hasTrue = true;
-
-                break;
-            }
-        }
-
-        // С вероятностью 0.0001 должен быть хотя бы один true за 100000 попыток
-        $this->assertTrue($hasTrue, 'Expected at least one true with probability 0.0001');
-    }
-
-    public function testMutantDetectionUpperBound(): void
-    {
-        // Детектирует мутантов, изменяющих верхнюю границу или умножитель
-        // При probability = 1.0, должны получать всегда true
-        $strategy = new ProbabilityPollStrategy(probability: 1.0);
-
-        for ($i = 0; $i < 1000; ++$i) {
-            $this->assertTrue($strategy->shouldPoll());
+        for ($i = 0; $i < 10; ++$i) {
+            self::assertTrue($strategy->shouldPoll());
         }
     }
 
-    public function testMutantDetectionLowerBound(): void
+    public function testShouldPollNearZeroBoundaries(): void
     {
-        // Детектирует мутанта random_int(-1, 9999)
-        // При probability = 0.0 должен всегда возвращать false
-        $strategy = new ProbabilityPollStrategy(probability: 0.0);
+        // seed 7: порог 1610 — первое значение 1610 (false), второе 130 (true), третье 9894 (false).
+        $strategy = new ProbabilityPollStrategy(
+            probability: 0.161,
+            randomizer: new Randomizer(new Xoshiro256StarStar(7)),
+        );
 
-        for ($i = 0; $i < 1000; ++$i) {
-            $this->assertFalse($strategy->shouldPoll());
-        }
+        self::assertFalse($strategy->shouldPoll());
+        self::assertTrue($strategy->shouldPoll());
+        self::assertFalse($strategy->shouldPoll());
     }
 
-    public function testStrictLessThanDetection(): void
+    public function testDefaultRandomizerKeepsStrategyUsable(): void
     {
-        // Детектирует мутанта < на <=
-        // При probability = 0.0001: random_int(0, 9999) < 1
-        // С мутантом: random_int(0, 9999) <= 1
-        // Мутант даёт в 2 раза больше true (0 и 1 вместо только 0)
-        // Но это трудно детектировать без очень большого количества итераций
+        // Без явной инъекции стратегия работает на системном CSPRNG:
+        // граничные вероятности детерминированы по определению.
+        $never = new ProbabilityPollStrategy(probability: 0.0);
+        $always = new ProbabilityPollStrategy(probability: 1.0);
 
-        // Вместо этого проверяем probability = 0.9999
-        // random_int(0, 9999) < 9999 - значения 0-9998 дают true
-        // С мутантом: random_int(0, 9999) <= 9999 - значения 0-9999 дают true
-        // Мутант добавляет одно значение (9999) в true
-
-        $strategy = new ProbabilityPollStrategy(probability: 0.9999);
-
-        $falseCount = 0;
-        $iterations = 50000;
-
-        for ($i = 0; $i < $iterations; ++$i) {
-            if (!$strategy->shouldPoll()) {
-                ++$falseCount;
-            }
-        }
-
-        // С оригиналом: false только при 10000 (1/10000 ≈ 0.01%)
-        // Ожидаем ≈ 5 false за 50000
-        // С мутантом: нет false (0/10001)
-        // Если нашли хотя бы один false, значит мутанта нет
-        // Если falseCount = 0, может быть как мутант, так и удача
-        $this->assertLessThan(20, $falseCount, 'Too many false results, possible mutation');
-    }
-
-    public function testPreciseUpperBound(): void
-    {
-        // Детектирует мутантов, изменяющих верхнюю границу умножения
-        // При probability = 0.0001: random_int(0, 9999) < 1
-        // Мутант * 9999: random_int(0, 9999) < 0.9999 -> 0 (всегда false)
-        // Мутант * 10001: random_int(0, 9999) < 1.0001 -> 1 (почти то же)
-
-        $strategy = new ProbabilityPollStrategy(probability: 0.0001);
-
-        $trueCount = 0;
-        $iterations = 200000;
-
-        for ($i = 0; $i < $iterations; ++$i) {
-            if ($strategy->shouldPoll()) {
-                ++$trueCount;
-            }
-        }
-
-        // С оригиналом: true при 0 (1/10000 шанс)
-        // Ожидаем ≈ 20 true за 200000
-        // С мутантом * 9999: всегда false (0/10001)
-        $this->assertGreaterThan(10, $trueCount, 'Expected some true results with probability 0.0001');
-    }
-
-    public function testVeryHighPrecision(): void
-    {
-        // Детектирует мутантов с изменением диапазона random_int
-        // Используем probability = 0.5 для лучшей детекции
-
-        $strategy = new ProbabilityPollStrategy(probability: 0.5);
-
-        $trueCount = 0;
-        $iterations = 100000;
-
-        for ($i = 0; $i < $iterations; ++$i) {
-            if ($strategy->shouldPoll()) {
-                ++$trueCount;
-            }
-        }
-
-        // С оригиналом: random_int(0, 9999) < 5000
-        // Значения 0-4999 дают true (5000/10000 ≈ 49.995%)
-        // Ожидаем ≈ 49995 true за 100000
-
-        // Мутанты:
-        // random_int(0, 9998) < 5000 - 5000/10000 = 50.0%
-        // random_int(0, 10000) < 5000 - 5000/10002 ≈ 49.99%
-        // random_int(-1, 9999) < 5000 - 5001/10000 ≈ 49.995%
-        // * 9999: random_int(0, 9999) < 4999.5 -> 4999 (4999.5/10000 ≈ 49.99%)
-        // * 10001: random_int(0, 9999) < 5000.5 -> 5000 (5000.5/10000 ≈ 49.997%)
-
-        // Все мутанты дают близкие результаты, поэтому используем узкий диапазон
-        $this->assertGreaterThan(49000, $trueCount);
-        $this->assertLessThan(51000, $trueCount);
-    }
-
-    public function testEdgeCaseOneMinusEpsilon(): void
-    {
-        // Детектирует мутанта <= вместо <
-        // При probability = 0.9999: random_int(0, 9999) < 9999
-        // Мутант: random_int(0, 9999) <= 9999 - всегда true!
-
-        $strategy = new ProbabilityPollStrategy(probability: 0.9999);
-
-        // Если есть мутант, этот тест пройдёт за 1 итерацию
-        // Если нет мутанта, нужно много итераций чтобы поймать false
-        $foundFalse = false;
-        for ($i = 0; $i < 100000; ++$i) {
-            if (!$strategy->shouldPoll()) {
-                $foundFalse = true;
-
-                break;
-            }
-        }
-
-        // Если false не найден за 100000 итераций, возможно есть мутант
-        // Но это не гарантия из-за случайности
-        // Этот тест скорее проверяет, что код может вернуть false
-        $this->assertTrue($foundFalse, 'Strategy should return false at least once in 100000 iterations with probability 0.9999');
+        self::assertFalse($never->shouldPoll());
+        self::assertTrue($always->shouldPoll());
     }
 }
