@@ -161,6 +161,7 @@ final class KafkaProducerTest extends TestCase
 
         $infoRecords = $logger->findByMessage('Producer flushed successfully');
         self::assertCount(1, $infoRecords);
+        self::assertSame(1000, $infoRecords[0]['context']['timeout_ms']);
         self::assertSame(1, $infoRecords[0]['context']['attempts']);
     }
 
@@ -235,6 +236,7 @@ final class KafkaProducerTest extends TestCase
 
         $errorRecords = $logger->findByMessage('Flush failed');
         self::assertCount(1, $errorRecords);
+        self::assertSame(1000, $errorRecords[0]['context']['timeout_ms']);
         self::assertSame(1, $errorRecords[0]['context']['attempts']);
         self::assertSame(2, $errorRecords[0]['context']['out_queue_len']);
     }
