@@ -8,7 +8,7 @@ use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
-use Anktx\Kafka\Client\PollStrategy\NeverPoolStrategy;
+use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;
 use Anktx\Kafka\Client\PollStrategy\PollStrategy;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -34,12 +34,12 @@ final class KafkaProducer
      * Создаёт новый экземпляр Kafka Producer.
      *
      * @param ProducerConfig  $config       Конфигурация продюсера
-     * @param PollStrategy    $pollStrategy Стратегия опроса очереди (по умолчанию NeverPoolStrategy)
+     * @param PollStrategy    $pollStrategy Стратегия опроса очереди (по умолчанию NeverPollStrategy)
      * @param LoggerInterface $logger       PSR-3 логгер (по умолчанию NullLogger)
      */
     public function __construct(
         ProducerConfig $config,
-        private readonly PollStrategy $pollStrategy = new NeverPoolStrategy(),
+        private readonly PollStrategy $pollStrategy = new NeverPollStrategy(),
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {
         $conf = $config->asKafkaConfig();

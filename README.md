@@ -120,7 +120,7 @@ $producer = new KafkaProducer(
 ```
 
 **Доступные стратегии:**
-- `NeverPoolStrategy` — не вызывать `poll()` (по умолчанию, подходит для низкой нагрузки)
+- `NeverPollStrategy` — не вызывать `poll()` (по умолчанию, подходит для низкой нагрузки)
 - `TimeoutPollStrategy` — вызывать `poll()` каждые N секунд
 - `ProbabilityPollStrategy` — вызывать `poll()` с вероятностью N (например, 10% вызовов)
 
@@ -211,7 +211,7 @@ src/
 │
 ├── PollStrategy/                    # Стратегии опроса очереди
 │   ├── PollStrategy.php             # Интерфейс стратегии
-│   ├── NeverPoolStrategy.php        # Не вызывать poll()
+│   ├── NeverPollStrategy.php        # Не вызывать poll()
 │   ├── ProbabilityPollStrategy.php  # Вызывать с вероятностью N
 │   └── TimeoutPollStrategy.php      # Вызывать каждые N секунд
 │

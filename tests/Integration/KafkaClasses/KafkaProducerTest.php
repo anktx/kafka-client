@@ -9,7 +9,7 @@ use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaProducer;
-use Anktx\Kafka\Client\PollStrategy\NeverPoolStrategy;
+use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;
 use PHPUnit\Framework\TestCase;
 
 final class KafkaProducerTest extends TestCase
@@ -26,7 +26,7 @@ final class KafkaProducerTest extends TestCase
     public function testConstructorWithCustomPollStrategy(): void
     {
         $config = new ProducerConfig(brokers: 'localhost:9092');
-        $strategy = new NeverPoolStrategy();
+        $strategy = new NeverPollStrategy();
 
         $producer = new KafkaProducer($config, $strategy);
 
