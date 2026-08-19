@@ -253,8 +253,7 @@ Exception
 │   └── InvalidMessageException       # Сообщение без offset и т.п.
 └── BusinessException                 # Бизнес-логика
     ├── EmptySubscriptionsException   # Пустой список подписок
-    ├── InvalidSubscriptionException  # Неверные topic/partition/offset в подписке
-    └── TopicHasNoPartitionException  # Топик не имеет партиций
+    └── InvalidSubscriptionException  # Пустой topic в подписке
 ```
 
 Пример обработки:

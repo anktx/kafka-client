@@ -74,20 +74,18 @@ final class KafkaConsumerSubscribeTest extends TestCase
         $this->buildConsumer($rdKafka)->subscribe(TopicSubscriptionList::create('test-topic'));
     }
 
-    public function testSubscribeWithExplicitPartitionsStillDoesNotAssign(): void
+    public function testSubscribeDeduplicatesTopicNames(): void
     {
-        // Через TopicSubscriptionList::create($topic) все partition'ы остаются null,
-        // но consumer может создать список и с явными partition'ами. В обоих случаях
-        // внешний assign() после subscribe() недопустим — назначение partition'ов
-        // остаётся за librdkafka.
+        // Один и тот же топик может попасть в список несколько раз —
+        // RdKafka::subscribe() должен получить только уникальные имена.
         $list = new TopicSubscriptionList(
-            new TopicSubscription('test-topic', 0),
-            new TopicSubscription('test-topic', 1),
-            new TopicSubscription('test-topic', 2),
+            new TopicSubscription('test-topic'),
+            new TopicSubscription('test-topic'),
+            new TopicSubscription('notifications'),
         );
 
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
-        $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic']);
+        $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic', 'notifications']);
         $rdKafka->expects($this->never())->method('assign');
 
         $this->buildConsumer($rdKafka)->subscribe($list);
@@ -136,10 +134,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
         ;
         $rdKafka->expects($this->never())->method('assign');
 
-        $list = new TopicSubscriptionList(
-            new TopicSubscription('test-topic', 0),
-            new TopicSubscription('notifications', 4),
-        );
+        $list = TopicSubscriptionList::create('test-topic', 'notifications');
 
         $consumer = $this->buildConsumer($rdKafka, $logger);
 
@@ -154,13 +149,6 @@ final class KafkaConsumerSubscribeTest extends TestCase
         self::assertCount(1, $errorRecords);
         self::assertSame(['test-topic', 'notifications'], $errorRecords[0]['context']['topics']);
         self::assertSame('broker down', $errorRecords[0]['context']['error']);
-        self::assertSame(
-            [
-                ['topic' => 'test-topic', 'partition' => 0],
-                ['topic' => 'notifications', 'partition' => 4],
-            ],
-            $errorRecords[0]['context']['subscriptions'],
-        );
     }
 
     public function testSubscribeWithEmptyListThrowsBeforeAnyConsumerCallAndLogsNothing(): void

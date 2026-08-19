@@ -22,10 +22,14 @@
   `Config parameter "pollIntervalSec" must not be negative, …` и
   `Config parameter "probability" must be between 0 and 1, …`
   (новая фабрика `InvalidConfigException::probability()`).
-- **BC:** `TopicSubscription` валидирует аргументы конструктора: пустой
-  `topic`, отрицательные `partition`/`offset` и `offset` без `partition`
-  отвергаются новым `InvalidSubscriptionException` (раньше мусорные значения
-  молча игнорировались при подписке).
+- **BC:** `TopicSubscription` сокращён до одного поля `topic`: после
+  удаления ручного assign() из `subscribe()` поля `partition`/`offset`
+  молча игнорировались (партиции и смещения назначает rebalance
+  librdkafka), поэтому удалены вместе с мёртвыми преобразованиями
+  `fromKafkaTopicPartition()`/`asKafkaTopicPartition()`/
+  `asKafkaTopicPartitionArray()` и исключением
+  `TopicHasNoPartitionException`; `InvalidSubscriptionException`
+  остаётся для пустого `topic`.
 - **BC:** сырые `\RdKafka\Exception` больше не утекают из публичного API:
   сбои `asKafkaConfig()` оборачиваются в `InvalidConfigException`, конструкторов
   клиентов и `produce()` (включая `newTopic()`) — в

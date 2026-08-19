@@ -5,57 +5,25 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\TopicSubscription;
 
 use Anktx\Kafka\Client\Exception\Business\InvalidSubscriptionException;
-use Anktx\Kafka\Client\Exception\Business\TopicHasNoPartitionException;
-use RdKafka\TopicPartition;
 
+/**
+ * Подписка на топик в составе consumer group.
+ *
+ * Партиции и смещения назначает librdkafka через rebalance-callback,
+ * поэтому подписка задаётся только именем топика.
+ */
 final readonly class TopicSubscription
 {
     public function __construct(
         public string $topic,
-        public ?int $partition = null,
-        public ?int $offset = null,
     ) {
         if ($this->topic === '') {
             throw InvalidSubscriptionException::emptyTopic();
         }
-
-        if ($this->partition !== null && $this->partition < 0) {
-            throw InvalidSubscriptionException::negativePartition($this->partition);
-        }
-
-        if ($this->offset !== null && $this->offset < 0) {
-            throw InvalidSubscriptionException::negativeOffset($this->offset);
-        }
-
-        if ($this->offset !== null && $this->partition === null) {
-            throw InvalidSubscriptionException::offsetWithoutPartition();
-        }
     }
 
-    public static function create(string $topic, ?int $partition = null, ?int $offset = null): self
+    public static function create(string $topic): self
     {
-        return new self($topic, $partition, $offset);
-    }
-
-    public static function fromKafkaTopicPartition(TopicPartition $tp): self
-    {
-        return new self(
-            topic: $tp->getTopic(),
-            partition: $tp->getPartition(),
-            offset: $tp->getOffset(),
-        );
-    }
-
-    public function asKafkaTopicPartition(): TopicPartition
-    {
-        if ($this->partition === null) {
-            throw TopicHasNoPartitionException::create($this->topic);
-        }
-
-        if ($this->offset === null) {
-            return new TopicPartition($this->topic, $this->partition);
-        }
-
-        return new TopicPartition($this->topic, $this->partition, $this->offset);
+        return new self($topic);
     }
 }

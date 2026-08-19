@@ -16,7 +16,6 @@ use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaProducer;
 use Anktx\Kafka\Client\Tests\Integration\Support\KafkaBroker;
-use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\TestCase;
 
@@ -79,19 +78,6 @@ final class KafkaConsumerTest extends TestCase
 
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
-        $consumer->unsubscribe();
-        $consumer->close();
-
-        self::assertInstanceOf(KafkaConsumer::class, $consumer);
-    }
-
-    public function testSubscribeWithPartition(): void
-    {
-        $consumer = new KafkaConsumer($this->consumerConfig());
-
-        $consumer->subscribe(new TopicSubscriptionList(
-            new TopicSubscription('test-topic', 0),
-        ));
         $consumer->unsubscribe();
         $consumer->close();
 

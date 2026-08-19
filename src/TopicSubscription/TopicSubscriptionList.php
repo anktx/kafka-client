@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\TopicSubscription;
 
-use RdKafka\TopicPartition;
-
 final readonly class TopicSubscriptionList
 {
     /**
@@ -25,13 +23,6 @@ final readonly class TopicSubscriptionList
         );
     }
 
-    public static function fromKafkaTopicPartition(TopicPartition ...$items): self
-    {
-        return new self(
-            ...array_map(static fn(TopicPartition $tp) => TopicSubscription::fromKafkaTopicPartition($tp), $items),
-        );
-    }
-
     /**
      * @return string[]
      */
@@ -44,26 +35,8 @@ final readonly class TopicSubscriptionList
         );
     }
 
-    /**
-     * @return TopicPartition[]
-     */
-    public function asKafkaTopicPartitionArray(): array
-    {
-        return array_map(
-            static fn(TopicSubscription $s) => $s->asKafkaTopicPartition(),
-            $this->havingPartitions()->items,
-        );
-    }
-
     public function isEmpty(): bool
     {
         return \count($this->items) === 0;
-    }
-
-    private function havingPartitions(): self
-    {
-        return new self(
-            ...array_filter($this->items, static fn(TopicSubscription $s) => $s->partition !== null),
-        );
     }
 }

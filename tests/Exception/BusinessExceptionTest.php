@@ -7,7 +7,6 @@ namespace Anktx\Kafka\Client\Tests\Exception;
 use Anktx\Kafka\Client\Exception\Business\BusinessException;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Business\InvalidSubscriptionException;
-use Anktx\Kafka\Client\Exception\Business\TopicHasNoPartitionException;
 use PHPUnit\Framework\TestCase;
 
 final class BusinessExceptionTest extends TestCase
@@ -29,27 +28,11 @@ final class BusinessExceptionTest extends TestCase
         self::assertSame('No subscriptions', $exception->getMessage());
     }
 
-    public function testTopicHasNoPartitionException(): void
-    {
-        $exception = new TopicHasNoPartitionException('Topic has no partition');
-
-        self::assertInstanceOf(BusinessException::class, $exception);
-        self::assertInstanceOf(TopicHasNoPartitionException::class, $exception);
-        self::assertSame('Topic has no partition', $exception->getMessage());
-    }
-
     public function testEmptySubscriptionsExceptionWithCode(): void
     {
         $exception = new EmptySubscriptionsException('No subscriptions', 100);
 
         self::assertSame(100, $exception->getCode());
-    }
-
-    public function testTopicHasNoPartitionExceptionWithCode(): void
-    {
-        $exception = new TopicHasNoPartitionException('Topic has no partition', 200);
-
-        self::assertSame(200, $exception->getCode());
     }
 
     public function testBusinessExceptionWithPrevious(): void
@@ -67,13 +50,6 @@ final class BusinessExceptionTest extends TestCase
         self::assertInstanceOf(\DomainException::class, $exception);
     }
 
-    public function testTopicHasNoPartitionExceptionIsDomainException(): void
-    {
-        $exception = new TopicHasNoPartitionException('Test');
-
-        self::assertInstanceOf(\DomainException::class, $exception);
-    }
-
     public function testEmptySubscriptionsExceptionCreate(): void
     {
         $exception = EmptySubscriptionsException::create();
@@ -83,33 +59,12 @@ final class BusinessExceptionTest extends TestCase
         self::assertSame('At least one subscription is required', $exception->getMessage());
     }
 
-    public function testTopicHasNoPartitionExceptionCreate(): void
-    {
-        $exception = TopicHasNoPartitionException::create('test-topic');
-
-        self::assertInstanceOf(BusinessException::class, $exception);
-        self::assertInstanceOf(TopicHasNoPartitionException::class, $exception);
-        self::assertSame('Topic "test-topic" has no partition', $exception->getMessage());
-    }
-
     public function testInvalidSubscriptionExceptionFactories(): void
     {
         self::assertInstanceOf(BusinessException::class, InvalidSubscriptionException::emptyTopic());
         self::assertSame(
             'Subscription topic must not be an empty string',
             InvalidSubscriptionException::emptyTopic()->getMessage(),
-        );
-        self::assertSame(
-            'Subscription partition must not be negative, -1 given',
-            InvalidSubscriptionException::negativePartition(-1)->getMessage(),
-        );
-        self::assertSame(
-            'Subscription offset must not be negative, -5 given',
-            InvalidSubscriptionException::negativeOffset(-5)->getMessage(),
-        );
-        self::assertSame(
-            'Subscription offset cannot be set without a partition',
-            InvalidSubscriptionException::offsetWithoutPartition()->getMessage(),
         );
     }
 

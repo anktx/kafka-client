@@ -91,11 +91,11 @@ final class KafkaConsumer
      * выполняйте на уровне приложения.
      *
      * Партиции и смещения назначает сам librdkafka через внутренний
-     * rebalance-callback. Внешний assign() после subscribe() переключает
-     * консьюмера в ручной режим и затирает выставленные rebalance'ом
-     * партиции и смещения.
+     * rebalance-callback, поэтому подписка задаётся только именем топика.
+     * Внешний assign() после subscribe() переключает консьюмера в ручной
+     * режим и затирает выставленные rebalance'ом партиции и смещения.
      *
-     * @param TopicSubscriptionList $subscriptionList Список подписок на топики/партиции
+     * @param TopicSubscriptionList $subscriptionList Список подписок на топики
      *
      * @throws ClientClosedException       Если консьюмер закрыт через close()
      * @throws EmptySubscriptionsException Если список подписок пуст
@@ -114,10 +114,6 @@ final class KafkaConsumer
         } catch (Exception $e) {
             $this->logger->error('Failed to subscribe to topics', [
                 'topics' => $subscriptionList->topicNames(),
-                'subscriptions' => array_map(static fn($s) => [
-                    'topic' => $s->topic,
-                    'partition' => $s->partition,
-                ], $subscriptionList->items),
                 'error' => $e->getMessage(),
             ]);
 
