@@ -106,10 +106,10 @@ foreach ($stream->stream() as $message) {
 use Anktx\Kafka\Client\PollStrategy\TimeoutPollStrategy;
 use Anktx\Kafka\Client\PollStrategy\ProbabilityPollStrategy;
 
-// Опрос каждые N секунд
+// Опрос не чаще, чем раз в N миллисекунд
 $producer = new KafkaProducer(
     $config,
-    new TimeoutPollStrategy(pollIntervalSec: 1),
+    new TimeoutPollStrategy(pollIntervalMs: 1000),
 );
 
 // Опрос с вероятностью N (0.0 - 1.0)
@@ -121,7 +121,7 @@ $producer = new KafkaProducer(
 
 **Доступные стратегии:**
 - `NeverPollStrategy` — не вызывать `poll()` (по умолчанию, подходит для низкой нагрузки)
-- `TimeoutPollStrategy` — вызывать `poll()` каждые N секунд
+- `TimeoutPollStrategy` — вызывать `poll()` с фиксированным интервалом в миллисекундах (источник времени — PSR-20 `Psr\Clock\ClockInterface`, по умолчанию системные часы)
 - `ProbabilityPollStrategy` — вызывать `poll()` с вероятностью N (например, 10% вызовов)
 
 Ошибки доставки сообщений (delivery reports) продюсер логирует через PSR-3
@@ -235,6 +235,9 @@ match ($result::class) {
 
 ```
 src/
+├── Clock/                           # Время
+│   └── SystemClock.php              # Системные часы PSR-20 (по умолчанию)
+│
 ├── Config/                          # Конфигурация
 │   ├── ConsumerConfig.php           # Конфигурация консьюмера
 │   ├── ProducerConfig.php           # Конфигурация продюсера
@@ -259,7 +262,7 @@ src/
 │   ├── PollStrategy.php             # Интерфейс стратегии
 │   ├── NeverPollStrategy.php        # Не вызывать poll()
 │   ├── ProbabilityPollStrategy.php  # Вызывать с вероятностью N
-│   └── TimeoutPollStrategy.php      # Вызывать каждые N секунд
+│   └── TimeoutPollStrategy.php      # Вызывать с фиксированным интервалом (мс)
 │
 ├── TopicSubscription/               # Подписки на топики
 │   ├── TopicSubscription.php        # Одна подписка

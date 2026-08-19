@@ -115,6 +115,22 @@ final class ProbabilityPollStrategyTest extends TestCase
         self::assertFalse($strategy->shouldPoll());
     }
 
+    public function testMarkPolledDoesNotAffectSequence(): void
+    {
+        // Стратегия не имеет состояния: markPolled() — no-op, выпавшая
+        // последовательность не сбрасывается и не пропускается.
+        $strategy = new ProbabilityPollStrategy(
+            probability: 0.5,
+            randomizer: new Randomizer(new Xoshiro256StarStar(42)),
+        );
+
+        self::assertTrue($strategy->shouldPoll());
+        $strategy->markPolled();
+        self::assertFalse($strategy->shouldPoll());
+        $strategy->markPolled();
+        self::assertTrue($strategy->shouldPoll());
+    }
+
     public function testDefaultRandomizerKeepsStrategyUsable(): void
     {
         // Без явной инъекции стратегия работает на системном CSPRNG:

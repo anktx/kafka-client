@@ -28,6 +28,22 @@
 
 ### Changed
 
+- **BC:** контракт `PollStrategy` приведён к CQS: `shouldPoll()` стал чистым
+  запросом без побочных эффектов (раньше `TimeoutPollStrategy::shouldPoll()`
+  неявно обновлял отметку последнего опроса), фиксация факта опроса вынесена
+  в новую команду `markPolled(): void`. `KafkaProducer::produce()` вызывает
+  `markPolled()` после дренирования очереди delivery-report'ов. Внешние
+  реализации `PollStrategy` обязаны добавить `markPolled()` (для
+  stateless-стратегий — no-op, как в `NeverPollStrategy`/
+  `ProbabilityPollStrategy`).
+- **BC:** `TimeoutPollStrategy`: параметр `pollIntervalSec` переименован в
+  `pollIntervalMs` и переведён в миллисекунды — единый суффикс `*Ms` с
+  остальными таймингами библиотеки (`lingerMs`, `sessionTimeoutMs`, …) и
+  субсекундные интервалы. Время инъектируется через PSR-20
+  `Psr\Clock\ClockInterface` (новая зависимость `psr/clock`; по умолчанию —
+  новая `Clock\SystemClock`), граничные случаи интервала (ровно граница/−1 мс)
+  покрыты детерминированными тестами на управляемых часах вместо заглушек.
+
 - **BC:** кейсы `CompressionType` и `OffsetReset` переименованы в
   PascalCase согласно конвенции PHP (`snappy` → `Snappy`, `lz4` → `Lz4`,
   `earliest` → `Earliest` и т.д.); бэкинг-значения — стабильные

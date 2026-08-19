@@ -90,6 +90,7 @@ final class KafkaProducer
     {
         if ($this->pollStrategy->shouldPoll()) {
             $this->drainDeliveryReports();
+            $this->pollStrategy->markPolled();
         }
 
         try {

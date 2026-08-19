@@ -15,4 +15,13 @@ final class NeverPollStrategyTest extends TestCase
 
         self::assertFalse($strategy->shouldPoll());
     }
+
+    public function testMarkPolledChangesNothing(): void
+    {
+        $strategy = new NeverPollStrategy();
+
+        $strategy->markPolled();
+
+        self::assertFalse($strategy->shouldPoll());
+    }
 }

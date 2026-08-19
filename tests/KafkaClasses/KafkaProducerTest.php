@@ -253,6 +253,8 @@ final class KafkaProducerTest extends TestCase
     ): KafkaProducer {
         $pollStrategy = $this->createMock(PollStrategy::class);
         $pollStrategy->method('shouldPoll')->willReturn($shouldPoll);
+        // Факт опроса фиксируется только после разрешения shouldPoll()
+        $pollStrategy->expects($shouldPoll ? $this->once() : $this->never())->method('markPolled');
 
         $kafkaProducer = (new \ReflectionClass(KafkaProducer::class))->newInstanceWithoutConstructor();
 

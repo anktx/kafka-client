@@ -27,4 +27,6 @@ final readonly class ProbabilityPollStrategy implements PollStrategy
     {
         return $this->randomizer->getFloat(0, 1) < $this->probability;
     }
+
+    public function markPolled(): void {}
 }

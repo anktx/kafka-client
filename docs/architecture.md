@@ -39,8 +39,11 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
 
 4. **PollStrategy** (`src/PollStrategy/`)
    - Стратегии опроса очереди для оптимизации производительности
+   - Контракт по CQS: `shouldPoll()` — чистый запрос, `markPolled()` —
+     команда, фиксирующая факт опроса (вызывается клиентом после дренирования)
    - `NeverPollStrategy` — не вызывать poll() (по умолчанию)
-   - `TimeoutPollStrategy` — опрос с фиксированным интервалом
+   - `TimeoutPollStrategy` — опрос с фиксированным интервалом в мс
+     (инъекция PSR-20 `Psr\Clock\ClockInterface`, дефолт — `Clock\SystemClock`)
    - `ProbabilityPollStrategy` — опрос с заданной вероятностью (инъекция `\Random\Randomizer`)
 
 5. **Исключения** (`src/Exception/`)
@@ -66,7 +69,7 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
 
 - **Immutable Value Objects**: конфигурационные классы — readonly, без сеттеров
 - **Strategy Pattern**: полиморфные стратегии опроса (PollStrategy)
-- **Dependency Injection**: внедрение зависимостей через конструкторы (логгер, Randomizer)
+- **Dependency Injection**: внедрение зависимостей через конструкторы (логгер, Randomizer, PSR-20 clock)
 - **Type Safety**: строгая типизация, enum'ы, union types
 - **PSR-3 Logging**: структурированное логирование с контекстом
 - **Final classes/methods**: запрет наследования там, где это уместно

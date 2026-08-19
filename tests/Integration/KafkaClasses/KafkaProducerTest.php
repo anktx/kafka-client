@@ -37,7 +37,7 @@ final class KafkaProducerTest extends TestCase
     {
         $producer = new KafkaProducer(
             new ProducerConfig(brokers: $this->brokers),
-            new TimeoutPollStrategy(pollIntervalSec: 1),
+            new TimeoutPollStrategy(pollIntervalMs: 1000),
         );
 
         self::assertInstanceOf(KafkaProducer::class, $producer);

@@ -4,37 +4,42 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\PollStrategy;
 
+use Anktx\Kafka\Client\Clock\SystemClock;
 use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
+use Psr\Clock\ClockInterface;
 
 final class TimeoutPollStrategy implements PollStrategy
 {
-    private int $lastPollTimestamp;
+    private ?int $lastPollMs = null;
 
     /**
-     * @param int $pollIntervalSec Минимальный интервал между опросами в секундах
+     * @param int            $pollIntervalMs Минимальный интервал между опросами в миллисекундах
+     * @param ClockInterface $clock          Источник времени (по умолчанию системные часы)
      *
      * @throws InvalidConfigException Если интервал отрицательный
      */
     public function __construct(
-        public readonly int $pollIntervalSec,
+        public readonly int $pollIntervalMs,
+        private readonly ClockInterface $clock = new SystemClock(),
     ) {
-        if ($this->pollIntervalSec < 0) {
-            throw InvalidConfigException::nonNegativeInt('pollIntervalSec', $this->pollIntervalSec);
+        if ($this->pollIntervalMs < 0) {
+            throw InvalidConfigException::nonNegativeInt('pollIntervalMs', $this->pollIntervalMs);
         }
-
-        $this->lastPollTimestamp = 0;
     }
 
     public function shouldPoll(): bool
     {
-        $timestamp = time();
+        return $this->lastPollMs === null
+            || $this->nowMs() >= $this->lastPollMs + $this->pollIntervalMs;
+    }
 
-        $result = $timestamp >= $this->lastPollTimestamp + $this->pollIntervalSec;
+    public function markPolled(): void
+    {
+        $this->lastPollMs = $this->nowMs();
+    }
 
-        if ($result === true) {
-            $this->lastPollTimestamp = $timestamp;
-        }
-
-        return $result;
+    private function nowMs(): int
+    {
+        return (int) $this->clock->now()->format('Uv');
     }
 }

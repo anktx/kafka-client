@@ -10,4 +10,6 @@ final class NeverPollStrategy implements PollStrategy
     {
         return false;
     }
+
+    public function markPolled(): void {}
 }
