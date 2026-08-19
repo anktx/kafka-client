@@ -17,7 +17,6 @@ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Exception;
 use RdKafka\Message;
-use RdKafka\TopicPartition;
 
 /**
  * Юнит-тесты для {@see KafkaConsumer::consume()} на mock'е RdKafka\KafkaConsumer.
@@ -249,15 +248,23 @@ final class KafkaConsumerConsumeTest extends TestCase
         $errorRecords = $logger->findByMessage('Attempted to commit a message without offset');
         self::assertCount(1, $errorRecords);
         self::assertSame('test-topic', $errorRecords[0]['context']['topic']);
+        self::assertSame(-1, $errorRecords[0]['context']['partition']);
     }
 
     public function testCommitCommitsNextOffset(): void
     {
         // commit() фиксирует offset + 1 — следующий за обработанным сообщением.
+        // RdKafka\TopicPartition — C-объект без PHP-свойств, == для него всегда
+        // true, поэтому значения проверяются геттерами внутри колбэка.
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
-        $rdKafka->expects($this->once())->method('commit')->with([
-            new TopicPartition('test-topic', 3, 43),
-        ]);
+        $rdKafka->expects($this->once())->method('commit')->willReturnCallback(
+            static function (array $offsets): void {
+                self::assertCount(1, $offsets);
+                self::assertSame('test-topic', $offsets[0]->getTopic());
+                self::assertSame(3, $offsets[0]->getPartition());
+                self::assertSame(43, $offsets[0]->getOffset());
+            },
+        );
 
         $consumer = $this->buildConsumer($rdKafka);
         $consumer->commit(new KafkaConsumerMessage(
@@ -271,22 +278,33 @@ final class KafkaConsumerConsumeTest extends TestCase
     #[AllowMockObjectsWithoutExpectations]
     public function testCommitRethrowsRdKafkaExceptionAsKafkaConsumerException(): void
     {
+        $logger = new InMemoryLogger();
+
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('commit')
             ->willThrowException(new Exception('commit failed'))
         ;
 
-        $consumer = $this->buildConsumer($rdKafka);
+        $consumer = $this->buildConsumer($rdKafka, logger: $logger);
 
-        $this->expectException(KafkaConsumerException::class);
-        $this->expectExceptionMessage('commit failed');
+        try {
+            $consumer->commit(new KafkaConsumerMessage(
+                topic: 'test-topic',
+                body: 'hello',
+                partition: 3,
+                offset: 42,
+            ));
+            self::fail('Expected KafkaConsumerException');
+        } catch (KafkaConsumerException $e) {
+            self::assertSame('commit failed', $e->getMessage());
+        }
 
-        $consumer->commit(new KafkaConsumerMessage(
-            topic: 'test-topic',
-            body: 'hello',
-            partition: 3,
-            offset: 42,
-        ));
+        $errorRecords = $logger->findByMessage('Failed to commit message');
+        self::assertCount(1, $errorRecords);
+        self::assertSame('test-topic', $errorRecords[0]['context']['topic']);
+        self::assertSame(3, $errorRecords[0]['context']['partition']);
+        self::assertSame(42, $errorRecords[0]['context']['offset']);
+        self::assertSame('commit failed', $errorRecords[0]['context']['error']);
     }
 
     /**

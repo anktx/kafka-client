@@ -9,14 +9,13 @@ use PHPUnit\Framework\TestCase;
 
 final class KafkaConsumeTimeoutTest extends TestCase
 {
-    public function testCreate(): void
+    public function testIsMarkerObjectWithoutStaleBrokerData(): void
     {
-        $timeout = new KafkaConsumeTimeout(
-            partition: 1,
-            offset: 100,
-        );
+        // Раньше объект нёс partition/offset из служебного Message librdkafka:
+        // для таймаута это мусор (-1/-1001). Контракт — маркер без полей.
+        $timeout = new KafkaConsumeTimeout();
 
-        self::assertSame(1, $timeout->partition);
-        self::assertSame(100, $timeout->offset);
+        self::assertInstanceOf(KafkaConsumeTimeout::class, $timeout);
+        self::assertSame([], (new \ReflectionClass(KafkaConsumeTimeout::class))->getProperties());
     }
 }

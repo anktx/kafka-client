@@ -59,11 +59,16 @@ final class RdKafkaCallbacksTest extends TestCase
         self::assertSame(LogLevel::WARNING, $records[0]['level']);
         self::assertSame(\RD_KAFKA_RESP_ERR__TRANSPORT, $records[0]['context']['error_code']);
         self::assertSame('connection refused', $records[0]['context']['reason']);
+        // Ровно одна запись: удаление return из ветки уронило бы код в общий
+        // warning 'Kafka client error' — задвоение записей ловится здесь.
+        self::assertCount(1, $logger->records);
     }
 
     #[AllowMockObjectsWithoutExpectations]
-    public function testAttachErrorCallbackIgnoresNonConnectionErrors(): void
+    public function testAttachErrorCallbackLogsNonConnectionErrorsAsWarning(): void
     {
+        // Раньше не-connection ошибки (аутентификация, SASL и т.п.) глотались
+        // молча — например, неверные креды были видны только в debug-логе.
         $logger = new InMemoryLogger();
         $onBrokerError = $this->captureCallback(
             'setErrorCb',
@@ -73,7 +78,33 @@ final class RdKafkaCallbacksTest extends TestCase
 
         $onBrokerError($this->createMock(KafkaConsumer::class), \RD_KAFKA_RESP_ERR__BAD_MSG, 'bad message format');
 
-        self::assertSame([], $logger->records);
+        $records = $logger->findByMessage('Kafka client error');
+        self::assertCount(1, $records);
+        self::assertSame(LogLevel::WARNING, $records[0]['level']);
+        self::assertSame(\RD_KAFKA_RESP_ERR__BAD_MSG, $records[0]['context']['error_code']);
+        self::assertSame('bad message format', $records[0]['context']['reason']);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testAttachErrorCallbackLogsFatalErrorAsError(): void
+    {
+        $logger = new InMemoryLogger();
+        $onBrokerError = $this->captureCallback(
+            'setErrorCb',
+            $logger,
+            static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachErrorCallback($conf),
+        );
+
+        $onBrokerError($this->createMock(KafkaConsumer::class), \RD_KAFKA_RESP_ERR__FATAL, 'fatal broker error');
+
+        $records = $logger->findByMessage('Kafka fatal error, client is unusable');
+        self::assertCount(1, $records);
+        self::assertSame(LogLevel::ERROR, $records[0]['level']);
+        self::assertSame(\RD_KAFKA_RESP_ERR__FATAL, $records[0]['context']['error_code']);
+        self::assertSame('fatal broker error', $records[0]['context']['reason']);
+        // Ровно одна запись: после fatal-ветки код не должен проваливаться
+        // в общий warning 'Kafka client error'.
+        self::assertCount(1, $logger->records);
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -99,6 +130,9 @@ final class RdKafkaCallbacksTest extends TestCase
         self::assertSame('test-topic', $records[0]['context']['topic']);
         self::assertSame(2, $records[0]['context']['partition']);
         self::assertSame(15, $records[0]['context']['offset']);
+        // Ровно одна запись: без return успех-ветка проваливалась бы в error
+        // 'Message delivery failed'.
+        self::assertCount(1, $logger->records);
     }
 
     #[AllowMockObjectsWithoutExpectations]

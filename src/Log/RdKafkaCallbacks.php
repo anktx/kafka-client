@@ -82,10 +82,15 @@ final readonly class RdKafkaCallbacks
     }
 
     /**
-     * Error-callback librdkafka: логирует потерю соединения с брокерами.
+     * Error-callback librdkafka: логирует все ошибки клиента.
+     *
+     * Потеря соединения с брокерами — warning (переподключением librdkafka
+     * занимается сам), фатальные ошибки — error (клиент после них неработоспособен),
+     * прочие (аутентификация, SASL и т.п.) — warning: раньше они глотались
+     * молча и, например, неверные креды были видны только в debug-логе.
      *
      * Выполняется синхронно в C-коде ext-rdkafka, поэтому бросать исключения
-     * отсюда нельзя. Переподключением librdkafka занимается сам.
+     * отсюда нельзя.
      *
      * @param KafkaConsumer|Producer $client Клиент, вызвавший callback (не используется)
      * @param int                    $err    Код ошибки RD_KAFKA_RESP_ERR__*
@@ -93,14 +98,24 @@ final readonly class RdKafkaCallbacks
      */
     private function onBrokerError(KafkaConsumer|Producer $client, int $err, string $reason): void
     {
-        if (!\in_array($err, self::CONNECTION_ERROR_CODES, true)) {
+        $context = [
+            'error_code' => $err,
+            'reason' => $reason,
+        ];
+
+        if (\in_array($err, self::CONNECTION_ERROR_CODES, true)) {
+            $this->logger->warning('Kafka broker connection error', $context);
+
             return;
         }
 
-        $this->logger->warning('Kafka broker connection error', [
-            'error_code' => $err,
-            'reason' => $reason,
-        ]);
+        if ($err === \RD_KAFKA_RESP_ERR__FATAL) {
+            $this->logger->error('Kafka fatal error, client is unusable', $context);
+
+            return;
+        }
+
+        $this->logger->warning('Kafka client error', $context);
     }
 
     /**

@@ -27,6 +27,22 @@ final class ProducerConfigTest extends TestCase
         self::assertInstanceOf(Conf::class, $kafkaConfig);
     }
 
+    public function testAsKafkaConfigWrapsRdKafkaExceptionIntoInvalidConfigException(): void
+    {
+        // linger.ms вне диапазона librdkafka (0..900000): конструктор проходит
+        // (значение неотрицательное), а Conf::set() бросает сырой RdKafka\Exception
+        // — asKafkaConfig() обязан обернуть его в наш тип.
+        $config = new ProducerConfig('kafka:9092', lingerMs: \PHP_INT_MAX);
+
+        try {
+            $config->asKafkaConfig();
+            self::fail('Expected InvalidConfigException');
+        } catch (InvalidConfigException $e) {
+            self::assertStringContainsString('outside allowed range', $e->getMessage());
+            self::assertSame(-1, $e->getCode());
+        }
+    }
+
     public function testDefaults(): void
     {
         $config = new ProducerConfig('kafka:9092');

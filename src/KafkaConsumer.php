@@ -8,6 +8,7 @@ use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
+use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
@@ -43,7 +44,8 @@ final readonly class KafkaConsumer
      * @param ConsumerConfig  $config Конфигурация консьюмера
      * @param LoggerInterface $logger PSR-3 логгер (по умолчанию NullLogger)
      *
-     * @throws KafkaConsumerException Если не удалось создать консьюмера
+     * @throws InvalidConfigException Если конфигурация отклонена librdkafka
+     * @throws KafkaConsumerException Если не удалось создать клиента RdKafka
      */
     public function __construct(
         ConsumerConfig $config,
@@ -55,7 +57,17 @@ final readonly class KafkaConsumer
         $callbacks->attachLogCallback($conf);
         $callbacks->attachErrorCallback($conf);
 
-        $this->consumer = new \RdKafka\KafkaConsumer($conf);
+        try {
+            $this->consumer = new \RdKafka\KafkaConsumer($conf);
+        } catch (Exception $e) {
+            $this->logger->error('Failed to create RdKafka consumer', [
+                'brokers' => $config->brokers,
+                'group_id' => $config->groupId,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw KafkaConsumerException::fromKafkaException($e);
+        }
 
         $this->logger->info('KafkaConsumer created', [
             'brokers' => $config->brokers,
@@ -192,10 +204,7 @@ final readonly class KafkaConsumer
                 offset: $message->offset,
             ),
 
-            \RD_KAFKA_RESP_ERR__TIMED_OUT, \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN => new KafkaConsumeTimeout(
-                partition: $message->partition,
-                offset: $message->offset,
-            ),
+            \RD_KAFKA_RESP_ERR__TIMED_OUT, \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN => new KafkaConsumeTimeout(),
 
             default => $this->throwOnUnrecognizedConsumeError($message),
         };

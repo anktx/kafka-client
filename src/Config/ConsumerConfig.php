@@ -7,6 +7,7 @@ namespace Anktx\Kafka\Client\Config;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
 use RdKafka\Conf;
+use RdKafka\Exception;
 
 final readonly class ConsumerConfig
 {
@@ -53,15 +54,25 @@ final readonly class ConsumerConfig
         }
     }
 
+    /**
+     * Собирает нативную конфигурацию RdKafka из параметров объекта.
+     *
+     * @throws InvalidConfigException Если librdkafka отклонил значение параметра
+     *                                (например, вне допустимого диапазона)
+     */
     public function asKafkaConfig(): Conf
     {
         $conf = new Conf();
 
-        $this->configureDebug($conf);
-        $this->configureEssentials($conf);
-        $this->configureCommit($conf);
-        $this->configureTimeouts($conf);
-        $this->configureReconnect($conf);
+        try {
+            $this->configureDebug($conf);
+            $this->configureEssentials($conf);
+            $this->configureCommit($conf);
+            $this->configureTimeouts($conf);
+            $this->configureReconnect($conf);
+        } catch (Exception $e) {
+            throw InvalidConfigException::fromKafkaException($e);
+        }
 
         return $conf;
     }

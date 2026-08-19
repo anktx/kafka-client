@@ -66,6 +66,27 @@ final class ConsumerConfigTest extends TestCase
         self::assertInstanceOf(Conf::class, $config->asKafkaConfig());
     }
 
+    public function testAsKafkaConfigWrapsRdKafkaExceptionIntoInvalidConfigException(): void
+    {
+        // session.timeout.ms вне диапазона librdkafka (1..3600000): конструктор
+        // проходит (значение положительное), а Conf::set() бросает сырой
+        // RdKafka\Exception — asKafkaConfig() обязан обернуть его в наш тип.
+        $config = new ConsumerConfig(
+            brokers: 'kafka:9092',
+            groupId: 'test-group',
+            sessionTimeoutMs: \PHP_INT_MAX,
+        );
+
+        try {
+            $config->asKafkaConfig();
+            self::fail('Expected InvalidConfigException');
+        } catch (InvalidConfigException $e) {
+            self::assertInstanceOf(KafkaException::class, $e);
+            self::assertStringContainsString('outside allowed range', $e->getMessage());
+            self::assertSame(-1, $e->getCode());
+        }
+    }
+
     public function testWithDebugEnabled(): void
     {
         $config = new ConsumerConfig(
@@ -261,6 +282,23 @@ final class ConsumerConfigTest extends TestCase
         new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMs: -5);
     }
 
+    public function testNegativeReconnectBackoffMaxThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "reconnectBackoffMaxMs" must not be negative, -50 given');
+
+        new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMaxMs: -50);
+    }
+
+    public function testReconnectBackoffMsWithoutMaxIsValid(): void
+    {
+        // reconnectBackoffMs задан, reconnectBackoffMaxMs нет: librdkafka
+        // подставит дефолт для max — инверсии диапазона быть не может.
+        $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMs: 100);
+
+        self::assertNull($config->reconnectBackoffMaxMs);
+    }
+
     public function testReconnectBackoffMaxLessThanMinThrows(): void
     {
         $this->expectException(InvalidConfigException::class);
@@ -289,6 +327,13 @@ final class ConsumerConfigTest extends TestCase
         $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMs: 0);
 
         self::assertSame(0, $config->reconnectBackoffMs);
+    }
+
+    public function testZeroReconnectBackoffMaxIsValid(): void
+    {
+        $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMaxMs: 0);
+
+        self::assertSame(0, $config->reconnectBackoffMaxMs);
     }
 
     public function testReconnectBackoffMaxEqualToMinIsValid(): void

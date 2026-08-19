@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client;
 
 use Anktx\Kafka\Client\Config\ProducerConfig;
+use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
@@ -25,6 +26,9 @@ use RdKafka\ProducerTopic;
 final class KafkaProducer
 {
     private const int DEFAULT_FLUSH_TIMEOUT_MS = 1000;
+
+    /** Бюджет poll()-вызовов на один drain очереди delivery-report'ов. */
+    private const int MAX_DRAIN_POLLS = 100;
     private readonly Producer $producer;
 
     /**
@@ -38,6 +42,9 @@ final class KafkaProducer
      * @param ProducerConfig  $config       Конфигурация продюсера
      * @param PollStrategy    $pollStrategy Стратегия опроса очереди (по умолчанию NeverPollStrategy)
      * @param LoggerInterface $logger       PSR-3 логгер (по умолчанию NullLogger)
+     *
+     * @throws InvalidConfigException Если конфигурация отклонена librdkafka
+     * @throws KafkaProducerException Если не удалось создать клиента RdKafka
      */
     public function __construct(
         ProducerConfig $config,
@@ -51,7 +58,16 @@ final class KafkaProducer
         $callbacks->attachErrorCallback($conf);
         $callbacks->attachDeliveryReportCallback($conf);
 
-        $this->producer = new Producer($conf);
+        try {
+            $this->producer = new Producer($conf);
+        } catch (Exception $e) {
+            $this->logger->error('Failed to create RdKafka producer', [
+                'brokers' => $config->brokers,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw KafkaProducerException::fromKafkaException($e);
+        }
 
         $this->logger->info('KafkaProducer created', [
             'brokers' => $config->brokers,
@@ -73,14 +89,12 @@ final class KafkaProducer
     public function produce(KafkaProducerMessage $message): void
     {
         if ($this->pollStrategy->shouldPoll()) {
-            while ($this->producer->getOutQLen() > 0) {
-                $this->producer->poll(0);
-            }
+            $this->drainDeliveryReports();
         }
 
-        $topic = $this->topic($message->topic);
-
         try {
+            $topic = $this->topic($message->topic);
+
             $topic->producev(
                 partition: $message->partition,
                 msgflags: 0,
@@ -141,6 +155,33 @@ final class KafkaProducer
         ]);
 
         throw KafkaProducerException::flushFailed($result);
+    }
+
+    /**
+     * Опустошает очередь delivery-report'ов с ограниченным бюджетом poll()-вызовов.
+     *
+     * poll(0) неблокирующий, поэтому без бюджета цикл крутился бы вхолостую
+     * на 100% CPU, пока очередь не дренируется сама: при недоступных брокерах
+     * отчёты не приходят вплоть до message.timeout.ms (5 минут по умолчанию).
+     * Недренжированный остаток логируется warning'ом — сообщения ещё в очереди.
+     */
+    private function drainDeliveryReports(): void
+    {
+        $polls = 0;
+
+        while ($this->producer->getOutQLen() > 0 && $polls < self::MAX_DRAIN_POLLS) {
+            $this->producer->poll(0);
+            ++$polls;
+        }
+
+        $remaining = $this->producer->getOutQLen();
+
+        if ($remaining > 0) {
+            $this->logger->warning('Delivery report queue not fully drained', [
+                'max_polls' => self::MAX_DRAIN_POLLS,
+                'remaining_messages' => $remaining,
+            ]);
+        }
     }
 
     /**
