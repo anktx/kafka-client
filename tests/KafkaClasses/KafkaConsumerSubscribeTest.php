@@ -41,11 +41,13 @@ final class KafkaConsumerSubscribeTest extends TestCase
         // никаких getMetadata()/probe брокеров до первого consume().
         $logger = new InMemoryLogger();
 
-        $consumer = new KafkaConsumer(new ConsumerConfig(
-            brokers: 'localhost:1',
-            groupId: 'contract-test',
-            logger: $logger,
-        ));
+        $consumer = new KafkaConsumer(
+            new ConsumerConfig(
+                brokers: 'localhost:1',
+                groupId: 'contract-test',
+            ),
+            $logger,
+        );
 
         self::assertInstanceOf(KafkaConsumer::class, $consumer);
 

@@ -7,7 +7,6 @@ namespace Anktx\Kafka\Client\Tests\Config;
 use Anktx\Kafka\Client\Config\Enum\CompressionType;
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use RdKafka\Conf;
 
 final class ProducerConfigTest extends TestCase
@@ -36,7 +35,6 @@ final class ProducerConfigTest extends TestCase
         $this->assertSame(10, $config->lingerMs);
         $this->assertSame(CompressionType::snappy, $config->compressionType);
         $this->assertFalse($config->isDebug);
-        $this->assertInstanceOf(NullLogger::class, $config->logger);
     }
 
     public function testWithCustomQueueBufferingMaxKBytes(): void
@@ -107,17 +105,6 @@ final class ProducerConfigTest extends TestCase
         );
 
         $this->assertTrue($config->isDebug);
-    }
-
-    public function testWithCustomLogger(): void
-    {
-        $logger = new NullLogger();
-        $config = new ProducerConfig(
-            'kafka:9092',
-            logger: $logger,
-        );
-
-        $this->assertSame($logger, $config->logger);
     }
 
     public function testAsKafkaConfigWithAllOptions(): void

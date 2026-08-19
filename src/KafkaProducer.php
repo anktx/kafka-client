@@ -11,6 +11,7 @@ use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\PollStrategy\NeverPoolStrategy;
 use Anktx\Kafka\Client\PollStrategy\PollStrategy;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use RdKafka\Exception;
 use RdKafka\Producer;
 use RdKafka\ProducerTopic;
@@ -23,7 +24,6 @@ use RdKafka\ProducerTopic;
 final class KafkaProducer
 {
     private readonly Producer $producer;
-    private readonly LoggerInterface $logger;
 
     /**
      * @var ProducerTopic[]
@@ -33,15 +33,20 @@ final class KafkaProducer
     /**
      * Создаёт новый экземпляр Kafka Producer.
      *
-     * @param ProducerConfig $config       Конфигурация продюсера
-     * @param PollStrategy   $pollStrategy Стратегия опроса очереди (по умолчанию NeverPoolStrategy)
+     * @param ProducerConfig  $config       Конфигурация продюсера
+     * @param PollStrategy    $pollStrategy Стратегия опроса очереди (по умолчанию NeverPoolStrategy)
+     * @param LoggerInterface $logger       PSR-3 логгер (по умолчанию NullLogger)
      */
     public function __construct(
         ProducerConfig $config,
         private readonly PollStrategy $pollStrategy = new NeverPoolStrategy(),
+        private readonly LoggerInterface $logger = new NullLogger(),
     ) {
-        $this->logger = $config->logger;
-        $this->producer = new Producer($config->asKafkaConfig());
+        $conf = $config->asKafkaConfig();
+
+        $conf->setLogCb($this->onLog(...));
+
+        $this->producer = new Producer($conf);
 
         $this->logger->info('KafkaProducer created', [
             'brokers' => $config->brokers,
@@ -143,10 +148,23 @@ final class KafkaProducer
      */
     private function topic(string $name): ProducerTopic
     {
-        if (! isset($this->topics[$name])) {
+        if (!isset($this->topics[$name])) {
             $this->topics[$name] = $this->producer->newTopic($name);
         }
 
         return $this->topics[$name];
+    }
+
+    /**
+     * Log-callback librdkafka: перенаправляет внутренние сообщения библиотеки в PSR-3 лог.
+     *
+     * @param Producer $producer Продюсер (не используется)
+     * @param int      $level    Уровень логирования (syslog severity 0–7)
+     * @param string   $facility Источник сообщения
+     * @param string   $message  Текст сообщения
+     */
+    private function onLog(Producer $producer, int $level, string $facility, string $message): void
+    {
+        $this->logger->log($level, $message, ['facility' => $facility]);
     }
 }

@@ -136,7 +136,6 @@ $config = new ProducerConfig(
     lingerMs: int,                      // По умолчанию: 10
     compressionType: CompressionType,   // По умолчанию: snappy
     isDebug: bool,                      // По умолчанию: false
-    logger: LoggerInterface,            // По умолчанию: NullLogger
 );
 ```
 
@@ -151,8 +150,18 @@ $config = new ConsumerConfig(
     autoCommitMs: ?int,                 // По умолчанию: null (ручной коммит)
     sessionTimeoutMs: ?int,             // По умолчанию: null
     isDebug: bool,                      // По умолчанию: false
-    logger: LoggerInterface,            // По умолчанию: NullLogger
 );
+```
+
+### Логирование
+
+PSR-3 логгер передаётся напрямую в конструкторы клиентов (по умолчанию `NullLogger`):
+
+```php
+use Psr\Log\LoggerInterface;
+
+$producer = new KafkaProducer($config, logger: $logger);
+$consumer = new KafkaConsumer($config, logger: $logger);
 ```
 
 ## Типы возвращаемых значений

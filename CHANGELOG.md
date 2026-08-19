@@ -5,7 +5,87 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 и этот проект следует [Semantic Versioning](https://semver.org/lang/ru/).
 
-## [Unreleased]
+## [0.8.0] - 2026-08-19
+
+### Changed
+
+- **BC:** PSR-3 логгер передаётся в конструкторы клиентов: вторым параметром в
+  `KafkaConsumer::__construct(ConsumerConfig $config, LoggerInterface $logger = new NullLogger())`
+  и третьим в `KafkaProducer` (после `PollStrategy`). Колбэки librdkafka
+  (`setLogCb`, `setErrorCb`) навешиваются самими клиентами — вся политика
+  логирования живёт в одном месте. Логи librdkafka продюсера теперь тоже
+  содержат `facility` в контексте.
+- **BC:** в конструкторе `ConsumerConfig` параметр `isDebug` перенесён в конец
+  сигнатуры (после `$socketKeepaliveEnable`) — позиционные аргументы после
+  `$sessionTimeoutMs` «съезжают», при именованных аргументах проблем нет.
+
+### Removed
+
+- Параметр `logger` удалён из конструкторов `ConsumerConfig` и `ProducerConfig`:
+  конфиги снова чистые value object'ы настроек, `asKafkaConfig()` — чистый
+  маппинг в `Conf::set()` без навешивания колбэков.
+
+## [0.7.2] - 2026-08-19
+
+### Changed
+
+- Источником истины о состоянии подписки в `KafkaConsumer::consume()` теперь
+  librdkafka (`RdKafka\KafkaConsumer::getSubscription()`), а не внутренний
+  флаг: без подписки librdkafka бесконечно возвращает таймауты, неотличимые
+  от пустого топика. Контракт `NotSubscribedException` сохранён без изменений.
+- `KafkaConsumer` объявлен как `readonly class`.
+
+## [0.7.1] - 2026-08-19
+
+### Removed
+
+- Проверка доступности брокеров перед созданием консьюмера
+  (`assertBrokersAreAlive()` на основе `getMetadata()`) удалена из конструктора
+  `KafkaConsumer`. Конструктор больше не выполняет сетевых вызовов и не бросает
+  `KafkaConnectionException`: инициализация полностью ленивая, сеть трогается
+  только фоновыми потоками librdkafka после первого `subscribe()` — объект
+  безопасен для ленивого резолва в DI-контейнере. Недоступность брокеров и так
+  наблюдаема через `consume()` (возврат `KafkaConsumeTimeout`) и error-callback
+  в логах; fail-fast health-check при старте — зона ответственности приложения.
+- Параметр `int $timeoutMs` (default `5000`) удалён из конструктора
+  `KafkaConsumer`: он использовался только удалённой проверкой. Сигнатура
+  конструктора снова DI-дружелюбна.
+
+## [0.7.0] - 2026-08-06
+
+### Added
+
+- `ConsumerConfig`: новые опциональные параметры для управления переподключением
+  librdkafka:
+  - `reconnectBackoffMs` (`?int`, default `null` — используется дефолт librdkafka)
+  - `reconnectBackoffMaxMs` (`?int`, default `null`)
+  - `socketKeepaliveEnable` (`bool`, default `true`)
+
+### Changed
+
+- **BC:** `KafkaConsumer::consume()` и `consumeMatch()` больше не бросают
+  `KafkaUnavailableException`. Класс сохранён для обратной совместимости,
+  но не инстанцируется. Код, ловивший это исключение для рестарта
+  (например, в Kubernetes), больше его не получит — вместо него при полной
+  потере связи возвращается `KafkaConsumeTimeout`.
+- `RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN` теперь обрабатывается в `consume()`
+  как `KafkaConsumeTimeout` вместо попадания в `default` arm с бросанием
+  `KafkaConsumerException`.
+- `socket.keepalive.enable` теперь по умолчанию `true` (раньше не выставлялся,
+  librdkafka использует `false`). Это улучшает детектирование half-open
+  соединений в Kubernetes.
+- Error-callback в `KafkaConsumer` теперь только логирует ошибки соединения
+  (warning с `error_code`/`reason`); классификация кодов (`__ALL_BROKERS_DOWN`,
+  `__TRANSPORT`, `__RESOLVE`) перенесена в приватную константу
+  `KafkaConsumer::CONNECTION_ERROR_CODES`.
+
+### Removed
+
+- **BC:** класс `BrokerHealthState` и пространство имён `Connection` удалены.
+  Классификация ошибок соединения перенесена в `KafkaConsumer::CONNECTION_ERROR_CODES`.
+- **BC:** `ConsumerConfig::$unavailableThresholdSec` (int, default `30`) удалён
+  из конструктора. Параметр использовался только проверкой, устранённой
+  в этом релизе, и не влиял на поведение librdkafka.
 
 ### Fixed
 
@@ -21,43 +101,61 @@
   происходят автоматически в фоновых потоках librdkafka — консьюмер
   самовосстанавливается без перезапуска процесса.
 
-### Removed
-
-- Проверка доступности брокеров перед подпиской (`assertBrokersAreAlive()` на
-  основе `getMetadata()`) удалена из `KafkaConsumer::subscribe()`. Подписка —
-  локальная операция: подключение и запрос метаданных librdkafka выполняет
-  асинхронно в фоновых потоках, а гарантий проверка не давала (брокеры могли
-  упасть сразу после неё). Недоступность брокеров и так наблюдаема через
-  `consume()` (возврат `KafkaConsumeTimeout`) и error-callback в логах;
-  fail-fast health-check при старте — зона ответственности приложения.
-- Параметр `int $timeoutMs` (default `5000`) удалён из конструктора
-  `KafkaConsumer` вместе с приватным свойством `$connectTimeoutMs`:
-  использовался только удалённой проверкой. Сигнатура конструктора снова
-  DI-дружелюбна: `__construct(ConsumerConfig $config)`.
-- Класс `BrokerHealthState` и пространство имён `Connection` удалены. После
-  устранения `assertKafkaAvailable()` класс стал write-only: состояние записывалось
-  через error callback и `consume()`, но не читалось ни одним production-кодом.
-  Классификация ошибок соединения (`__ALL_BROKERS_DOWN`, `__TRANSPORT`, `__RESOLVE`)
-  перенесена в приватную константу `KafkaConsumer::CONNECTION_ERROR_CODES`.
-- `ConsumerConfig::$unavailableThresholdSec` удалён из конструктора. Параметр
-  использовался только удалённым `assertKafkaAvailable()` и не влиял на поведение
-  librdkafka.
+## [0.6.0] - 2026-07-27
 
 ### Changed
 
-- `KafkaConsumer::consume()` больше не бросает `KafkaUnavailableException`.
-  Класс сохранён для обратной совместимости, но не инстанцируется.
-- `RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN` теперь обрабатывается в `consume()`
-  как `KafkaConsumeTimeout` вместо попадания в `default` arm с бросанием
-  `KafkaConsumerException`.
-- `socket.keepalive.enable` теперь по умолчанию `true` (раньше не выставлялся,
-  librdkafka использует `false`). Это улучшает детектирование half-open
-  соединений в Kubernetes.
+- Управление партициями полностью делегировано librdkafka: `subscribe()` не
+  вызывает `assign()` даже при подписке с явными партициями в
+  `TopicSubscription` — назначения делает внутренний rebalance-callback.
+
+### Fixed
+
+- **Критический баг: «выпадение» партиций из потребления после подписки.**
+  `KafkaConsumer::subscribe()` больше не вызывает `assign()` со снимком
+  закоммиченных офсетов: раньше это переключало консьюмер в manual mode
+  и затирало назначения партиций, выставленные rebalance-callback'ом
+  librdkafka, — часть партиций молча выпадала из потребления. Назначение
+  партиций и восстановление смещений выполняет librdkafka.
+- Подписка ускорена: `subscribe()` больше не делает блокирующий запрос
+  `getCommittedOffsets()` (таймаут 1000 мс) и не требует живого брокера
+  на этом шаге. Путь ошибки «Failed to assign offsets»
+  (`KafkaConsumerException` из шага `assign()`) устранён.
+
+## [0.5.0] - 2026-07-25
 
 ### Added
 
-- `ConsumerConfig`: новые опциональные параметры для управления переподключением
-  librdkafka:
-  - `reconnectBackoffMs` (`?int`, default `null` — используется дефолт librdkafka)
-  - `reconnectBackoffMaxMs` (`?int`, default `null`)
-  - `socketKeepaliveEnable` (`bool`, default `true`)
+- Детекция длительной недоступности Kafka в консьюмере: если брокеры
+  недоступны дольше `unavailableThresholdSec` (новый параметр конструктора
+  `ConsumerConfig`, `int`, default `30`), `KafkaConsumer::consume()` и
+  `consumeMatch()` бросают новое исключение `KafkaUnavailableException`
+  (наследует `KafkaException`) вместо бесконечного цикла таймаутов.
+  Рекомендуемый сценарий — завершить приложение и перезапуститься
+  (например, оркестратором Kubernetes). Обратите внимание: параметр вставлен
+  в середину сигнатуры конструктора — позиционные аргументы после
+  `$sessionTimeoutMs` «съезжают», при именованных аргументах проблем нет.
+- Класс `Connection\BrokerHealthState` — конечный автомат состояния
+  соединения: фиксация потери/восстановления соединения из error-callback
+  librdkafka (`Conf::setErrorCb()`, логирует warning «Kafka broker connection
+  error»), распознавание кодов `__ALL_BROKERS_DOWN`/`__TRANSPORT`/`__RESOLVE`.
+  Восстановление фиксируется только по получению сообщения или EOF партиции.
+
+## [0.4.0] - 2026-07-02
+
+### Changed
+
+- Параметр `ConsumerConfig::$instanceId` стал опциональным: `?string`,
+  default `null` (раньше — обязательный `string`). Статическое членство
+  в группе (KIP-345, `group.instance.id`) теперь включается только при явной
+  передаче: rdkafka-опция выставляется лишь когда `instanceId !== null`.
+  Обратно совместимо — существующий код, передающий `instanceId`, работает
+  без изменений.
+
+[0.8.0]: https://git.anom.ru/anktx/kafka-client/compare/0.7.2...master
+[0.7.2]: https://git.anom.ru/anktx/kafka-client/compare/0.7.1...0.7.2
+[0.7.1]: https://git.anom.ru/anktx/kafka-client/compare/0.7.0...0.7.1
+[0.7.0]: https://git.anom.ru/anktx/kafka-client/compare/0.6.0...0.7.0
+[0.6.0]: https://git.anom.ru/anktx/kafka-client/compare/0.5.0...0.6.0
+[0.5.0]: https://git.anom.ru/anktx/kafka-client/compare/0.4.0...0.5.0
+[0.4.0]: https://git.anom.ru/anktx/kafka-client/commits/0.4.0

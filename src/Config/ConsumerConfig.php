@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\Config;
 
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
-use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 use RdKafka\Conf;
-use RdKafka\KafkaConsumer;
 
 final readonly class ConsumerConfig
 {
@@ -19,18 +16,16 @@ final readonly class ConsumerConfig
         public OffsetReset $offsetReset = OffsetReset::earliest,
         public ?int $autoCommitMs = null,
         public ?int $sessionTimeoutMs = null,
-        public bool $isDebug = false,
-        public LoggerInterface $logger = new NullLogger(),
         public ?int $reconnectBackoffMs = null,
         public ?int $reconnectBackoffMaxMs = null,
         public bool $socketKeepaliveEnable = true,
+        public bool $isDebug = false,
     ) {}
 
     public function asKafkaConfig(): Conf
     {
         $conf = new Conf();
 
-        $this->configureLogging($conf);
         $this->configureDebug($conf);
         $this->configureEssentials($conf);
         $this->configureCommit($conf);
@@ -38,13 +33,6 @@ final readonly class ConsumerConfig
         $this->configureReconnect($conf);
 
         return $conf;
-    }
-
-    private function configureLogging(Conf $conf): void
-    {
-        $conf->setLogCb(function (KafkaConsumer $consumer, int $level, string $facility, string $message): void {
-            $this->logger->log($level, $message, ['facility' => $facility]);
-        });
     }
 
     private function configureDebug(Conf $conf): void

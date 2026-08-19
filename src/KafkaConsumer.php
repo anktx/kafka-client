@@ -13,6 +13,7 @@ use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use RdKafka\Exception as RdKafkaException;
 use RdKafka\TopicPartition;
 
@@ -37,7 +38,6 @@ final readonly class KafkaConsumer
         \RD_KAFKA_RESP_ERR__RESOLVE,
     ];
     private \RdKafka\KafkaConsumer $consumer;
-    private LoggerInterface $logger;
 
     /**
      * Создаёт консьюмера, не подключаясь к брокерам.
@@ -46,16 +46,20 @@ final readonly class KafkaConsumer
      * в фоновых потоках после первого {@see subscribe()} — объект безопасен
      * для ленивого резолва в DI-контейнере.
      *
-     * @param ConsumerConfig $config Конфигурация консьюмера
+     * @param ConsumerConfig  $config Конфигурация консьюмера
+     * @param LoggerInterface $logger PSR-3 логгер (по умолчанию NullLogger)
      *
      * @throws KafkaConsumerException Если не удалось создать консьюмера
      */
-    public function __construct(ConsumerConfig $config)
-    {
-        $this->logger = $config->logger;
-
+    public function __construct(
+        ConsumerConfig $config,
+        private LoggerInterface $logger = new NullLogger(),
+    ) {
         $conf = $config->asKafkaConfig();
+
+        $conf->setLogCb($this->onLog(...));
         $conf->setErrorCb($this->onBrokerError(...));
+
         $this->consumer = new \RdKafka\KafkaConsumer($conf);
 
         $this->logger->info('KafkaConsumer created', [
@@ -277,6 +281,19 @@ final readonly class KafkaConsumer
         $this->consumer->close();
 
         $this->logger->info('KafkaConsumer closed');
+    }
+
+    /**
+     * Log-callback librdkafka: перенаправляет внутренние сообщения библиотеки в PSR-3 лог.
+     *
+     * @param \RdKafka\KafkaConsumer $consumer Консьюмер (не используется)
+     * @param int                    $level    Уровень логирования (syslog severity 0–7)
+     * @param string                 $facility Источник сообщения
+     * @param string                 $message  Текст сообщения
+     */
+    private function onLog(\RdKafka\KafkaConsumer $consumer, int $level, string $facility, string $message): void
+    {
+        $this->logger->log($level, $message, ['facility' => $facility]);
     }
 
     /**

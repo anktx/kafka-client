@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\Config;
 
 use Anktx\Kafka\Client\Config\Enum\CompressionType;
-use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 use RdKafka\Conf;
-use RdKafka\Producer;
 
 final readonly class ProducerConfig
 {
@@ -19,16 +16,12 @@ final readonly class ProducerConfig
         public int $lingerMs = 10,
         public CompressionType $compressionType = CompressionType::snappy,
         public bool $isDebug = false,
-        public LoggerInterface $logger = new NullLogger(),
     ) {}
 
     public function asKafkaConfig(): Conf
     {
         $conf = new Conf();
 
-        $conf->setLogCb(function (Producer $producer, int $level, string $facility, string $message): void {
-            $this->logger->log($level, $message);
-        });
         if ($this->isDebug) {
             $conf->set('debug', 'all');
         }

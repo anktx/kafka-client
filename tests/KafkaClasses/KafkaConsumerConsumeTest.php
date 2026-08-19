@@ -235,6 +235,26 @@ final class KafkaConsumerConsumeTest extends TestCase
     }
 
     #[AllowMockObjectsWithoutExpectations]
+    public function testOnLogForwardsLibrdkafkaLogToLogger(): void
+    {
+        $logger = new InMemoryLogger();
+        $consumer = $this->buildConsumer($this->createMock(RdKafkaConsumer::class), logger: $logger);
+
+        (new \ReflectionMethod($consumer, 'onLog'))->invoke(
+            $consumer,
+            $this->createMock(RdKafkaConsumer::class),
+            3,
+            'FETCH',
+            'message fetched',
+        );
+
+        self::assertCount(1, $logger->records);
+        self::assertSame(3, $logger->records[0]['level']);
+        self::assertSame('message fetched', $logger->records[0]['message']);
+        self::assertSame(['facility' => 'FETCH'], $logger->records[0]['context']);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
     public function testOnBrokerErrorIgnoresNonConnectionErrors(): void
     {
         $logger = new InMemoryLogger();

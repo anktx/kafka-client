@@ -7,7 +7,6 @@ namespace Anktx\Kafka\Client\Tests\Config;
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use RdKafka\Conf;
 
 final class ConsumerConfigTest extends TestCase
@@ -49,7 +48,6 @@ final class ConsumerConfigTest extends TestCase
         $this->assertSame(OffsetReset::earliest, $config->offsetReset);
         $this->assertNull($config->autoCommitMs);
         $this->assertNull($config->sessionTimeoutMs);
-        $this->assertInstanceOf(NullLogger::class, $config->logger);
         $this->assertNull($config->reconnectBackoffMs);
         $this->assertNull($config->reconnectBackoffMaxMs);
         $this->assertTrue($config->socketKeepaliveEnable);
@@ -112,19 +110,6 @@ final class ConsumerConfigTest extends TestCase
         );
 
         $this->assertSame(OffsetReset::latest, $config->offsetReset);
-    }
-
-    public function testWithCustomLogger(): void
-    {
-        $logger = new NullLogger();
-        $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
-            groupId: 'test-group',
-            instanceId: 'test-instance',
-            logger: $logger,
-        );
-
-        $this->assertSame($logger, $config->logger);
     }
 
     public function testAsKafkaConfigWithAutoCommit(): void
