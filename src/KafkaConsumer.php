@@ -254,38 +254,6 @@ final class KafkaConsumer
     }
 
     /**
-     * Читает сообщение и передаёт его в callback, соответствующий типу результата.
-     *
-     * @param \Closure(KafkaConsumerMessage): mixed $onMessage     Обработчик сообщения
-     * @param \Closure(KafkaConsumeTimeout): mixed  $onTimeout     Обработчик таймаута
-     * @param \Closure(KafkaBrokersDown): mixed     $onBrokersDown Обработчик потери всех брокеров
-     * @param \Closure(KafkaPartitionEof): mixed    $onEof         Обработчик конца партиции
-     * @param int                                   $timeoutMs     Таймаут ожидания в миллисекундах
-     *
-     * @return mixed Значение, возвращённое сработавшим callback'ом
-     *
-     * @throws ClientClosedException  Если консьюмер закрыт через close()
-     * @throws NotSubscribedException Если консьюмер не подписан на топики
-     * @throws KafkaConsumerException Если чтение завершилось ошибкой
-     */
-    public function consumeMatch(
-        \Closure $onMessage,
-        \Closure $onTimeout,
-        \Closure $onBrokersDown,
-        \Closure $onEof,
-        int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS,
-    ): mixed {
-        $result = $this->consume($timeoutMs);
-
-        return match ($result::class) {
-            KafkaConsumerMessage::class => $onMessage($result),
-            KafkaConsumeTimeout::class => $onTimeout($result),
-            KafkaBrokersDown::class => $onBrokersDown($result),
-            KafkaPartitionEof::class => $onEof($result),
-        };
-    }
-
-    /**
      * Коммитит смещение обработанного сообщения.
      *
      * Фиксирует в Kafka offset, следующий за сообщением, — после этого группа

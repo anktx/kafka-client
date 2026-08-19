@@ -54,9 +54,8 @@ final readonly class KafkaMessageStream
      * Возвращает генератор, который выдаёт только реальные сообщения.
      *
      * Каждый результат consume() сначала передаётся наблюдателю
-     * {@see StreamObserver} — хуками onMessage/onTimeout/onBrokersDown/onEof,
-     * зеркалящими колбэки {@see KafkaConsumer::consumeMatch()}; исключение
-     * из хука прерывает генератор. Так нештатные ситуации (например,
+     * {@see StreamObserver} — хуками onMessage/onTimeout/onBrokersDown/onEof;
+     * исключение из хука прерывает генератор. Так нештатные ситуации (например,
      * «вечная» потеря брокеров — {@see BrokersDownBudgetStreamObserver})
      * получают fail-fast реакцию, а управление — вызывающий код.
      *
@@ -64,8 +63,8 @@ final readonly class KafkaMessageStream
      * генератор бесконечен (для остановки нужно прервать цикл), полную
      * потерю брокеров переживает молча и самовосстанавливается, когда
      * librdkafka переподключится в фоновых потоках. Различать потерю
-     * брокеров и таймаут для метрик/watchdog'а используйте consume()/
-     * consumeMatch() напрямую.
+     * брокеров и таймаут для метрик/watchdog'а — задача наблюдателя
+     * ({@see BrokersDownBudgetStreamObserver} — готовый fail-fast вариант).
      *
      * @return \Generator<int, KafkaConsumerMessage> Генератор сообщений
      *

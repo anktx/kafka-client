@@ -79,9 +79,9 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
 
 8. **StreamObserver** (`src/StreamObserver/`)
    - Реакция на результаты consume() в потоке сообщений
-     (`KafkaMessageStream`): хуки `onMessage`/`onTimeout`/`onBrokersDown`/
-     `onEof` зеркалят колбэки `consumeMatch()`, вызываются по каждому
-     результату до yield; исключение из хука прерывает генератор
+      (`KafkaMessageStream`): хуки `onMessage`/`onTimeout`/`onBrokersDown`/
+      `onEof` вызываются по каждому результату до yield; исключение
+      из хука прерывает генератор
    - `SilentStreamObserver` — null-object, поглощает всё (дефолт,
      полная BC со старым поведением стрима)
    - `BrokersDownBudgetStreamObserver` — fail-fast бюджет

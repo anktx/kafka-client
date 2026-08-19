@@ -7,9 +7,7 @@ namespace Anktx\Kafka\Client\Tests\Integration\KafkaClasses;
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use Anktx\Kafka\Client\Config\ProducerConfig;
-use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
-use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
-use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
+use Anktx\Kafka\Client\ConsumeResult\ConsumeResult;
 use Anktx\Kafka\Client\Exception\Logic\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
@@ -140,39 +138,20 @@ final class KafkaConsumerTest extends TestCase
         self::assertInstanceOf(KafkaConsumer::class, $consumer);
     }
 
-    public function testConsumeMatch(): void
+    public function testConsume(): void
     {
         $consumer = new KafkaConsumer($this->consumerConfig());
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
-        $messageCalled = false;
-        $timeoutCalled = false;
-        $brokersDownCalled = false;
-        $eofCalled = false;
-
         try {
-            $consumer->consumeMatch(
-                onMessage: static function (KafkaConsumerMessage $msg) use (&$messageCalled): void {
-                    $messageCalled = true;
-                },
-                onTimeout: static function (KafkaConsumeTimeout $timeout) use (&$timeoutCalled): void {
-                    $timeoutCalled = true;
-                },
-                onBrokersDown: static function (KafkaBrokersDown $brokersDown) use (&$brokersDownCalled): void {
-                    $brokersDownCalled = true;
-                },
-                onEof: static function (KafkaPartitionEof $eof) use (&$eofCalled): void {
-                    $eofCalled = true;
-                },
-                timeoutMs: 100,
-            );
+            $result = $consumer->consume(timeoutMs: 100);
         } finally {
             $consumer->close();
         }
 
-        // Один из callback'ов обязан был сработать: пустой топик после
-        // auto-create отдаёт таймаут, конец партиции — EOF.
-        self::assertTrue($messageCalled || $timeoutCalled || $brokersDownCalled || $eofCalled);
+        // Пустой топик после auto-create отдаёт таймаут, конец партиции —
+        // EOF: contract consume() — любой из четырёх результатов union.
+        self::assertInstanceOf(ConsumeResult::class, $result);
     }
 
     /**

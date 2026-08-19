@@ -7,7 +7,6 @@ namespace Anktx\Kafka\Client\StreamObserver;
 use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
-use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\KafkaMessageStream;
 
@@ -15,8 +14,8 @@ use Anktx\Kafka\Client\KafkaMessageStream;
  * Реакция на результаты consume() в потоке сообщений
  * {@see KafkaMessageStream}.
  *
- * Хуки зеркалят колбэки {@see KafkaConsumer::consumeMatch()}
- * и вызываются по каждому результату до выдачи сообщения наружу:
+ * Хуки вызываются по каждому результату consume() до выдачи
+ * сообщения наружу:
  * обычный возврат — опрос продолжается, исключение — прерывает генератор
  * и становится наблюдаемым для воркера и супервизора (restart-политика
  * Docker, restartPolicy Kubernetes).
