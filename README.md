@@ -211,6 +211,9 @@ $consumer = new KafkaConsumer($config, logger: $logger);
 `ConsumeResult`):
 - `KafkaConsumerMessage` — успешно полученное сообщение
 - `KafkaConsumeTimeout` — таймаут (нет новых сообщений)
+- `KafkaBrokersDown` — полная потеря соединения со всеми брокерами
+  (ALL_BROKERS_DOWN): не ошибка — librdkafka переподключается в фоновых
+  потоках; отдельный результат для метрик и watchdog'ов
 - `KafkaPartitionEof` — достигнут конец партиции
 
 Пример обработки — `match` по классу даёт исчерпывающую диспетчеризацию
@@ -223,6 +226,7 @@ $result = $consumer->consume(1000);
 match ($result::class) {
     KafkaConsumerMessage::class => $consumer->commit($result),
     KafkaConsumeTimeout::class => null, // нет сообщений, можно продолжить работу
+    KafkaBrokersDown::class => null,    // все брокеры недоступны, librdkafka переподключается
     KafkaPartitionEof::class => null,   // достигнут конец партиции
 };
 ```
@@ -246,6 +250,7 @@ src/
 │       └── OffsetReset.php          # Стратегия сброса оффсета (earliest, latest, error)
 │
 ├── ConsumeResult/                   # Результаты консьюминга
+│   ├── KafkaBrokersDown.php        # Полная потеря всех брокеров (ALL_BROKERS_DOWN)
 │   ├── KafkaConsumeTimeout.php      # Таймаут (нет сообщений)
 │   └── KafkaPartitionEof.php        # Достигнут конец партиции
 │

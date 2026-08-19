@@ -35,7 +35,9 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
    - Подписка на топики через `TopicSubscription`/`TopicSubscriptionList`
    - Чтение сообщений через `consume()` с таймаутом
    - Ручной коммит обработанных сообщений через `commit()`
-   - Возврат union-типа `KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof`
+   - Возврат union-типа `KafkaConsumerMessage|KafkaConsumeTimeout|KafkaBrokersDown|KafkaPartitionEof`
+     (`KafkaBrokersDown` — полная потеря брокеров, различима с таймаутом
+     для метрик/watchdog'а; `KafkaMessageStream` фильтрует оба случая)
 
 4. **PollStrategy** (`src/PollStrategy/`)
    - Стратегии опроса очереди для оптимизации производительности

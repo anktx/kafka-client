@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client;
 
+use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -46,19 +47,21 @@ final readonly class KafkaMessageStream
      *
      * Метод фильтрует служебные результаты:
      * - {@see KafkaConsumeTimeout} игнорируется
+     * - {@see KafkaBrokersDown} игнорируется
      * - {@see KafkaPartitionEof} игнорируется
      * - {@see KafkaConsumerMessage} возвращается через yield
      *
      * Генератор бесконечен - для остановки нужно прервать цикл.
      *
-     * Полная потеря связи с брокерами намеренно неотличима от таймаута:
-     * {@see KafkaConsumer::consume()} возвращает KafkaConsumeTimeout и при
-     * RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN, поэтому генератор просто
+     * Полная потеря связи с брокерами не прерывает генератор:
+     * {@see KafkaConsumer::consume()} различает её (KafkaBrokersDown) и
+     * таймаут, но stream() намеренно фильтрует оба случая одинаково —
      * продолжает опрос (не дольше pollTimeoutMs на итерацию) и
      * самовосстанавливается, когда librdkafka переподключится в фоновых
-     * потоках. «Вечное» отсутствие брокеров через этот API не наблюдаемо —
-     * fail-fast контроль доступности (error-callback в логах, внешний
-     * таймаут итераций, health-check) выполняйте на уровне приложения.
+     * потоках. Различать их для метрик и watchdog'а используйте consume()/
+     * consumeMatch() напрямую; «вечное» отсутствие брокеров через поток
+     * не наблюдаемо — fail-fast контроль (внешний таймаут итераций,
+     * health-check) выполняйте на уровне приложения.
      *
      * @return \Generator<int, KafkaConsumerMessage> Генератор сообщений
      *
@@ -72,6 +75,7 @@ final readonly class KafkaMessageStream
             $message = $this->consumer->consumeMatch(
                 onMessage: static fn(KafkaConsumerMessage $msg): KafkaConsumerMessage => $msg,
                 onTimeout: static fn(): null => null,
+                onBrokersDown: static fn(): null => null,
                 onEof: static fn(): null => null,
                 timeoutMs: $this->pollTimeoutMs,
             );

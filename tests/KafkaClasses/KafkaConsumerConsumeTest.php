@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
+use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -22,9 +23,10 @@ use RdKafka\Message;
  * Юнит-тесты для {@see KafkaConsumer::consume()} на mock'е RdKafka\KafkaConsumer.
  *
  * Покрывают все ветки match: NO_ERROR, PARTITION_EOF, TIMED_OUT,
- * ALL_BROKERS_DOWN (как таймаут) и default (бросает исключение).
- * Регрессионный сценарий самовосстановления: consume() продолжает работать
- * после временной потери связи с брокером без перезапуска процесса.
+ * ALL_BROKERS_DOWN (отдельный результат KafkaBrokersDown) и default
+ * (бросает исключение). Регрессионный сценарий самовосстановления:
+ * consume() продолжает работать после временной потери связи с брокером
+ * без перезапуска процесса.
  */
 final class KafkaConsumerConsumeTest extends TestCase
 {
@@ -135,12 +137,13 @@ final class KafkaConsumerConsumeTest extends TestCase
         self::assertInstanceOf(KafkaConsumeTimeout::class, $result);
     }
 
-    public function testConsumeReturnsTimeoutForAllBrokersDownAndDoesNotThrow(): void
+    public function testConsumeReturnsBrokersDownForAllBrokersDownAndDoesNotThrow(): void
     {
         // При полной потере связи librdkafka возвращает RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN.
-        // Раньше это доходило до default arm match и бросало KafkaConsumerException.
-        // Теперь обрабатывается как таймаут, позволяя циклу потребления продолжаться
-        // и давая librdkafka прокачивать rebalance-протокол (JoinGroup/SyncGroup).
+        // Раньше это доходило до default arm match и бросало KafkaConsumerException,
+        // затем маскировалось под таймаут. Теперь — отдельный результат: наблюдаем
+        // для метрик/watchdog'а, но не бросает и позволяет циклу потребления
+        // продолжаться и librdkafka прокачивать rebalance-протокол (JoinGroup/SyncGroup).
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->expects($this->once())->method('consume')->willReturn(self::message([
@@ -154,14 +157,14 @@ final class KafkaConsumerConsumeTest extends TestCase
 
         $result = $consumer->consume(100);
 
-        self::assertInstanceOf(KafkaConsumeTimeout::class, $result);
+        self::assertInstanceOf(KafkaBrokersDown::class, $result);
     }
 
     #[AllowMockObjectsWithoutExpectations]
     public function testConsumeSelfHealsAfterBrokerRecovery(): void
     {
         // Ключевой сценарий самовосстановления:
-        // 1. Брокер недоступен → consume() возвращает ALL_BROKERS_DOWN (как таймаут)
+        // 1. Брокер недоступен → consume() возвращает KafkaBrokersDown
         // 2. Брокер восстановился → consume() возвращает сообщение
         // Процесс продолжает работать без перезапуска.
         $allBrokersDownMessage = self::message([
@@ -191,7 +194,7 @@ final class KafkaConsumerConsumeTest extends TestCase
 
         // Первая итерация: брокер недоступен — consume() работает, не бросает.
         $result1 = $consumer->consume(100);
-        self::assertInstanceOf(KafkaConsumeTimeout::class, $result1);
+        self::assertInstanceOf(KafkaBrokersDown::class, $result1);
 
         // Вторая итерация: брокер восстановился — сообщение получено.
         $result2 = $consumer->consume(100);

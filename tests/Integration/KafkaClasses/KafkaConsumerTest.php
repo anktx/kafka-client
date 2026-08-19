@@ -7,6 +7,7 @@ namespace Anktx\Kafka\Client\Tests\Integration\KafkaClasses;
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use Anktx\Kafka\Client\Config\ProducerConfig;
+use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Logic\EmptySubscriptionsException;
@@ -146,6 +147,7 @@ final class KafkaConsumerTest extends TestCase
 
         $messageCalled = false;
         $timeoutCalled = false;
+        $brokersDownCalled = false;
         $eofCalled = false;
 
         try {
@@ -155,6 +157,9 @@ final class KafkaConsumerTest extends TestCase
                 },
                 onTimeout: static function (KafkaConsumeTimeout $timeout) use (&$timeoutCalled): void {
                     $timeoutCalled = true;
+                },
+                onBrokersDown: static function (KafkaBrokersDown $brokersDown) use (&$brokersDownCalled): void {
+                    $brokersDownCalled = true;
                 },
                 onEof: static function (KafkaPartitionEof $eof) use (&$eofCalled): void {
                     $eofCalled = true;
@@ -167,7 +172,7 @@ final class KafkaConsumerTest extends TestCase
 
         // Один из callback'ов обязан был сработать: пустой топик после
         // auto-create отдаёт таймаут, конец партиции — EOF.
-        self::assertTrue($messageCalled || $timeoutCalled || $eofCalled);
+        self::assertTrue($messageCalled || $timeoutCalled || $brokersDownCalled || $eofCalled);
     }
 
     /**

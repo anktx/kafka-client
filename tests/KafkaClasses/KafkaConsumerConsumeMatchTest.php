@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
+use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
@@ -45,6 +46,7 @@ final class KafkaConsumerConsumeMatchTest extends TestCase
         $result = $this->buildConsumer($rdKafka)->consumeMatch(
             onMessage: static fn(KafkaConsumerMessage $message): string => $message->body ?? 'null-body',
             onTimeout: static fn(KafkaConsumeTimeout $_): string => 'timeout',
+            onBrokersDown: static fn(KafkaBrokersDown $_): string => 'brokers-down',
             onEof: static fn(KafkaPartitionEof $_): string => 'eof',
             timeoutMs: 150,
         );
@@ -68,10 +70,34 @@ final class KafkaConsumerConsumeMatchTest extends TestCase
         $result = $this->buildConsumer($rdKafka)->consumeMatch(
             onMessage: static fn(KafkaConsumerMessage $_): string => 'message',
             onTimeout: static fn(KafkaConsumeTimeout $timeout): string => $timeout::class,
+            onBrokersDown: static fn(KafkaBrokersDown $_): string => 'brokers-down',
             onEof: static fn(KafkaPartitionEof $_): string => 'eof',
         );
 
         self::assertSame(KafkaConsumeTimeout::class, $result);
+    }
+
+    public function testConsumeMatchPassesBrokersDownResultToOnBrokersDown(): void
+    {
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
+        $rdKafka->expects($this->once())
+            ->method('consume')
+            ->willReturn(self::message([
+                'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
+                'partition' => -1,
+                'offset' => -1,
+            ]))
+        ;
+
+        $result = $this->buildConsumer($rdKafka)->consumeMatch(
+            onMessage: static fn(KafkaConsumerMessage $_): string => 'message',
+            onTimeout: static fn(KafkaConsumeTimeout $_): string => 'timeout',
+            onBrokersDown: static fn(KafkaBrokersDown $brokersDown): string => $brokersDown::class,
+            onEof: static fn(KafkaPartitionEof $_): string => 'eof',
+        );
+
+        self::assertSame(KafkaBrokersDown::class, $result);
     }
 
     public function testConsumeMatchPassesPartitionEofResultToOnEof(): void
@@ -91,6 +117,7 @@ final class KafkaConsumerConsumeMatchTest extends TestCase
         $result = $this->buildConsumer($rdKafka)->consumeMatch(
             onMessage: static fn(KafkaConsumerMessage $_): string => 'message',
             onTimeout: static fn(KafkaConsumeTimeout $_): string => 'timeout',
+            onBrokersDown: static fn(KafkaBrokersDown $_): string => 'brokers-down',
             onEof: static fn(KafkaPartitionEof $eof): string => \sprintf('%s:%d:%d', $eof->topic, $eof->partition, $eof->offset),
         );
 
@@ -116,6 +143,7 @@ final class KafkaConsumerConsumeMatchTest extends TestCase
         $result = $this->buildConsumer($rdKafka)->consumeMatch(
             onMessage: static fn(KafkaConsumerMessage $_): string => 'message',
             onTimeout: static fn(KafkaConsumeTimeout $_): string => 'timeout',
+            onBrokersDown: static fn(KafkaBrokersDown $_): string => 'brokers-down',
             onEof: static fn(KafkaPartitionEof $_): string => 'eof',
         );
 
@@ -133,6 +161,7 @@ final class KafkaConsumerConsumeMatchTest extends TestCase
         $this->buildConsumer($rdKafka)->consumeMatch(
             onMessage: static fn(KafkaConsumerMessage $_): string => 'message',
             onTimeout: static fn(KafkaConsumeTimeout $_): string => 'timeout',
+            onBrokersDown: static fn(KafkaBrokersDown $_): string => 'brokers-down',
             onEof: static fn(KafkaPartitionEof $_): string => 'eof',
         );
     }

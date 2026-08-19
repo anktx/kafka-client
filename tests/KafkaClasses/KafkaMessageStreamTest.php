@@ -21,27 +21,33 @@ use RdKafka\Message;
  * RdKafka\KafkaConsumer — ровно та цепочка stream() → consumeMatch() →
  * consume(), что раньше была закрыта только integration-тестами.
  *
- * Фиксируется контракт: таймауты и EOF не выдаются наружу (poll
- * продолжается), сообщения yield'ятся с последовательными int-ключами,
- * таймаут опроса пробрасывается в consume(), исключения консьюмера
- * пробрасываются из генератора при первой итерации, закрытый консьюмер
- * отвергается ClientClosedException до единого вызова RdKafka.
+ * Фиксируется контракт: таймауты, потеря брокеров и EOF не выдаются
+ * наружу (poll продолжается), сообщения yield'ятся с последовательными
+ * int-ключами, таймаут опроса пробрасывается в consume(), исключения
+ * консьюмера пробрасываются из генератора при первой итерации, закрытый
+ * консьюмер отвергается ClientClosedException до единого вызова RdKafka.
  */
 final class KafkaMessageStreamTest extends TestCase
 {
-    public function testStreamYieldsOnlyMessagesSkippingTimeoutAndEof(): void
+    public function testStreamYieldsOnlyMessagesSkippingTimeoutBrokersDownAndEof(): void
     {
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
-        // 2 служебных результата (timeout, EOF) между сообщениями: poll
-        // продолжается, и на два выданных сообщения приходится 4 consume().
-        $rdKafka->expects($this->exactly(4))
+        // 3 служебных результата (timeout, ALL_BROKERS_DOWN, EOF) между
+        // сообщениями: poll продолжается, и на два выданных сообщения
+        // приходится 5 consume(). Потеря брокеров фильтруется как таймаут.
+        $rdKafka->expects($this->exactly(5))
             ->method('consume')
             ->willReturnOnConsecutiveCalls(
                 self::message([
                     'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
                     'partition' => 0,
                     'offset' => 0,
+                ]),
+                self::message([
+                    'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
+                    'partition' => -1,
+                    'offset' => -1,
                 ]),
                 self::message([
                     'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,

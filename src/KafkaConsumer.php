@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client;
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
+use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -166,9 +167,12 @@ final class KafkaConsumer
      *
      * Возможные результаты:
      * - {@see KafkaConsumerMessage} - сообщение;
-     * - {@see KafkaConsumeTimeout} - таймаут; сюда же попадает полная потеря
-     *   связи с брокерами (ALL_BROKERS_DOWN): переподключение librdkafka
-     *   продолжает в фоновых потоках;
+     * - {@see KafkaConsumeTimeout} - таймаут (за окно опроса не пришло
+     *   сообщений);
+     * - {@see KafkaBrokersDown} - полная потеря соединения со всеми
+     *   брокерами (ALL_BROKERS_DOWN): не ошибка, переподключение librdkafka
+     *   продолжает в фоновых потоках; «вечная» ли потеря — изнутри клиента
+     *   неопределимо, порог ожидания определяет вызывающий код;
      * - {@see KafkaPartitionEof} - достигнут конец партиции.
      *
      * Чтение всегда делегируется librdkafka: через consume() также доставляются
@@ -179,13 +183,13 @@ final class KafkaConsumer
      *
      * @param int $timeoutMs Таймаут ожидания в миллисекундах
      *
-     * @return KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат чтения
+     * @return KafkaBrokersDown|KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат чтения
      *
      * @throws ClientClosedException  Если консьюмер закрыт через close()
      * @throws NotSubscribedException Если консьюмер не подписан на топики
      * @throws KafkaConsumerException Если чтение завершилось ошибкой
      */
-    public function consume(int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
+    public function consume(int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS): KafkaBrokersDown|KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
     {
         $this->assertNotClosed(__METHOD__);
 
@@ -239,7 +243,9 @@ final class KafkaConsumer
                 offset: $message->offset,
             ),
 
-            \RD_KAFKA_RESP_ERR__TIMED_OUT, \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN => new KafkaConsumeTimeout(),
+            \RD_KAFKA_RESP_ERR__TIMED_OUT => new KafkaConsumeTimeout(),
+
+            \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN => new KafkaBrokersDown(),
 
             default => $this->throwOnUnrecognizedConsumeError($message),
         };
@@ -248,10 +254,11 @@ final class KafkaConsumer
     /**
      * Читает сообщение и передаёт его в callback, соответствующий типу результата.
      *
-     * @param \Closure(KafkaConsumerMessage): mixed $onMessage Обработчик сообщения
-     * @param \Closure(KafkaConsumeTimeout): mixed  $onTimeout Обработчик таймаута
-     * @param \Closure(KafkaPartitionEof): mixed    $onEof     Обработчик конца партиции
-     * @param int                                   $timeoutMs Таймаут ожидания в миллисекундах
+     * @param \Closure(KafkaConsumerMessage): mixed $onMessage     Обработчик сообщения
+     * @param \Closure(KafkaConsumeTimeout): mixed  $onTimeout     Обработчик таймаута
+     * @param \Closure(KafkaBrokersDown): mixed     $onBrokersDown Обработчик потери всех брокеров
+     * @param \Closure(KafkaPartitionEof): mixed    $onEof         Обработчик конца партиции
+     * @param int                                   $timeoutMs     Таймаут ожидания в миллисекундах
      *
      * @return mixed Значение, возвращённое сработавшим callback'ом
      *
@@ -262,6 +269,7 @@ final class KafkaConsumer
     public function consumeMatch(
         \Closure $onMessage,
         \Closure $onTimeout,
+        \Closure $onBrokersDown,
         \Closure $onEof,
         int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS,
     ): mixed {
@@ -270,6 +278,7 @@ final class KafkaConsumer
         return match ($result::class) {
             KafkaConsumerMessage::class => $onMessage($result),
             KafkaConsumeTimeout::class => $onTimeout($result),
+            KafkaBrokersDown::class => $onBrokersDown($result),
             KafkaPartitionEof::class => $onEof($result),
         };
     }

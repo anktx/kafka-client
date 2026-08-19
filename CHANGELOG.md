@@ -5,6 +5,25 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 и этот проект следует [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [Unreleased]
+
+### Added
+
+- `KafkaBrokersDown` — четвёртый результат `consume()`: полная потеря
+  соединения со всеми брокерами (ALL_BROKERS_DOWN) больше не маскируется
+  под `KafkaConsumeTimeout` и наблюдаема напрямую для метрик и watchdog'ов
+  (счётчик подряд идущих результатов, порог остановки). Не ошибка:
+  librdkafka продолжает переподключение в фоне. `KafkaMessageStream`
+  поведение не изменил — фильтрует `KafkaBrokersDown` так же, как таймаут.
+
+### Changed
+
+- **BC:** `KafkaConsumer::consume()` расширил возвращаемый union
+  (`…|KafkaBrokersDown|…`), `consumeMatch()` получил обязательный
+  callback `onBrokersDown`. Пользовательские исчерпывающие `match` по
+  результату и вызовы `consumeMatch()` без `onBrokersDown` нужно
+  дополнить новой веткой/аргументом.
+
 ## [0.9.0] - 2026-08-20
 
 ### Added
