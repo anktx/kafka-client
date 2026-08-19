@@ -258,6 +258,10 @@ src/
 │   ├── KafkaConsumerMessage.php     # Сообщение консьюмера (topic/partition/offset обязательны)
 │   └── KafkaProducerMessage.php     # Сообщение продюсера (валидация в конструкторе)
 │
+├── Log/                             # Логирование
+│   ├── RdKafkaCallbacks.php         # Колбэки librdkafka + единая политика логирования в PSR-3
+│   └── RdKafkaLogLevel.php          # Маппинг syslog-severity librdkafka в уровни PSR-3
+│
 ├── PollStrategy/                    # Стратегии опроса очереди
 │   ├── PollStrategy.php             # Интерфейс стратегии
 │   ├── NeverPollStrategy.php        # Не вызывать poll()

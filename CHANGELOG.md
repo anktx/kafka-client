@@ -12,19 +12,23 @@
 - `CompressionType::None` (`compression.type=none`): типизированный API
   теперь позволяет отключить сжатие сообщений продюсера (до этого enum
   содержал только компрессирующие кодеки).
-
-### Fixed
-
-- `OffsetReset` с политикой «без сброса» передавал в librdkafka значение
-  `none`, которое тот не принимает (`Invalid value "none" for configuration
-  property "auto.offset.reset"`) — любой `ConsumerConfig` с этим кейсом
-  бросал `InvalidConfigException` из `asKafkaConfig()`. Кейс `none`
-  (бэкинг `'none'`) заменён на `Error = 'error'` — каноничное имя
-  librdkafka для этой политики (в терминологии Kafka-протокола — `none`):
-  при отсутствии валидного закоммиченного смещения партиция уходит в
-  ошибку `RD_KAFKA_RESP_ERR__AUTO_OFFSET_RESET`, и `consume()` бросает
-  `KafkaConsumerException` вместо молчаливого сброса; поведение
-  `earliest`/`latest` не изменилось.
+- Маркерный интерфейс `ConsumeResult`: три результата `consume()` получили
+  общий supertype для хелперов, логгеров и метрик. Сигнатура `consume()` не
+  изменилась: точный union остаётся единственным словарём вариантов —
+  дискриминация через `match ($result::class)`/`instanceof` (параллельный
+  enum-дискриминатор `kind()` в релиз не вошёл: вызовов в библиотеке у него
+  не было, а список вариантов дублировал). Соответствие union ↔ реализации
+  интерфейса фиксируется рефлексионным тестом без дублирования списка.
+- Жизненный цикл закрытия консьюмера: повторный `KafkaConsumer::close()` —
+  no-op (раньше делегировался в RdKafka повторно и падал), а
+  `subscribe()`/`unsubscribe()`/`consume()`/`commit()` после закрытия
+  бросают новый `ClientClosedException` до любых обращений к RdKafka —
+  вместо утекающего из ext-rdkafka голого `\Exception` с вводящим в
+  заблуждение сообщением. Ошибки `RdKafka\KafkaConsumer::close()`
+  оборачиваются в `KafkaConsumerException` (подробнее —
+  docs/lifecycle.md).
+- Валидация `ConsumerConfig::$instanceId`: пустая строка отвергается
+  `InvalidConfigException` (раньше молча уходила в `group.instance.id`).
 
 ### Changed
 
@@ -139,28 +143,18 @@
   падают при сбоях; `group.instance.id` уникальны per-test (фикс фенсинга
   статических членов между тестами).
 
-### Added
-
-- Маркерный интерфейс `ConsumeResult`: три результата `consume()` получили
-  общий supertype для хелперов, логгеров и метрик. Сигнатура `consume()` не
-  изменилась: точный union остаётся единственным словарём вариантов —
-  дискриминация через `match ($result::class)`/`instanceof` (параллельный
-  enum-дискриминатор `kind()` в релиз не вошёл: вызовов в библиотеке у него
-  не было, а список вариантов дублировал). Соответствие union ↔ реализации
-  интерфейса фиксируется рефлексионным тестом без дублирования списка.
-- Жизненный цикл закрытия консьюмера: повторный `KafkaConsumer::close()` —
-  no-op (раньше делегировался в RdKafka повторно и падал), а
-  `subscribe()`/`unsubscribe()`/`consume()`/`commit()` после закрытия
-  бросают новый `ClientClosedException` до любых обращений к RdKafka —
-  вместо утекающего из ext-rdkafka голого `\Exception` с вводящим в
-  заблуждение сообщением. Ошибки `RdKafka\KafkaConsumer::close()`
-  оборачиваются в `KafkaConsumerException` (подробнее —
-  docs/lifecycle.md).
-- Валидация `ConsumerConfig::$instanceId`: пустая строка отвергается
-  `InvalidConfigException` (раньше молча уходила в `group.instance.id`).
-
 ### Fixed
 
+- `OffsetReset` с политикой «без сброса» передавал в librdkafka значение
+  `none`, которое тот не принимает (`Invalid value "none" for configuration
+  property "auto.offset.reset"`) — любой `ConsumerConfig` с этим кейсом
+  бросал `InvalidConfigException` из `asKafkaConfig()`. Кейс `none`
+  (бэкинг `'none'`) заменён на `Error = 'error'` — каноничное имя
+  librdkafka для этой политики (в терминологии Kafka-протокола — `none`):
+  при отсутствии валидного закоммиченного смещения партиция уходит в
+  ошибку `RD_KAFKA_RESP_ERR__AUTO_OFFSET_RESET`, и `consume()` бросает
+  `KafkaConsumerException` вместо молчаливого сброса; поведение
+  `earliest`/`latest` не изменилось.
 - Busy-loop в `KafkaProducer::produce()`: drain очереди delivery-report'ов
   (`while (getOutQLen() > 0) { poll(0); }`) при недоступных брокерах крутился
   на 100% CPU до `message.timeout.ms` (5 минут) — теперь бюджет

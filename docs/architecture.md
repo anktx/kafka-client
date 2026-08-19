@@ -66,6 +66,14 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
      `consume()`; соответствие union ↔ реализаций интерфейса закреплено
      рефлексионным тестом (список вариантов не дублируется)
 
+7. **Логирование** (`src/Log/`)
+   - `RdKafkaCallbacks` — колбэки librdkafka (`setLogCb`/`setErrorCb`/
+     `setDrMsgCb`) и единая политика их логирования в PSR-3; общая точка
+     переиспользования для продюсера и консьюмера (клиенты навешивают
+     колбэки на `RdKafka\Conf` в конструкторах через attach-методы)
+   - `RdKafkaLogLevel` — маппинг syslog-severity librdkafka (0–7)
+     в строковые уровни PSR-3
+
 ## Ключевые паттерны проектирования
 
 - **Immutable Value Objects**: конфигурационные классы — readonly, без сеттеров
