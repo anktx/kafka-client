@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\Config;
 
 use Anktx\Kafka\Client\Config\Enum\CompressionType;
+use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
 use RdKafka\Conf;
 
 final readonly class ProducerConfig
@@ -16,7 +17,23 @@ final readonly class ProducerConfig
         public int $lingerMs = 10,
         public CompressionType $compressionType = CompressionType::snappy,
         public bool $isDebug = false,
-    ) {}
+    ) {
+        if ($this->brokers === '') {
+            throw InvalidConfigException::emptyString('brokers');
+        }
+
+        if ($this->queueBufferingMaxKBytes <= 0) {
+            throw InvalidConfigException::positiveInt('queueBufferingMaxKBytes', $this->queueBufferingMaxKBytes);
+        }
+
+        if ($this->batchSize <= 0) {
+            throw InvalidConfigException::positiveInt('batchSize', $this->batchSize);
+        }
+
+        if ($this->lingerMs < 0) {
+            throw InvalidConfigException::nonNegativeInt('lingerMs', $this->lingerMs);
+        }
+    }
 
     public function asKafkaConfig(): Conf
     {

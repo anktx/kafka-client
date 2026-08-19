@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\Config;
 
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
+use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
 use RdKafka\Conf;
 
 final readonly class ConsumerConfig
@@ -20,7 +21,37 @@ final readonly class ConsumerConfig
         public ?int $reconnectBackoffMaxMs = null,
         public bool $socketKeepaliveEnable = true,
         public bool $isDebug = false,
-    ) {}
+    ) {
+        if ($this->brokers === '') {
+            throw InvalidConfigException::emptyString('brokers');
+        }
+
+        if ($this->groupId === '') {
+            throw InvalidConfigException::emptyString('groupId');
+        }
+
+        if ($this->autoCommitMs !== null && $this->autoCommitMs < 0) {
+            throw InvalidConfigException::nonNegativeInt('autoCommitMs', $this->autoCommitMs);
+        }
+
+        if ($this->sessionTimeoutMs !== null && $this->sessionTimeoutMs <= 0) {
+            throw InvalidConfigException::positiveInt('sessionTimeoutMs', $this->sessionTimeoutMs);
+        }
+
+        if ($this->reconnectBackoffMs !== null && $this->reconnectBackoffMs < 0) {
+            throw InvalidConfigException::nonNegativeInt('reconnectBackoffMs', $this->reconnectBackoffMs);
+        }
+
+        if ($this->reconnectBackoffMaxMs !== null && $this->reconnectBackoffMaxMs < 0) {
+            throw InvalidConfigException::nonNegativeInt('reconnectBackoffMaxMs', $this->reconnectBackoffMaxMs);
+        }
+
+        if ($this->reconnectBackoffMs !== null && $this->reconnectBackoffMaxMs !== null
+            && $this->reconnectBackoffMaxMs < $this->reconnectBackoffMs
+        ) {
+            throw InvalidConfigException::backoffRange($this->reconnectBackoffMs, $this->reconnectBackoffMaxMs);
+        }
+    }
 
     public function asKafkaConfig(): Conf
     {

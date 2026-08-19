@@ -6,6 +6,8 @@ namespace Anktx\Kafka\Client\Tests\Config;
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
+use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
+use Anktx\Kafka\Client\Exception\Kafka\KafkaException;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Conf;
 
@@ -217,5 +219,97 @@ final class ConsumerConfigTest extends TestCase
 
         self::assertSame('50', $dump['reconnect.backoff.ms']);
         self::assertSame('5000', $dump['reconnect.backoff.max.ms']);
+    }
+
+    public function testEmptyBrokersThrowsInvalidConfigException(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "brokers" must not be an empty string');
+
+        new ConsumerConfig(brokers: '', groupId: 'g');
+    }
+
+    public function testEmptyGroupIdThrowsInvalidConfigException(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "groupId" must not be an empty string');
+
+        new ConsumerConfig(brokers: 'kafka:9092', groupId: '');
+    }
+
+    public function testNegativeAutoCommitMsThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "autoCommitMs" must not be negative, -1 given');
+
+        new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', autoCommitMs: -1);
+    }
+
+    public function testZeroSessionTimeoutMsThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "sessionTimeoutMs" must be positive, 0 given');
+
+        new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', sessionTimeoutMs: 0);
+    }
+
+    public function testNegativeReconnectBackoffThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "reconnectBackoffMs" must not be negative, -5 given');
+
+        new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMs: -5);
+    }
+
+    public function testReconnectBackoffMaxLessThanMinThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage(
+            'Config parameter "reconnectBackoffMaxMs" (100) must not be less than "reconnectBackoffMs" (500)',
+        );
+
+        new ConsumerConfig(
+            brokers: 'kafka:9092',
+            groupId: 'g',
+            reconnectBackoffMs: 500,
+            reconnectBackoffMaxMs: 100,
+        );
+    }
+
+    public function testZeroAutoCommitMsIsValid(): void
+    {
+        // auto.commit.interval.ms = 0 — валидное значение (коммит после каждого сообщения).
+        $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', autoCommitMs: 0);
+
+        self::assertSame(0, $config->autoCommitMs);
+    }
+
+    public function testZeroReconnectBackoffMsIsValid(): void
+    {
+        $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMs: 0);
+
+        self::assertSame(0, $config->reconnectBackoffMs);
+    }
+
+    public function testReconnectBackoffMaxEqualToMinIsValid(): void
+    {
+        $config = new ConsumerConfig(
+            brokers: 'kafka:9092',
+            groupId: 'g',
+            reconnectBackoffMs: 500,
+            reconnectBackoffMaxMs: 500,
+        );
+
+        self::assertSame(500, $config->reconnectBackoffMaxMs);
+    }
+
+    public function testInvalidConfigExceptionIsCatchableAsKafkaException(): void
+    {
+        try {
+            new ConsumerConfig(brokers: '', groupId: 'g');
+            self::fail('Expected InvalidConfigException');
+        } catch (KafkaException $e) {
+            self::assertInstanceOf(InvalidConfigException::class, $e);
+        }
     }
 }

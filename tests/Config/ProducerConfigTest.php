@@ -6,6 +6,7 @@ namespace Anktx\Kafka\Client\Tests\Config;
 
 use Anktx\Kafka\Client\Config\Enum\CompressionType;
 use Anktx\Kafka\Client\Config\ProducerConfig;
+use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Conf;
 
@@ -157,5 +158,52 @@ final class ProducerConfigTest extends TestCase
         $kafkaConfig = $config->asKafkaConfig();
 
         self::assertInstanceOf(Conf::class, $kafkaConfig);
+    }
+
+    public function testEmptyBrokersThrowsInvalidConfigException(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "brokers" must not be an empty string');
+
+        new ProducerConfig('');
+    }
+
+    public function testZeroQueueBufferingMaxKBytesThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "queueBufferingMaxKBytes" must be positive, 0 given');
+
+        new ProducerConfig('kafka:9092', queueBufferingMaxKBytes: 0);
+    }
+
+    public function testZeroBatchSizeThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "batchSize" must be positive, 0 given');
+
+        new ProducerConfig('kafka:9092', batchSize: 0);
+    }
+
+    public function testNegativeBatchSizeThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "batchSize" must be positive, -1 given');
+
+        new ProducerConfig('kafka:9092', batchSize: -1);
+    }
+
+    public function testNegativeLingerMsThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "lingerMs" must not be negative, -10 given');
+
+        new ProducerConfig('kafka:9092', lingerMs: -10);
+    }
+
+    public function testZeroLingerMsIsValid(): void
+    {
+        $config = new ProducerConfig('kafka:9092', lingerMs: 0);
+
+        self::assertSame(0, $config->lingerMs);
     }
 }
