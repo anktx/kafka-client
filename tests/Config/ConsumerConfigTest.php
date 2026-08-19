@@ -6,8 +6,8 @@ namespace Anktx\Kafka\Client\Tests\Config;
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
-use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
-use Anktx\Kafka\Client\Exception\Kafka\KafkaException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
+use Anktx\Kafka\Client\Exception\Logic\LogicException;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Conf;
 
@@ -91,7 +91,7 @@ final class ConsumerConfigTest extends TestCase
             $config->asKafkaConfig();
             self::fail('Expected InvalidConfigException');
         } catch (InvalidConfigException $e) {
-            self::assertInstanceOf(KafkaException::class, $e);
+            self::assertInstanceOf(LogicException::class, $e);
             self::assertStringContainsString('outside allowed range', $e->getMessage());
             self::assertSame(-1, $e->getCode());
         }
@@ -358,12 +358,12 @@ final class ConsumerConfigTest extends TestCase
         self::assertSame(500, $config->reconnectBackoffMaxMs);
     }
 
-    public function testInvalidConfigExceptionIsCatchableAsKafkaException(): void
+    public function testInvalidConfigExceptionIsCatchableAsLogicException(): void
     {
         try {
             new ConsumerConfig(brokers: '', groupId: 'g');
             self::fail('Expected InvalidConfigException');
-        } catch (KafkaException $e) {
+        } catch (LogicException $e) {
             self::assertInstanceOf(InvalidConfigException::class, $e);
         }
     }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Subscription;
 
-use Anktx\Kafka\Client\Exception\Business\InvalidSubscriptionException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidSubscriptionException;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
 use PHPUnit\Framework\TestCase;
 

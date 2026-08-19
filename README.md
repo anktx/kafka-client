@@ -211,9 +211,9 @@ src/
 │   └── KafkaPartitionEof.php        # Достигнут конец партиции
 │
 ├── Exception/                       # Исключения
-│   ├── Business/                    # Бизнес-логика
-│   ├── Kafka/                       # Ошибки Kafka
-│   └── Logic/                       # Логические ошибки
+│   ├── KafkaClientException.php     # Маркерный интерфейс всех исключений библиотеки
+│   ├── Kafka/                       # Сбои инфраструктуры Kafka (runtime)
+│   └── Logic/                       # Детерминированные ошибки программиста
 │
 ├── KafkaMessage/                    # Сообщения
 │   ├── AbstractMessage.php          # Базовый класс
@@ -237,24 +237,29 @@ src/
 
 ## Обработка исключений
 
-Библиотека использует иерархию исключений:
+Библиотека использует иерархию из двух семейств и маркерного интерфейса:
 
 ```
-Exception
-├── KafkaException                    # Ошибки Kafka (наследует RdKafka\Exception)
-│   ├── KafkaConnectionException      # Потеряно соединение
+KafkaClientException                 # Маркер: всё, что кидает библиотека (interface, extends \Throwable)
+├── KafkaException                   # Сбои Kafka/окружения (наследует RdKafka\Exception)
+│   ├── KafkaConnectionException      # Таймаут flush
 │   ├── KafkaConsumerException        # Ошибка консьюмера
-│   ├── KafkaProducerException        # Ошибка продюсера
-│   ├── KafkaUnavailableException     # Kafka недоступен дольше порога
-│   └── InvalidConfigException        # Невалидная конфигурация
-├── LogicException                    # Логические ошибки
-│   ├── ClientClosedException         # Операция после close() клиента
-│   ├── NotSubscribedException        # Не подписан на топики
-│   └── InvalidMessageException       # Сообщение без offset и т.п.
-└── BusinessException                 # Бизнес-логика
+│   └── KafkaProducerException        # Ошибка продюсера
+└── LogicException                   # Ошибки программиста (наследует \LogicException)
+    ├── ClientClosedException         # Операция после close() клиента
     ├── EmptySubscriptionsException   # Пустой список подписок
-    └── InvalidSubscriptionException  # Пустой topic в подписке
+    ├── InvalidConfigException        # Невалидная конфигурация или параметры
+    ├── InvalidMessageException       # Сообщение без offset и т.п.
+    ├── InvalidSubscriptionException  # Пустой topic в подписке
+    └── NotSubscribedException        # Не подписан на топики
 ```
+
+Точки поимки:
+- `catch (KafkaClientException)` — всё, что кидает библиотека;
+- `catch (KafkaException)` / `catch (RdKafka\Exception)` — только сбои Kafka,
+  без опечаток в конфиге;
+- `catch (\LogicException)` — детерминированные ошибки использования
+  (невалидный конфиг, неверный порядок вызовов).
 
 Пример обработки:
 
@@ -266,6 +271,8 @@ try {
     // Потеряно соединение с Kafka
 } catch (KafkaProducerException $e) {
     // Ошибка отправки сообщения
+} catch (KafkaClientException $e) {
+    // Всё остальное от библиотеки
 }
 ```
 

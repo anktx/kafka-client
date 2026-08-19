@@ -9,6 +9,21 @@
 
 ### Changed
 
+- **BC:** иерархия исключений переработана в два семейства + маркерный
+  интерфейс `Anktx\Kafka\Client\Exception\KafkaClientException`
+  (`extends \Throwable`), реализуемый обеими базами: один
+  `catch (KafkaClientException)` ловит всё, что кидает библиотека.
+  `InvalidConfigException` переехал из `Exception\Kafka` в `Exception\Logic`
+  и наследует `\LogicException`, а не `RdKafka\Exception` (все его throw-сайты
+  — валидация: опечатки в конфиге больше не ловятся как «Kafka упал»);
+  обёртка сбоев `Conf::set()` сохранена через
+  `InvalidConfigException::fromKafkaException()`. Ветка `Exception\Business`
+  удалена: `EmptySubscriptionsException` и `InvalidSubscriptionException`
+  переехали в `Exception\Logic` — та же природа ошибки, что у
+  `NotSubscribedException`.
+- **BC:** удалён `KafkaUnavailableException`: с версии 0.7.0 не выбрасывался
+  нигде (`consume()` при `RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN` возвращает
+  `KafkaConsumeTimeout`), класс удерживался только ради обратной совместимости.
 - **BC:** `KafkaProducer::flush()` переписан как retry-цикл с суммарным
   дедлайном `$timeoutMs`: транзитный `RD_KAFKA_RESP_ERR__TIMED_OUT` от
   отдельного вызова `RdKafka\Producer::flush()` больше не превращается сразу

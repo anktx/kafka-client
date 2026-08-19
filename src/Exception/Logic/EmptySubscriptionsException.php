@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Anktx\Kafka\Client\Exception\Business;
+namespace Anktx\Kafka\Client\Exception\Logic;
 
-final class EmptySubscriptionsException extends BusinessException
+final class EmptySubscriptionsException extends LogicException
 {
     public static function create(): self
     {

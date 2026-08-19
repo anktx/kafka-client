@@ -44,9 +44,14 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
    - `ProbabilityPollStrategy` — опрос с заданной вероятностью (инъекция `\Random\Randomizer`)
 
 5. **Исключения** (`src/Exception/`)
-   - Иерархия исключений для разных сценариев ошибок
+   - Два семейства по природе сбоя: `Kafka\` — рантайм-сбои инфраструктуры
+     (база наследует `RdKafka\Exception`), `Logic\` — детерминированные
+     ошибки программиста (база наследует `\LogicException`: невалидный
+     конфиг, неверное использование API, пустые подписки)
+   - Маркерный интерфейс `KafkaClientException` (`extends \Throwable`)
+     реализован обеими базами — единая точка поимки всех исключений
+     библиотеки одним catch
    - Статические factory-методы (например, `KafkaException::fromKafkaException()`)
-   - Чёткое разделение на Business / Kafka / Logic exceptions
 
 6. **ConsumeResult** (`src/ConsumeResult/`)
    - Union-типы для разных результатов потребления

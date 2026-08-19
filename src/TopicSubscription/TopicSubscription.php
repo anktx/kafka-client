@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\TopicSubscription;
 
-use Anktx\Kafka\Client\Exception\Business\InvalidSubscriptionException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidSubscriptionException;
 
 /**
  * Подписка на топик в составе consumer group.

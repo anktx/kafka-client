@@ -6,8 +6,8 @@ namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
-use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
+use Anktx\Kafka\Client\Exception\Logic\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;

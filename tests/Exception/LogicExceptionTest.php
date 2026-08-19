@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\Tests\Exception;
 
 use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
+use Anktx\Kafka\Client\Exception\Logic\EmptySubscriptionsException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidSubscriptionException;
 use Anktx\Kafka\Client\Exception\Logic\LogicException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use PHPUnit\Framework\TestCase;
@@ -63,5 +65,48 @@ final class LogicExceptionTest extends TestCase
     public function testClientClosedExceptionIsLogicException(): void
     {
         self::assertInstanceOf(\LogicException::class, ClientClosedException::forMethod('flush'));
+    }
+
+    public function testEmptySubscriptionsExceptionCreate(): void
+    {
+        $exception = EmptySubscriptionsException::create();
+
+        self::assertInstanceOf(LogicException::class, $exception);
+        self::assertInstanceOf(EmptySubscriptionsException::class, $exception);
+        self::assertSame('At least one subscription is required', $exception->getMessage());
+    }
+
+    public function testEmptySubscriptionsExceptionIsLogicException(): void
+    {
+        self::assertInstanceOf(\LogicException::class, new EmptySubscriptionsException('Test'));
+    }
+
+    public function testEmptySubscriptionsExceptionWithCode(): void
+    {
+        $exception = new EmptySubscriptionsException('No subscriptions', 100);
+
+        self::assertSame(100, $exception->getCode());
+    }
+
+    public function testEmptySubscriptionsExceptionWithPrevious(): void
+    {
+        $previous = new \Exception('Previous error');
+        $exception = new EmptySubscriptionsException('Test', 0, $previous);
+
+        self::assertSame($previous, $exception->getPrevious());
+    }
+
+    public function testInvalidSubscriptionExceptionEmptyTopic(): void
+    {
+        $exception = InvalidSubscriptionException::emptyTopic();
+
+        self::assertInstanceOf(LogicException::class, $exception);
+        self::assertInstanceOf(InvalidSubscriptionException::class, $exception);
+        self::assertSame('Subscription topic must not be an empty string', $exception->getMessage());
+    }
+
+    public function testInvalidSubscriptionExceptionIsLogicException(): void
+    {
+        self::assertInstanceOf(\LogicException::class, InvalidSubscriptionException::emptyTopic());
     }
 }

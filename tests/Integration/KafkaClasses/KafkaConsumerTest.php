@@ -9,7 +9,7 @@ use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
-use Anktx\Kafka\Client\Exception\Business\EmptySubscriptionsException;
+use Anktx\Kafka\Client\Exception\Logic\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;

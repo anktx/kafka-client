@@ -2,10 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Anktx\Kafka\Client\Exception\Kafka;
+namespace Anktx\Kafka\Client\Exception\Logic;
 
-final class InvalidConfigException extends KafkaException
+use RdKafka\Exception;
+
+final class InvalidConfigException extends LogicException
 {
+    public static function fromKafkaException(Exception $e): self
+    {
+        return new self($e->getMessage(), $e->getCode(), $e);
+    }
+
     public static function emptyString(string $parameter): self
     {
         return new self(\sprintf('Config parameter "%s" must not be an empty string', $parameter));

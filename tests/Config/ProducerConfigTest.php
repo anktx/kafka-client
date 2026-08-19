@@ -6,7 +6,7 @@ namespace Anktx\Kafka\Client\Tests\Config;
 
 use Anktx\Kafka\Client\Config\Enum\CompressionType;
 use Anktx\Kafka\Client\Config\ProducerConfig;
-use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Conf;
 

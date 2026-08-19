@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Exception\Kafka;
 
+use Anktx\Kafka\Client\Exception\KafkaClientException;
 use RdKafka\Exception;
 
-abstract class KafkaException extends Exception
+abstract class KafkaException extends Exception implements KafkaClientException
 {
     final public function __construct(string $message = '', int $code = 0, ?\Throwable $previous = null)
     {

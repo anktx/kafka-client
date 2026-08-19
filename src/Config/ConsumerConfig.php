@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\Config;
 
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
-use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use RdKafka\Conf;
 use RdKafka\Exception;
 

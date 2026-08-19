@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client;
 
 use Anktx\Kafka\Client\Config\ProducerConfig;
-use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
 use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Exception\Logic;
 
-abstract class LogicException extends \LogicException
+use Anktx\Kafka\Client\Exception\KafkaClientException;
+
+abstract class LogicException extends \LogicException implements KafkaClientException
 {
     final public function __construct(string $message = '', int $code = 0, ?\Throwable $previous = null)
     {

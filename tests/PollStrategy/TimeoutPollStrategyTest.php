@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\PollStrategy;
 
-use Anktx\Kafka\Client\Exception\Kafka\InvalidConfigException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use Anktx\Kafka\Client\PollStrategy\TimeoutPollStrategy;
 use PHPUnit\Framework\TestCase;
 

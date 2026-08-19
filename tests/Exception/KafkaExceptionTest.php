@@ -8,7 +8,6 @@ use Anktx\Kafka\Client\Exception\Kafka\KafkaConnectionException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
-use Anktx\Kafka\Client\Exception\Kafka\KafkaUnavailableException;
 use PHPUnit\Framework\TestCase;
 
 final class KafkaExceptionTest extends TestCase
@@ -134,27 +133,5 @@ final class KafkaExceptionTest extends TestCase
         self::assertInstanceOf(KafkaException::class, $exception);
         self::assertInstanceOf(KafkaProducerException::class, $exception);
         self::assertSame('Flush failed: Err-123? (123)', $exception->getMessage());
-    }
-
-    public function testKafkaUnavailableException(): void
-    {
-        $exception = KafkaUnavailableException::create(30, 45.5);
-
-        self::assertInstanceOf(KafkaException::class, $exception);
-        self::assertInstanceOf(KafkaUnavailableException::class, $exception);
-        self::assertSame(
-            'Kafka has been unavailable for 45.5 seconds (threshold: 30 seconds)',
-            $exception->getMessage(),
-        );
-    }
-
-    public function testKafkaUnavailableExceptionRoundsActualSeconds(): void
-    {
-        $exception = KafkaUnavailableException::create(10, 12.3456);
-
-        self::assertSame(
-            'Kafka has been unavailable for 12.3 seconds (threshold: 10 seconds)',
-            $exception->getMessage(),
-        );
     }
 }
