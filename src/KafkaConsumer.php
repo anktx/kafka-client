@@ -181,7 +181,17 @@ final class KafkaConsumer
     {
         $this->assertNotClosed(__METHOD__);
 
-        if ($this->consumer->getSubscription() === []) {
+        try {
+            $subscription = $this->consumer->getSubscription();
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get subscription state', [
+                'error' => $e->getMessage(),
+            ]);
+
+            throw KafkaConsumerException::fromKafkaException($e);
+        }
+
+        if ($subscription === []) {
             $this->logger->warning('Attempted to consume without subscription');
 
             throw NotSubscribedException::create();

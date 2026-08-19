@@ -226,6 +226,32 @@ final class KafkaConsumerConsumeTest extends TestCase
     }
 
     #[AllowMockObjectsWithoutExpectations]
+    public function testConsumeWrapsGetSubscriptionFailure(): void
+    {
+        // getSubscription() вызывается до try-блока consume() и раньше
+        // не был защищён: сбой ext-rdkafka утекал как сырое RdKafka\Exception.
+        $logger = new InMemoryLogger();
+
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->method('getSubscription')
+            ->willThrowException(new Exception('subscription state unavailable'))
+        ;
+
+        $consumer = $this->buildConsumer($rdKafka, logger: $logger);
+
+        try {
+            $consumer->consume(100);
+            self::fail('Expected KafkaConsumerException');
+        } catch (KafkaConsumerException $e) {
+            self::assertSame('subscription state unavailable', $e->getMessage());
+        }
+
+        $errorRecords = $logger->findByMessage('Failed to get subscription state');
+        self::assertCount(1, $errorRecords);
+        self::assertSame('subscription state unavailable', $errorRecords[0]['context']['error']);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
     public function testCommitWithoutOffsetThrowsInvalidMessageException(): void
     {
         // Сообщение без offset нельзя закоммитить: commit() фиксировал бы
