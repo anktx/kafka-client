@@ -15,9 +15,8 @@ use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
-use RdKafka\Exception as RdKafkaException;
-use RdKafka\KafkaConsumer as RdKafkaConsumer;
-use RdKafka\Message as RdKafkaMessage;
+use RdKafka\Exception;
+use RdKafka\Message;
 
 /**
  * Юнит-тесты для {@see KafkaConsumer::consume()} на mock'е RdKafka\KafkaConsumer.
@@ -31,7 +30,7 @@ final class KafkaConsumerConsumeTest extends TestCase
 {
     public function testConsumeReturnsMessageForNoError(): void
     {
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->expects($this->once())->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
@@ -59,7 +58,7 @@ final class KafkaConsumerConsumeTest extends TestCase
     #[AllowMockObjectsWithoutExpectations]
     public function testConsumeReturnsPartitionEof(): void
     {
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,
@@ -82,7 +81,7 @@ final class KafkaConsumerConsumeTest extends TestCase
     #[AllowMockObjectsWithoutExpectations]
     public function testConsumeReturnsTimeout(): void
     {
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
@@ -104,7 +103,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         // Раньше это доходило до default arm match и бросало KafkaConsumerException.
         // Теперь обрабатывается как таймаут, позволяя циклу потребления продолжаться
         // и давая librdkafka прокачивать rebalance-протокол (JoinGroup/SyncGroup).
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->expects($this->once())->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
@@ -143,7 +142,7 @@ final class KafkaConsumerConsumeTest extends TestCase
             'timestamp' => 9999,
         ]);
 
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')
             ->willReturnOnConsecutiveCalls($allBrokersDownMessage, $recoveredMessage)
@@ -167,7 +166,7 @@ final class KafkaConsumerConsumeTest extends TestCase
     {
         $logger = new InMemoryLogger();
 
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__BAD_MSG,
@@ -196,10 +195,10 @@ final class KafkaConsumerConsumeTest extends TestCase
     {
         $logger = new InMemoryLogger();
 
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')
-            ->willThrowException(new RdKafkaException('transport failure'))
+            ->willThrowException(new Exception('transport failure'))
         ;
 
         $consumer = $this->buildConsumer($rdKafka, logger: $logger);
@@ -223,18 +222,18 @@ final class KafkaConsumerConsumeTest extends TestCase
     {
         $this->expectException(NotSubscribedException::class);
 
-        $this->buildConsumer($this->createMock(RdKafkaConsumer::class))->consume(100);
+        $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class))->consume(100);
     }
 
     #[AllowMockObjectsWithoutExpectations]
     public function testOnBrokerErrorLogsConnectionErrors(): void
     {
         $logger = new InMemoryLogger();
-        $consumer = $this->buildConsumer($this->createMock(RdKafkaConsumer::class), logger: $logger);
+        $consumer = $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class), logger: $logger);
 
         (new \ReflectionMethod($consumer, 'onBrokerError'))->invoke(
             $consumer,
-            $this->createMock(RdKafkaConsumer::class),
+            $this->createMock(\RdKafka\KafkaConsumer::class),
             \RD_KAFKA_RESP_ERR__TRANSPORT,
             'connection refused',
         );
@@ -249,11 +248,11 @@ final class KafkaConsumerConsumeTest extends TestCase
     public function testOnLogForwardsLibrdkafkaLogToLogger(): void
     {
         $logger = new InMemoryLogger();
-        $consumer = $this->buildConsumer($this->createMock(RdKafkaConsumer::class), logger: $logger);
+        $consumer = $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class), logger: $logger);
 
         (new \ReflectionMethod($consumer, 'onLog'))->invoke(
             $consumer,
-            $this->createMock(RdKafkaConsumer::class),
+            $this->createMock(\RdKafka\KafkaConsumer::class),
             3,
             'FETCH',
             'message fetched',
@@ -269,11 +268,11 @@ final class KafkaConsumerConsumeTest extends TestCase
     public function testOnBrokerErrorIgnoresNonConnectionErrors(): void
     {
         $logger = new InMemoryLogger();
-        $consumer = $this->buildConsumer($this->createMock(RdKafkaConsumer::class), logger: $logger);
+        $consumer = $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class), logger: $logger);
 
         (new \ReflectionMethod($consumer, 'onBrokerError'))->invoke(
             $consumer,
-            $this->createMock(RdKafkaConsumer::class),
+            $this->createMock(\RdKafka\KafkaConsumer::class),
             \RD_KAFKA_RESP_ERR__BAD_MSG,
             'bad message format',
         );
@@ -284,9 +283,9 @@ final class KafkaConsumerConsumeTest extends TestCase
     /**
      * @param array<string, mixed> $values
      */
-    private static function message(array $values): RdKafkaMessage
+    private static function message(array $values): Message
     {
-        $message = new RdKafkaMessage();
+        $message = new Message();
         foreach ($values as $name => $value) {
             $message->{$name} = $value;
         }
@@ -295,7 +294,7 @@ final class KafkaConsumerConsumeTest extends TestCase
     }
 
     private function buildConsumer(
-        RdKafkaConsumer $rdKafka,
+        \RdKafka\KafkaConsumer $rdKafka,
         ?InMemoryLogger $logger = null,
     ): KafkaConsumer {
         $consumer = (new \ReflectionClass(KafkaConsumer::class))->newInstanceWithoutConstructor();

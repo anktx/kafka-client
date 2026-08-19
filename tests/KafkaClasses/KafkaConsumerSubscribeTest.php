@@ -15,9 +15,8 @@ use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
-use RdKafka\Exception as RdKafkaException;
-use RdKafka\KafkaConsumer as RdKafkaConsumer;
-use RdKafka\Message as RdKafkaMessage;
+use RdKafka\Exception;
+use RdKafka\Message;
 
 /**
  * Юнит-тесты для {@see KafkaConsumer::subscribe()} на mock'е RdKafka\KafkaConsumer.
@@ -68,7 +67,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
 
     public function testSubscribeCallsRdKafkaSubscribeOnceAndNeverAssigns(): void
     {
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic']);
         $rdKafka->expects($this->never())->method('assign');
 
@@ -87,7 +86,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
             new TopicSubscription('test-topic', 2),
         );
 
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic']);
         $rdKafka->expects($this->never())->method('assign');
 
@@ -101,12 +100,12 @@ final class KafkaConsumerSubscribeTest extends TestCase
         // RdKafka::getSubscription() — иначе consume() бросит NotSubscribedException.
         $logger = new InMemoryLogger();
 
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic']);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->expects($this->never())->method('assign');
 
-        $timeoutMessage = new RdKafkaMessage();
+        $timeoutMessage = new Message();
         $timeoutMessage->err = \RD_KAFKA_RESP_ERR__TIMED_OUT;
         $timeoutMessage->partition = 0;
         $timeoutMessage->offset = 0;
@@ -131,9 +130,9 @@ final class KafkaConsumerSubscribeTest extends TestCase
     {
         $logger = new InMemoryLogger();
 
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('subscribe')
-            ->willThrowException(new RdKafkaException('broker down'))
+            ->willThrowException(new Exception('broker down'))
         ;
         $rdKafka->expects($this->never())->method('assign');
 
@@ -168,7 +167,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
     {
         $logger = new InMemoryLogger();
 
-        $rdKafka = $this->createMock(RdKafkaConsumer::class);
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->expects($this->never())->method('subscribe');
         $rdKafka->expects($this->never())->method('assign');
 
@@ -186,7 +185,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
     {
         $this->expectException(NotSubscribedException::class);
 
-        $this->buildConsumer($this->createMock(RdKafkaConsumer::class))->consume(100);
+        $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class))->consume(100);
     }
 
     /**
@@ -194,7 +193,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
      * подключения к брокерам) и инжектит mock RdKafka\KafkaConsumer в приватный
      * readonly-параметр.
      */
-    private function buildConsumer(RdKafkaConsumer $rdKafka, ?InMemoryLogger $logger = null): KafkaConsumer
+    private function buildConsumer(\RdKafka\KafkaConsumer $rdKafka, ?InMemoryLogger $logger = null): KafkaConsumer
     {
         $consumer = (new \ReflectionClass(KafkaConsumer::class))->newInstanceWithoutConstructor();
 

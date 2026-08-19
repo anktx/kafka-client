@@ -27,6 +27,8 @@ use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
  */
 final readonly class KafkaMessageStream
 {
+    private const int DEFAULT_POLL_TIMEOUT_MS = 1000;
+
     /**
      * Создаёт новый поток сообщений.
      *
@@ -35,7 +37,7 @@ final readonly class KafkaMessageStream
      */
     public function __construct(
         private KafkaConsumer $consumer,
-        private int $pollTimeoutMs = 1000,
+        private int $pollTimeoutMs = self::DEFAULT_POLL_TIMEOUT_MS,
     ) {}
 
     /**

@@ -67,7 +67,7 @@ final readonly class ConsumerConfig
 
     private function configureTimeouts(Conf $conf): void
     {
-        if ($this->sessionTimeoutMs) {
+        if ($this->sessionTimeoutMs !== null) {
             $conf->set('session.timeout.ms', (string) $this->sessionTimeoutMs);
         }
     }

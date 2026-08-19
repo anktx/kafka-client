@@ -15,7 +15,7 @@ use Anktx\Kafka\Client\Log\LibrdkafkaLogLevel;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use RdKafka\Exception as RdKafkaException;
+use RdKafka\Exception;
 use RdKafka\Message;
 use RdKafka\TopicPartition;
 
@@ -29,6 +29,8 @@ use RdKafka\TopicPartition;
  */
 final readonly class KafkaConsumer
 {
+    private const int DEFAULT_CONSUME_TIMEOUT_MS = 1000;
+
     /**
      * Коды ошибок librdkafka, означающие потерю соединения с брокерами.
      *
@@ -101,7 +103,7 @@ final readonly class KafkaConsumer
 
         try {
             $this->consumer->subscribe($subscriptionList->topicNames());
-        } catch (RdKafkaException $e) {
+        } catch (Exception $e) {
             $this->logger->error('Failed to subscribe to topics', [
                 'topics' => $subscriptionList->topicNames(),
                 'subscriptions' => array_map(static fn($s) => [
@@ -129,7 +131,7 @@ final readonly class KafkaConsumer
     {
         try {
             $this->consumer->unsubscribe();
-        } catch (RdKafkaException $e) {
+        } catch (Exception $e) {
             $this->logger->error('Failed to unsubscribe', [
                 'error' => $e->getMessage(),
             ]);
@@ -163,7 +165,7 @@ final readonly class KafkaConsumer
      * @throws NotSubscribedException Если консьюмер не подписан на топики
      * @throws KafkaConsumerException Если чтение завершилось ошибкой
      */
-    public function consume(int $timeoutMs = 1000): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
+    public function consume(int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
     {
         if ($this->consumer->getSubscription() === []) {
             $this->logger->warning('Attempted to consume without subscription');
@@ -173,7 +175,7 @@ final readonly class KafkaConsumer
 
         try {
             $message = $this->consumer->consume($timeoutMs);
-        } catch (RdKafkaException $e) {
+        } catch (Exception $e) {
             $this->logger->error('Failed to consume message', [
                 'timeout_ms' => $timeoutMs,
                 'error' => $e->getMessage(),
@@ -182,7 +184,7 @@ final readonly class KafkaConsumer
             throw KafkaConsumerException::fromKafkaException($e);
         }
 
-        $result = match ($message->err) {
+        return match ($message->err) {
             \RD_KAFKA_RESP_ERR_NO_ERROR => new KafkaConsumerMessage(
                 topic: $message->topic_name,
                 body: $message->payload,
@@ -199,20 +201,13 @@ final readonly class KafkaConsumer
                 offset: $message->offset,
             ),
 
-            \RD_KAFKA_RESP_ERR__TIMED_OUT => new KafkaConsumeTimeout(
-                partition: $message->partition,
-                offset: $message->offset,
-            ),
-
-            \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN => new KafkaConsumeTimeout(
+            \RD_KAFKA_RESP_ERR__TIMED_OUT, \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN => new KafkaConsumeTimeout(
                 partition: $message->partition,
                 offset: $message->offset,
             ),
 
             default => $this->throwOnUnrecognizedConsumeError($message),
         };
-
-        return $result;
     }
 
     /**
@@ -259,7 +254,7 @@ final readonly class KafkaConsumer
             $this->consumer->commit([
                 new TopicPartition($message->topic, $message->partition, $message->offset + 1),
             ]);
-        } catch (RdKafkaException $e) {
+        } catch (Exception $e) {
             $this->logger->error('Failed to commit message', [
                 'topic' => $message->topic,
                 'partition' => $message->partition,
