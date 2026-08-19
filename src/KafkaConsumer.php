@@ -15,6 +15,7 @@ use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RdKafka\Exception as RdKafkaException;
+use RdKafka\Message;
 use RdKafka\TopicPartition;
 
 /**
@@ -207,7 +208,7 @@ final readonly class KafkaConsumer
                 offset: $message->offset,
             ),
 
-            default => throw KafkaConsumerException::create($message->errstr()),
+            default => $this->throwOnUnrecognizedConsumeError($message),
         };
 
         return $result;
@@ -281,6 +282,21 @@ final readonly class KafkaConsumer
         $this->consumer->close();
 
         $this->logger->info('KafkaConsumer closed');
+    }
+
+    /**
+     * Логирует и бросает исключение для кода ошибки, не имеющего типизированной ветки в consume().
+     *
+     * @param Message $message Сообщение с кодом ошибки RD_KAFKA_RESP_ERR__*
+     */
+    private function throwOnUnrecognizedConsumeError(Message $message): never
+    {
+        $this->logger->error('Consume failed with unrecognized error', [
+            'error_code' => $message->err,
+            'error' => $message->errstr(),
+        ]);
+
+        throw KafkaConsumerException::create($message->errstr(), $message->err);
     }
 
     /**

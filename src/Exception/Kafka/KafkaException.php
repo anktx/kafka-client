@@ -15,6 +15,6 @@ abstract class KafkaException extends Exception
 
     final public static function fromKafkaException(Exception $e): static
     {
-        return new static($e->getMessage(), $e->getCode(), $e->getPrevious());
+        return new static($e->getMessage(), $e->getCode(), $e);
     }
 }

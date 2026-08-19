@@ -164,20 +164,30 @@ final class KafkaConsumerConsumeTest extends TestCase
     #[AllowMockObjectsWithoutExpectations]
     public function testConsumeThrowsOnUnknownErrCode(): void
     {
+        $logger = new InMemoryLogger();
+
         $rdKafka = $this->createMock(RdKafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')->willReturn(self::message([
             'err' => \RD_KAFKA_RESP_ERR__BAD_MSG,
         ]));
 
-        $consumer = $this->buildConsumer($rdKafka);
+        $consumer = $this->buildConsumer($rdKafka, logger: $logger);
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
-        $this->expectException(KafkaConsumerException::class);
-        // errstr() для RD_KAFKA_RESP_ERR__BAD_MSG возвращает 'Local: Bad message format'.
-        $this->expectExceptionMessage('Bad message format');
+        try {
+            $consumer->consume(100);
+            self::fail('Expected KafkaConsumerException');
+        } catch (KafkaConsumerException $e) {
+            // errstr() для RD_KAFKA_RESP_ERR__BAD_MSG возвращает 'Local: Bad message format'.
+            self::assertStringContainsString('Bad message format', $e->getMessage());
+            self::assertSame(\RD_KAFKA_RESP_ERR__BAD_MSG, $e->getCode());
+        }
 
-        $consumer->consume(100);
+        $errorRecords = $logger->findByMessage('Consume failed with unrecognized error');
+        self::assertCount(1, $errorRecords);
+        self::assertSame(\RD_KAFKA_RESP_ERR__BAD_MSG, $errorRecords[0]['context']['error_code']);
+        self::assertStringContainsString('Bad message format', $errorRecords[0]['context']['error']);
     }
 
     #[AllowMockObjectsWithoutExpectations]

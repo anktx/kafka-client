@@ -23,6 +23,8 @@ use RdKafka\ProducerTopic;
  */
 final class KafkaProducer
 {
+    private const int DEFAULT_FLUSH_TIMEOUT_MS = 1000;
+
     private readonly Producer $producer;
 
     /**
@@ -108,11 +110,11 @@ final class KafkaProducer
      * @throws KafkaConnectionException Если истёк таймаут ожидания
      * @throws KafkaProducerException   Если произошла ошибка при отправке
      */
-    public function flush(int $timeoutMs = 1000): void
+    public function flush(int $timeoutMs = self::DEFAULT_FLUSH_TIMEOUT_MS): void
     {
-        $rst = $this->producer->flush($timeoutMs);
+        $result = $this->producer->flush($timeoutMs);
 
-        if ($rst === \RD_KAFKA_RESP_ERR_NO_ERROR) {
+        if ($result === \RD_KAFKA_RESP_ERR_NO_ERROR) {
             $this->logger->info('Producer flushed successfully', [
                 'timeout_ms' => $timeoutMs,
             ]);
@@ -120,10 +122,10 @@ final class KafkaProducer
             return;
         }
 
-        if ($rst === \RD_KAFKA_RESP_ERR__TIMED_OUT) {
+        if ($result === \RD_KAFKA_RESP_ERR__TIMED_OUT) {
             $this->logger->warning('Flush timed out', [
                 'timeout_ms' => $timeoutMs,
-                'error_code' => $rst,
+                'error_code' => $result,
             ]);
 
             throw KafkaConnectionException::flushTimeout($timeoutMs);
@@ -131,10 +133,11 @@ final class KafkaProducer
 
         $this->logger->error('Flush failed', [
             'timeout_ms' => $timeoutMs,
-            'error_code' => $rst,
+            'error_code' => $result,
+            'error' => rd_kafka_err2str($result),
         ]);
 
-        throw KafkaProducerException::flushFailed($rst);
+        throw KafkaProducerException::flushFailed($result);
     }
 
     /**

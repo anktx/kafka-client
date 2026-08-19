@@ -8,6 +8,6 @@ final class KafkaProducerException extends KafkaException
 {
     public static function flushFailed(int $errorCode): self
     {
-        return new self('Flush failed, error ' . $errorCode);
+        return new self(\sprintf('Flush failed: %s (%d)', rd_kafka_err2str($errorCode), $errorCode));
     }
 }

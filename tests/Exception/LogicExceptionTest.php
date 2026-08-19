@@ -17,6 +17,7 @@ final class LogicExceptionTest extends TestCase
         $this->assertInstanceOf(LogicException::class, $exception);
         $this->assertInstanceOf(NotSubscribedException::class, $exception);
         $this->assertSame('Not subscribed', $exception->getMessage());
+        $this->assertSame(0, $exception->getCode());
     }
 
     public function testNotSubscribedExceptionWithCode(): void
