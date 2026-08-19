@@ -18,11 +18,19 @@ use PHPUnit\Framework\TestCase;
  * в composer tests / qa и не должны падать только из-за отсутствия
  * окружения. В CI, где брокер поднимается сервис-контейнером, skip
  * означает сломанный job-сетап, а не зелёный прогон.
+ *
+ * Проверка повторяется с паузой до суммарного таймаута RETRY_TIMEOUT_SEC,
+ * чтобы не ловить ложный skip в момент, когда сервис-контейнер брокера
+ * ещё поднимается. Результат мемоизируется: проверка выполняется один
+ * раз на процесс, и недоступный брокер не задерживает остальные тесты.
  */
 final class KafkaBroker
 {
     private const string DEFAULT_BROKERS = 'localhost:9092';
     private const float CONNECT_TIMEOUT_SEC = 1.0;
+    private const float RETRY_TIMEOUT_SEC = 5.0;
+    private const int RETRY_DELAY_MICROSEC = 250_000;
+    private static ?bool $brokersAvailable = null;
 
     /**
      * Возвращает адрес брокеров и гарантирует их доступность,
@@ -32,14 +40,12 @@ final class KafkaBroker
     {
         $brokers = self::brokers();
 
-        foreach (self::endpoints($brokers) as [$host, $port]) {
-            $socket = @fsockopen($host, $port, $errorCode, $errorMessage, self::CONNECT_TIMEOUT_SEC);
+        if (self::$brokersAvailable === null) {
+            self::$brokersAvailable = self::waitForBroker($brokers);
+        }
 
-            if ($socket !== false) {
-                fclose($socket);
-
-                return $brokers;
-            }
+        if (self::$brokersAvailable) {
+            return $brokers;
         }
 
         TestCase::markTestSkipped(\sprintf('Kafka broker is not available at "%s"', $brokers));
@@ -53,6 +59,29 @@ final class KafkaBroker
         $brokers = getenv('KAFKA_BROKERS');
 
         return \is_string($brokers) && $brokers !== '' ? $brokers : self::DEFAULT_BROKERS;
+    }
+
+    private static function waitForBroker(string $brokers): bool
+    {
+        $deadline = microtime(true) + self::RETRY_TIMEOUT_SEC;
+
+        while (true) {
+            foreach (self::endpoints($brokers) as [$host, $port]) {
+                $socket = @fsockopen($host, $port, $errorCode, $errorMessage, self::CONNECT_TIMEOUT_SEC);
+
+                if ($socket !== false) {
+                    fclose($socket);
+
+                    return true;
+                }
+            }
+
+            if (microtime(true) >= $deadline) {
+                return false;
+            }
+
+            usleep(self::RETRY_DELAY_MICROSEC);
+        }
     }
 
     /**
