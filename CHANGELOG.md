@@ -71,6 +71,26 @@
   `asKafkaTopicPartitionArray()` и исключением
   `TopicHasNoPartitionException`; `InvalidSubscriptionException`
   остаётся для пустого `topic`.
+- **BC:** иерархия сообщений переработана: базовый `AbstractMessage`
+  удалён — `KafkaConsumerMessage` и `KafkaProducerMessage` стали
+  самостоятельными `final readonly`-классами с валидацией в конструкторе
+  (пустой `topic`, отрицательные `partition`/`offset`/`timestampMs`
+  бросают `InvalidMessageException` вместо молчаливого приёма).
+  `KafkaConsumerMessage` требует `topic`/`partition`/`offset` как
+  обязательные параметры — прочитанное сообщение всегда знает своё
+  положение; порядок параметров изменён (`partition`/`offset` идут
+  после `topic`, перед `body`), `timestampMs` стал `?int`, где `null`
+  означает «брокер не передал время» (ext-rdkafka не задаёт timestamp
+  при null-payload, а `-1` — сентинел). Из конструктора
+  `KafkaProducerMessage` параметр `offset` удалён намеренно: офсет
+  назначает брокер и продюсеру не известен; `partition` (default
+  `RD_KAFKA_PARTITION_UA`) и `timestampMs = 0` по-прежнему означают
+  «значение выставит librdkafka». Как следствие,
+  `KafkaConsumer::commit()` больше не бросает `InvalidMessageException`
+  за сообщение без смещения (состояние невозможно by-construction):
+  проверка и фабрика `InvalidMessageException::noOffset()` удалены,
+  у исключения новые фабрики `emptyString()`/`nonNegativeInt()`/
+  `partitionBelowUnassigned()`.
 - **BC:** сырые `\RdKafka\Exception` больше не утекают из публичного API:
   сбои `asKafkaConfig()` оборачиваются в `InvalidConfigException`, конструкторов
   клиентов и `produce()` (включая `newTopic()`) — в
