@@ -66,8 +66,9 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
 
 - **Unit-тесты**: `tests/` (кроме `tests/Integration/`) — изолированные тесты
   без внешних зависимостей
-- **Integration-тесты**: `tests/Integration/` — требуют запущенный Kafka broker
-  (контейнер с Kafka/RedPanda)
+- **Integration-тесты**: `tests/Integration/` — адрес брокера берётся из
+  переменной окружения `KAFKA_BROKERS` (default `localhost:9092`, формат как
+  в `metadata.broker.list`); без доступного брокера тесты помечаются skipped
 - Сьюты `Unit` и `Integration` объявлены в `phpunit.dist.xml`;
   неймспейс всех тестов — `Anktx\Kafka\Client\Tests\`
 - Тест-двойники RdKafka — моки PHPUnit + reflection-инъекция
@@ -86,12 +87,16 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
 
 ## Важные детали
 
-1. **Integration-тесты** требуют локальный Kafka broker, поэтому не входят
-   в `composer tests` / `make qa` / CI.
+1. **Integration-тесты** не входят в `composer tests` / `make qa`; в CI
+   гоняются отдельным job `integration` против RedPanda-сервис-контейнера
+   (job падает, если брокер не поднялся, — защита от «вечно-зелёных» прогонов).
 
-2. **Мутационное тестирование** (Infection) имеет пороги:
-   - MSI (Mutation Score Indicator): 70%
-   - Covered MSI: 80%
+2. **Мутационное тестирование** (Infection, 10 threads) имеет пороги:
+   - MSI (Mutation Score Indicator): 100%
+   - Covered MSI: 100%
+   - Граничные тайминговые мутанты `KafkaProducer::flush()` (точность
+     пересчёта наносекунд в миллисекунды, границы бюджета retry-цикла)
+     игнорируются через `global-ignoreSourceCodeByRegex` в `infection.json.dist`
    - Для ослабленных проверок используйте `make infection-relaxed`
 
 3. **Static Analysis** (PHPStan level 8 + strict-rules) требует 512MB памяти.
@@ -106,12 +111,13 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
 ### Локальная разработка (без Docker)
 
 ```bash
-composer qa               # Полный цикл QA (style check + static analysis + unit tests)
+composer qa               # Полный цикл QA (validate + style check + static analysis + unit tests)
 composer tests            # Только unit-тесты (PHPUnit testsuite "Unit")
-composer tests-integration # Integration-тесты (требует запущенный Kafka)
+composer tests-integration # Integration-тесты (брокер из KAFKA_BROKERS, default localhost:9092)
 composer analyse          # PHPStan статический анализ (level 8 + strict-rules)
 composer cs-check         # Проверка стиля кода (dry-run)
 composer cs-fix           # Исправление стиля кода
+composer validate         # composer validate --strict
 composer coverage         # Unit-тесты с покрытием
 composer infection        # Мутационное тестирование
 ```
@@ -122,23 +128,23 @@ composer infection        # Мутационное тестирование
 # Запуск всех тестов
 make test-all            # Unit + integration тесты
 make test                # Только unit тесты
-make test-integration    # Только integration тесты (требует запущенный Kafka)
+make test-integration    # Только integration тесты (KAFKA_BROKERS, default localhost:9092)
 
 # Запуск конкретного теста
 make test-file FILE=tests/KafkaClasses/KafkaProducerTest.php
 
 # Мутационное тестирование
-make infection           # Запуск Infection (MSI: 70%, Covered MSI: 80%)
-make infection-show      # Детальный отчёт по мутациям
-make infection-relaxed   # Сниженный порог (60% MSI)
+make infection           # Запуск Infection (MSI: 100%, Covered MSI: 100%)
+make infection-relaxed   # Сниженный порог (указать MSI=..., требует make test-coverage)
 
 # Code quality
 make cs-dry              # Проверка стиля кода
 make cs-fix              # Исправление стиля кода
 make analyse             # PHPStan анализ
+make validate            # composer validate --strict
 
 # Полные CI-пайплайны
-make qa                  # cs-dry + analyse + test
+make qa                  # validate + cs-dry + analyse + test
 make ci                  # Полный CI pipeline (включая mutation testing)
 make clean               # Очистка сгенерированных файлов
 ```
@@ -147,6 +153,8 @@ make clean               # Очистка сгенерированных фай�
 
 - **PHPUnit**: `phpunit.dist.xml` — сьюты Unit/Integration, strict-режимы
 - **PHP-CS-Fixer**: `.php-cs-fixer.dist.php` — PER preset с risky rules и custom настройками
-- **PHPStan**: `phpstan.neon.dist` — level 8 + phpstan-strict-rules
-- **Infection**: `infection.json.dist` — 70% MSI, 80% Covered MSI, только testsuite Unit
-- **CI**: `.github/workflows/ci.yml` — QA + Infection на PHP 8.4 (ubuntu, ext-rdkafka из PECL)
+- **PHPStan**: `phpstan.neon.dist` — level 8 + strict-rules + deprecation-rules + phpstan-phpunit
+- **Infection**: `infection.json.dist` — MSI 100% / Covered MSI 100%, 10 threads,
+  только testsuite Unit, тайминговые мутанты `flush()` в ignore
+- **CI**: `.github/workflows/ci.yml` — QA + Infection + Integration (RedPanda
+  через `services:`) на PHP 8.4, concurrency-группа и кэш composer

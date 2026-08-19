@@ -5,6 +5,10 @@ on:
     branches: [main, master]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   qa:
     name: QA (PHP ${{ matrix.php }})
@@ -25,6 +29,20 @@ jobs:
           extensions: rdkafka
           coverage: none
           tools: composer:v2
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "directory=$(composer config cache-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.directory }}
+          key: composer-${{ runner.os }}-php-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php-${{ matrix.php }}-
+
+      - name: Validate composer.json
+        run: composer validate --strict
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
@@ -55,11 +73,30 @@ jobs:
           coverage: pcov
           tools: composer:v2
 
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "directory=$(composer config cache-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.directory }}
+          key: composer-${{ runner.os }}-php-8.4-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php-8.4-
+
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Infection
         run: vendor/bin/infection --no-progress --show-mutations
+
+      - name: Upload Infection log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infection-log
+          path: .infection/log.txt
+          if-no-files-found: ignore
 
   integration:
     name: Integration tests (RedPanda)

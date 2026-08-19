@@ -13,13 +13,19 @@
     },
     "mutators": {
         "@default": true,
-        "MethodCallRemoval": false
+        "MethodCallRemoval": false,
+        "global-ignoreSourceCodeByRegex": [
+            "\\$remainingMs = max\\(0, \\$timeoutMs - self::elapsedMs\\(\\$startedAtNs\\)\\);",
+            "\\} while \\(self::elapsedMs\\(\\$startedAtNs\\) < \\$timeoutMs\\);",
+            "return intdiv\\(hrtime\\(true\\) - \\$startedAtNs, 1_000_000\\);"
+        ]
     },
     "testFramework": "phpunit",
     "testFrameworkOptions": "--testsuite=Unit",
     "phpUnit": {
         "configDir": "."
     },
-    "minMsi": 70,
-    "minCoveredMsi": 80
+    "threads": 10,
+    "minMsi": 100,
+    "minCoveredMsi": 100
 }

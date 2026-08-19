@@ -7,19 +7,20 @@
 PHP-обёртка над Apache Kafka / RedPanda на расширении `ext-rdkafka`:
 продюсер, консьюмер, типобезопасный API, сжатие сообщений, стратегии опроса.
 
-Стек: PHP 8.4+, ext-rdkafka, PHPUnit 12, PHPStan level 8 + strict-rules,
-PHP-CS-Fixer (PER-CS2.0), Infection.
+Стек: PHP 8.4+, ext-rdkafka ^6.0, PHPUnit 12, PHPStan level 8 + strict-rules
++ deprecation-rules + phpstan-phpunit, PHP-CS-Fixer (PER-CS2.0), Infection.
 
 ## Команды
 
 ```bash
-composer qa               # cs-check + analyse + tests — запускать перед завершением задачи
+composer qa               # validate + cs-check + analyse + tests — запускать перед завершением задачи
 composer tests            # unit-тесты (suite "Unit")
-composer tests-integration # integration-тесты (требует запущенный Kafka)
+composer tests-integration # integration-тесты (KAFKA_BROKERS, default localhost:9092;
+                           # без брокера тесты помечаются skipped)
 composer analyse          # PHPStan (нужен memory_limit 512M)
 composer cs-check         # проверка стиля (dry-run)
 composer cs-fix           # исправление стиля
-composer infection        # мутационное тестирование
+composer infection        # мутационное тестирование (threads + пороги в infection.json.dist)
 ```
 
 Docker-аналоги — в `Makefile`: `make qa`, `make test`, `make test-integration`,
@@ -41,11 +42,14 @@ Docker-аналоги — в `Makefile`: `make qa`, `make test`, `make test-inte
 ## Тесты
 
 - Unit: `tests/` кроме `tests/Integration/`; неймспейс `Anktx\Kafka\Client\Tests\`
-- Integration: `tests/Integration/` — требуют запущенный Kafka broker,
-  не входят в `composer tests` / `make qa` / CI
+- Integration: `tests/Integration/` — адрес брокера из `KAFKA_BROKERS`
+  (default `localhost:9092`), без брокера — skipped; в CI гоняются против
+  RedPanda-сервис-контейнера (job `integration`), в `composer tests`/`make qa` не входят
 - Тест-двойники RdKafka — моки PHPUnit + reflection-инъекция
   в readonly-свойства (`newInstanceWithoutConstructor()`)
-- Пороги Infection: MSI 70%, Covered MSI 80% (ослабленный режим: `make infection-relaxed`)
+- Пороги Infection: MSI 100%, Covered MSI 100% (10 threads;
+  граничные тайминговые мутанты `flush()` игнорируются через
+  `global-ignoreSourceCodeByRegex`; ослабленный режим: `make infection-relaxed`)
 
 ## Подробнее
 

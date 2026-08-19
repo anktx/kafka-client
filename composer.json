@@ -11,12 +11,14 @@
   "minimum-stability": "stable",
   "require": {
     "php": "^8.4",
-    "ext-rdkafka": "*"
+    "ext-rdkafka": "^6.0"
   },
   "require-dev": {
     "friendsofphp/php-cs-fixer": "^3.0",
     "infection/infection": "^0.35",
     "phpstan/phpstan": "^2.0",
+    "phpstan/phpstan-deprecation-rules": "^2.0",
+    "phpstan/phpstan-phpunit": "^2.0",
     "phpstan/phpstan-strict-rules": "^2.0",
     "phpunit/phpunit": "^12.0"
   },
@@ -40,10 +42,22 @@
     "coverage": "phpunit --testsuite=Unit --coverage-text",
     "infection": "infection --show-mutations",
     "qa": [
+      "@composer validate --strict",
       "@cs-check",
       "@analyse",
       "@tests"
     ]
+  },
+  "scripts-descriptions": {
+    "analyse": "Runs PHPStan static analysis (level 8 + strict-rules)",
+    "analyse:baseline": "Generates PHPStan baseline for remaining errors",
+    "cs-fix": "Fixes code style with PHP CS Fixer",
+    "cs-check": "Checks code style with PHP CS Fixer without modifying files",
+    "tests": "Runs unit tests",
+    "tests-integration": "Runs integration tests (requires a running Kafka broker)",
+    "coverage": "Runs unit tests and prints a text code coverage report",
+    "infection": "Runs Infection mutation testing",
+    "qa": "Runs full QA pipeline (composer validate + style check + static analysis + tests)"
   },
   "config": {
     "optimize-autoloader": true,

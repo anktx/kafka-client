@@ -26,6 +26,27 @@
   `topic`, отрицательные `partition`/`offset` и `offset` без `partition`
   отвергаются новым `InvalidSubscriptionException` (раньше мусорные значения
   молча игнорировались при подписке).
+- **BC:** сырые `\RdKafka\Exception` больше не утекают из публичного API:
+  сбои `asKafkaConfig()` оборачиваются в `InvalidConfigException`, конструкторов
+  клиентов и `produce()` (включая `newTopic()`) — в
+  `KafkaConsumerException`/`KafkaProducerException` с контекстом в логе.
+- Инструментарий: Infection обновлён до `^0.35` (kwn/php-rdkafka-stubs
+  удалён); пороги Infection подняты до MSI 100% / Covered MSI 100%
+  (10 threads; граничные тайминговые мутанты `flush()` — в
+  `global-ignoreSourceCodeByRegex`); добавлены `phpstan-deprecation-rules`
+  и `phpstan-phpunit`; `composer validate --strict` включён в `composer qa`
+  (добавлены `scripts-descriptions`); зависимость `ext-rdkafka` зафиксирована
+  как `^6.0` вместо `*`; починен `.PHONY` Makefile и унифицирован запуск
+  Infection (`make infection` = `composer infection`, без предварительного
+  coverage-прогона); CI: concurrency-группы, кэш composer, артефакт с логом
+  Infection и новый job `integration` против RedPanda-сервис-контейнера.
+- Интеграционные тесты: адрес брокера читается из `KAFKA_BROKERS`
+  (default `localhost:9092`), при недоступности брокера тесты помечаются
+  skipped; неймспейсы приведены к PSR-4 (`Tests\Integration\…` вместо
+  `Tests\Kafka`); убраны пустые catch-заглушки, маскировавшие регрессии
+  («вечно-зелёные» тесты) — тесты без брокера честно skipped, с брокером —
+  падают при сбоях; `group.instance.id` уникальны per-test (фикс фенсинга
+  статических членов между тестами).
 
 ### Added
 
@@ -40,6 +61,22 @@
 - Валидация `ConsumerConfig::$instanceId`: пустая строка отвергается
   `InvalidConfigException` (раньше молча уходила в `group.instance.id`).
 
+### Fixed
+
+- Busy-loop в `KafkaProducer::produce()`: drain очереди delivery-report'ов
+  (`while (getOutQLen() > 0) { poll(0); }`) при недоступных брокерах крутился
+  на 100% CPU до `message.timeout.ms` (5 минут) — теперь бюджет
+  `MAX_DRAIN_POLLS = 100` poll()-вызовов с warning'ом о недренжированном
+  остатке.
+- Ошибочные исключения из `RdKafka\KafkaConsumer::getSubscription()` в
+  `consume()` (вызов был вне try-блока) оборачиваются в
+  `KafkaConsumerException` вместо утечки сырого `RdKafka\Exception`.
+- `consumeMatch()` использует константу `DEFAULT_CONSUME_TIMEOUT_MS` вместо
+  дублирующего литерала `1000`.
+- Error-callback librdkafka логирует все ошибки клиента (SASL/SSL/
+  авторизация — warning с `error_code`/`reason`, фатальные — error): раньше
+  молча глотались всё, кроме кодов соединения.
+
 ## [0.8.0] - 2026-08-19
 
 ### Changed
@@ -50,15 +87,45 @@
   (`setLogCb`, `setErrorCb`) навешиваются самими клиентами — вся политика
   логирования живёт в одном месте. Логи librdkafka продюсера теперь тоже
   содержат `facility` в контексте.
+- **BC:** `NeverPoolStrategy` переименован в `NeverPollStrategy` (фикс опечатки
+  в названии стратегии).
+- **BC:** `ConsumerConfig` и `ProducerConfig` валидируют параметры в
+  конструкторе и отвергают некорректные значения `InvalidConfigException`
+  вместо сырой ошибки librdkafka в момент `asKafkaConfig()` (или вовсе
+  молчаливого приёма).
+- **BC:** `KafkaConsumer::commit()` сообщения без смещения теперь бросает
+  `InvalidMessageException` вместо фиктивного коммита `offset = null + 1`.
+- **BC:** в конструкторе `ConsumerConfig` параметр `isDebug` перенесён в конец
+  сигнатуры (после `$socketKeepaliveEnable`) — позиционные аргументы после
+  `$sessionTimeoutMs` «съезжают», при именованных аргументах проблем нет.
 - Дублированные колбэки `onLog`/`onBrokerError` (и producer-only
   `onDeliveryReport`) вынесены из `KafkaProducer`/`KafkaConsumer` в
   `Anktx\Kafka\Client\Log\RdKafkaCallbacks`: attach-методы
   `attachLogCallback()`/`attachErrorCallback()`/`attachDeliveryReportCallback()`
   навешивают политику логирования на `RdKafka\Conf`. Публичный API клиентов
   не изменился.
-- **BC:** в конструкторе `ConsumerConfig` параметр `isDebug` перенесён в конец
-  сигнатуры (после `$socketKeepaliveEnable`) — позиционные аргументы после
-  `$sessionTimeoutMs` «съезжают», при именованных аргументах проблем нет.
+- Доменные Kafka-исключения обогащены кодами ошибок librdkafka
+  и детальными сообщениями (`rd_kafka_err2str()`).
+- Poll-стратегии упрочнены: отрицательный интервал `TimeoutPollStrategy`
+  отвергается, `ProbabilityPollStrategy` получает `Random\Randomizer` через
+  конструктор (детерминированные тесты) и сравнивает вероятность через
+  `getFloat()`.
+
+### Added
+
+- Продюсер логирует delivery-report каждого сообщения через
+  `Conf::setDrMsgCb()`: успешная доставка — debug, сбой — error
+  с `topic`/`partition`/`error_code`.
+- Error-callback логирует ошибки брокера warning'ом с `error_code`/`reason`,
+  syslog-уровни librdkafka маппятся в PSR-3 (`Log\RdKafkaLogLevel`).
+- CI-воркфлоу (php-cs-fixer + PHPStan strict-rules + unit-тесты + Infection)
+  и composer-скрипты `tests`/`tests-integration` по suites.
+
+### Fixed
+
+- В librdkafka передаются backing values enum'ов `compression.type` и
+  `auto.offset.reset` (например, `gzip`) вместо имён кейсов (`GZIP`) —
+  ранее конфигурация сжатия отвергалась librdkafka.
 
 ### Removed
 

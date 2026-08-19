@@ -1,4 +1,6 @@
 includes:
+    - vendor/phpstan/phpstan-deprecation-rules/rules.neon
+    - vendor/phpstan/phpstan-phpunit/extension.neon
     - vendor/phpstan/phpstan-strict-rules/rules.neon
 
 parameters:
@@ -8,4 +10,10 @@ parameters:
         - tests
 
     ignoreErrors:
-        # Можно добавить исключения по мере необходимости
+        # phpstan-phpunit помечает assertInstanceOf() с уже известным типом
+        # как всегда истинный. В тестах такие проверки — легитимные smoke-тесты
+        # («объект сконструировался»), правило оставлено активным для src/.
+        -
+            identifier: staticMethod.alreadyNarrowedType
+            paths:
+                - tests/*
