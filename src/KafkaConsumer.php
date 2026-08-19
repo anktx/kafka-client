@@ -15,6 +15,7 @@ use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
+use Anktx\Kafka\Client\StreamObserver\BrokersDownBudgetStreamObserver;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -172,7 +173,8 @@ final class KafkaConsumer
      * - {@see KafkaBrokersDown} - полная потеря соединения со всеми
      *   брокерами (ALL_BROKERS_DOWN): не ошибка, переподключение librdkafka
      *   продолжает в фоновых потоках; «вечная» ли потеря — изнутри клиента
-     *   неопределимо, порог ожидания определяет вызывающий код;
+     *   неопределимо, порог ожидания определяет вызывающий код (см.
+     *   {@see BrokersDownBudgetStreamObserver});
      * - {@see KafkaPartitionEof} - достигнут конец партиции.
      *
      * Чтение всегда делегируется librdkafka: через consume() также доставляются

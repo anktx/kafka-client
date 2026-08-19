@@ -96,6 +96,34 @@ foreach ($stream->stream() as $message) {
 }
 ```
 
+По умолчанию поток переживает полную потерю брокеров (librdkafka
+переподключается в фоне). Реакция на нештатные ситуации — инжектируемый
+наблюдатель `StreamObserver`: каждый результат `consume()` (сообщение,
+таймаут, потеря всех брокеров, EOF) передаётся его хукам
+`onMessage`/`onTimeout`/`onBrokersDown`/`onEof` до выдачи сообщения
+наружу, исключение из хука прерывает генератор. Дефолт
+`SilentStreamObserver` поглощает всё — прежнее поведение.
+
+Готовая fail-fast реализация — `BrokersDownBudgetStreamObserver`: если
+брокеры недоступны непрерывно дольше `maxBrokersDownMs` (wall-clock,
+источник времени — PSR-20 `Psr\Clock\ClockInterface`, по умолчанию
+системные часы), генератор выбрасывает `KafkaBrokersDownException` —
+воркер падает, супервизор пересоздаёт процесс (restart-политика Docker,
+restartPolicy Kubernetes):
+
+```php
+use Anktx\Kafka\Client\StreamObserver\BrokersDownBudgetStreamObserver;
+
+$stream = new KafkaMessageStream(
+    $consumer,
+    new BrokersDownBudgetStreamObserver(maxBrokersDownMs: 30_000),
+);
+```
+
+Сообщение и EOF доказывают живое соединение и сбрасывают бюджет;
+таймаут — нет (не отличает тишину в топике от сетевой проблемы).
+Свои сценарии реакции — реализуйте интерфейс `StreamObserver`.
+
 ## Стратегии опроса (Poll Strategies)
 
 При отправке сообщений они попадают в локальную очередь, а затем асинхронно отправляются в Kafka. Метод `poll()` обслуживает эту очередь — обрабатывает отчёты о доставке и освобождает память. Если не вызывать `poll()`, очередь может переполниться.
@@ -273,6 +301,11 @@ src/
 │   ├── ProbabilityPollStrategy.php  # Вызывать с вероятностью N
 │   └── TimeoutPollStrategy.php      # Вызывать с фиксированным интервалом (мс)
 │
+├── StreamObserver/                  # Реакция на результаты consume() в потоке сообщений
+│   ├── StreamObserver.php           # Интерфейс наблюдателя (onMessage/onTimeout/onBrokersDown/onEof)
+│   ├── SilentStreamObserver.php     # Молчаливая реакция (по умолчанию)
+│   └── BrokersDownBudgetStreamObserver.php # Fail-fast: брокеры недоступны дольше maxBrokersDownMs
+│
 ├── TopicSubscription/               # Подписки на топики
 │   ├── TopicSubscription.php        # Одна подписка
 │   └── TopicSubscriptionList.php    # Список подписок
@@ -289,6 +322,7 @@ src/
 ```
 KafkaClientException                 # Маркер: всё, что кидает библиотека (interface, extends \Throwable)
 ├── KafkaException                   # Сбои Kafka/окружения (наследует RdKafka\Exception)
+│   ├── KafkaBrokersDownException    # Брокеры недоступны дольше maxBrokersDownMs (BrokersDownBudgetStreamObserver)
 │   ├── KafkaConsumerException        # Ошибка консьюмера
 │   ├── KafkaFlushTimeoutException    # Таймаут flush: очередь не отправлена за $timeoutMs
 │   └── KafkaProducerException        # Ошибка продюсера

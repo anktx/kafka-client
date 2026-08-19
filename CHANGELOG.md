@@ -9,12 +9,27 @@
 
 ### Added
 
+- `StreamObserver` — инжектируемая в `KafkaMessageStream` реакция на
+  результаты `consume()`: хуки `onMessage`/`onTimeout`/`onBrokersDown`/
+  `onEof` (зеркало колбэков `consumeMatch()`) вызываются по каждому
+  результату до выдачи сообщения наружу; исключение из хука прерывает
+  генератор. Дефолт `SilentStreamObserver` сохраняет прежнее поведение
+  (служебные результаты поглощаются молча, BC).
+- `BrokersDownBudgetStreamObserver` — готовая fail-fast реализация:
+  бюджет `maxBrokersDownMs` непрерывной потери всех брокеров (wall-clock,
+  PSR-20 `Psr\Clock\ClockInterface`, по умолчанию системные часы);
+  по исчерпании бросает новое исключение `KafkaBrokersDownException`
+  (`RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN`) — воркер падает, и супервизор
+  (restart-политика Docker, restartPolicy Kubernetes) пересоздаёт процесс.
+  Сообщение и EOF сбрасывают бюджет, таймаут — нет (не отличает тишину
+  в топике от сетевой проблемы).
 - `KafkaBrokersDown` — четвёртый результат `consume()`: полная потеря
   соединения со всеми брокерами (ALL_BROKERS_DOWN) больше не маскируется
   под `KafkaConsumeTimeout` и наблюдаема напрямую для метрик и watchdog'ов
   (счётчик подряд идущих результатов, порог остановки). Не ошибка:
   librdkafka продолжает переподключение в фоне. `KafkaMessageStream`
-  поведение не изменил — фильтрует `KafkaBrokersDown` так же, как таймаут.
+  без кастомного наблюдателя поведение не изменил — фильтрует
+  `KafkaBrokersDown` так же, как таймаут.
 
 ### Changed
 

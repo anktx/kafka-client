@@ -11,6 +11,9 @@ use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
+use Anktx\Kafka\Client\StreamObserver\BrokersDownBudgetStreamObserver;
+use Anktx\Kafka\Client\StreamObserver\SilentStreamObserver;
+use Anktx\Kafka\Client\StreamObserver\StreamObserver;
 
 /**
  * Обёртка для консьюмера, предоставляющая поток сообщений через Generator.
@@ -20,7 +23,10 @@ use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
  *
  * @example
  * ```php
- * $stream = new KafkaMessageStream($consumer);
+ * $stream = new KafkaMessageStream(
+ *     $consumer,
+ *     new BrokersDownBudgetStreamObserver(maxBrokersDownMs: 30_000),
+ * );
  * foreach ($stream->stream() as $message) {
  *     // Обработка сообщения
  *     $consumer->commit($message);
@@ -34,34 +40,32 @@ final readonly class KafkaMessageStream
     /**
      * Создаёт новый поток сообщений.
      *
-     * @param KafkaConsumer $consumer      Консьюмер Kafka
-     * @param int           $pollTimeoutMs Таймаут опроса в миллисекундах (по умолчанию 1000 мс)
+     * @param KafkaConsumer  $consumer      Консьюмер Kafka
+     * @param int            $pollTimeoutMs Таймаут опроса в миллисекундах (по умолчанию 1000 мс)
+     * @param StreamObserver $observer      Реакция на результаты consume() (по умолчанию — молчаливая)
      */
     public function __construct(
         private KafkaConsumer $consumer,
         private int $pollTimeoutMs = self::DEFAULT_POLL_TIMEOUT_MS,
+        private StreamObserver $observer = new SilentStreamObserver(),
     ) {}
 
     /**
      * Возвращает генератор, который выдаёт только реальные сообщения.
      *
-     * Метод фильтрует служебные результаты:
-     * - {@see KafkaConsumeTimeout} игнорируется
-     * - {@see KafkaBrokersDown} игнорируется
-     * - {@see KafkaPartitionEof} игнорируется
-     * - {@see KafkaConsumerMessage} возвращается через yield
+     * Каждый результат consume() сначала передаётся наблюдателю
+     * {@see StreamObserver} — хуками onMessage/onTimeout/onBrokersDown/onEof,
+     * зеркалящими колбэки {@see KafkaConsumer::consumeMatch()}; исключение
+     * из хука прерывает генератор. Так нештатные ситуации (например,
+     * «вечная» потеря брокеров — {@see BrokersDownBudgetStreamObserver})
+     * получают fail-fast реакцию, а управление — вызывающий код.
      *
-     * Генератор бесконечен - для остановки нужно прервать цикл.
-     *
-     * Полная потеря связи с брокерами не прерывает генератор:
-     * {@see KafkaConsumer::consume()} различает её (KafkaBrokersDown) и
-     * таймаут, но stream() намеренно фильтрует оба случая одинаково —
-     * продолжает опрос (не дольше pollTimeoutMs на итерацию) и
-     * самовосстанавливается, когда librdkafka переподключится в фоновых
-     * потоках. Различать их для метрик и watchdog'а используйте consume()/
-     * consumeMatch() напрямую; «вечное» отсутствие брокеров через поток
-     * не наблюдаемо — fail-fast контроль (внешний таймаут итераций,
-     * health-check) выполняйте на уровне приложения.
+     * Наблюдатель по умолчанию {@see SilentStreamObserver} поглощает всё:
+     * генератор бесконечен (для остановки нужно прервать цикл), полную
+     * потерю брокеров переживает молча и самовосстанавливается, когда
+     * librdkafka переподключится в фоновых потоках. Различать потерю
+     * брокеров и таймаут для метрик/watchdog'а используйте consume()/
+     * consumeMatch() напрямую.
      *
      * @return \Generator<int, KafkaConsumerMessage> Генератор сообщений
      *
@@ -72,16 +76,17 @@ final readonly class KafkaMessageStream
     public function stream(): \Generator
     {
         while (true) {
-            $message = $this->consumer->consumeMatch(
-                onMessage: static fn(KafkaConsumerMessage $msg): KafkaConsumerMessage => $msg,
-                onTimeout: static fn(): null => null,
-                onBrokersDown: static fn(): null => null,
-                onEof: static fn(): null => null,
-                timeoutMs: $this->pollTimeoutMs,
-            );
+            $result = $this->consumer->consume(timeoutMs: $this->pollTimeoutMs);
 
-            if ($message !== null) {
-                yield $message;
+            match ($result::class) {
+                KafkaConsumerMessage::class => $this->observer->onMessage($result),
+                KafkaConsumeTimeout::class => $this->observer->onTimeout($result),
+                KafkaBrokersDown::class => $this->observer->onBrokersDown($result),
+                KafkaPartitionEof::class => $this->observer->onEof($result),
+            };
+
+            if ($result instanceof KafkaConsumerMessage) {
+                yield $result;
             }
         }
     }

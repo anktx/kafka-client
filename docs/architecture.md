@@ -37,7 +37,8 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
    - Ручной коммит обработанных сообщений через `commit()`
    - Возврат union-типа `KafkaConsumerMessage|KafkaConsumeTimeout|KafkaBrokersDown|KafkaPartitionEof`
      (`KafkaBrokersDown` — полная потеря брокеров, различима с таймаутом
-     для метрик/watchdog'а; `KafkaMessageStream` фильтрует оба случая)
+     для метрик/watchdog'а; реакция на неё в `KafkaMessageStream` —
+     инжектируемый `StreamObserver`)
 
 4. **PollStrategy** (`src/PollStrategy/`)
    - Стратегии опроса очереди для оптимизации производительности
@@ -76,10 +77,25 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
    - `RdKafkaLogLevel` — маппинг syslog-severity librdkafka (0–7)
      в строковые уровни PSR-3
 
+8. **StreamObserver** (`src/StreamObserver/`)
+   - Реакция на результаты consume() в потоке сообщений
+     (`KafkaMessageStream`): хуки `onMessage`/`onTimeout`/`onBrokersDown`/
+     `onEof` зеркалят колбэки `consumeMatch()`, вызываются по каждому
+     результату до yield; исключение из хука прерывает генератор
+   - `SilentStreamObserver` — null-object, поглощает всё (дефолт,
+     полная BC со старым поведением стрима)
+   - `BrokersDownBudgetStreamObserver` — fail-fast бюджет
+     `maxBrokersDownMs` непрерывной потери всех брокеров: wall-clock
+     (PSR-20 clock, сбрасывается сообщением/EOF, не таймаутом), по
+     исчерпании — `KafkaBrokersDownException` (воркер падает, супервизор
+     пересоздаёт процесс)
+
 ## Ключевые паттерны проектирования
 
 - **Immutable Value Objects**: конфигурационные классы — readonly, без сеттеров
 - **Strategy Pattern**: полиморфные стратегии опроса (PollStrategy)
+- **Observer**: реакция на результаты consume() в потоке сообщений (StreamObserver)
+- **Null Object**: `SilentStreamObserver` — дефолт без реакции
 - **Dependency Injection**: внедрение зависимостей через конструкторы (логгер, Randomizer, PSR-20 clock)
 - **Type Safety**: строгая типизация, enum'ы, union types
 - **PSR-3 Logging**: структурированное логирование с контекстом

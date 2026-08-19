@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
+use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
+use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
+use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\KafkaMessageStream;
+use Anktx\Kafka\Client\StreamObserver\StreamObserver;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
+use Anktx\Kafka\Client\Tests\Support\SpyStreamObserver;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Exception;
 use RdKafka\Message;
@@ -18,14 +23,17 @@ use RdKafka\Message;
 /**
  * Юнит-тесты для {@see KafkaMessageStream::stream()}. KafkaConsumer — final,
  * замокать его нельзя, поэтому поток тестируется end-to-end на mock'е
- * RdKafka\KafkaConsumer — ровно та цепочка stream() → consumeMatch() →
- * consume(), что раньше была закрыта только integration-тестами.
+ * RdKafka\KafkaConsumer — ровно та цепочка stream() → consume(), что раньше
+ * была закрыта только integration-тестами.
  *
- * Фиксируется контракт: таймауты, потеря брокеров и EOF не выдаются
- * наружу (poll продолжается), сообщения yield'ятся с последовательными
- * int-ключами, таймаут опроса пробрасывается в consume(), исключения
- * консьюмера пробрасываются из генератора при первой итерации, закрытый
- * консьюмер отвергается ClientClosedException до единого вызова RdKafka.
+ * Фиксируется контракт: с молчаливым наблюдателем по умолчанию таймауты,
+ * потеря брокеров и EOF не выдаются наружу (poll продолжается), сообщения
+ * yield'ятся с последовательными int-ключами, таймаут опроса
+ * пробрасывается в consume(), исключения консьюмера пробрасываются из
+ * генератора при первой итерации, закрытый консьюмер отвергается
+ * ClientClosedException до единого вызова RdKafka. Кастомный наблюдатель
+ * получает каждый результат соответствующим хуком до yield, а его
+ * исключение прерывает генератор.
  */
 final class KafkaMessageStreamTest extends TestCase
 {
@@ -160,6 +168,113 @@ final class KafkaMessageStreamTest extends TestCase
         $generator = (new KafkaMessageStream($this->buildConsumer($rdKafka)))->stream();
 
         self::assertSame('default', $generator->current()->body);
+    }
+
+    public function testStreamDispatchesEveryResultToObserverHooks(): void
+    {
+        // Тот же микс результатов, что и в тесте фильтрации: каждый уходит
+        // в свой хук наблюдателя, сообщения — теми же экземплярами, что
+        // выданы генератором. Порядок хуков — до yield.
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
+        $rdKafka->expects($this->exactly(5))
+            ->method('consume')
+            ->willReturnOnConsecutiveCalls(
+                self::message([
+                    'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
+                    'partition' => 0,
+                    'offset' => 0,
+                ]),
+                self::message([
+                    'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
+                    'partition' => -1,
+                    'offset' => -1,
+                ]),
+                self::message([
+                    'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,
+                    'topic_name' => 'test-topic',
+                    'partition' => 1,
+                    'offset' => 7,
+                ]),
+                self::message([
+                    'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
+                    'topic_name' => 'test-topic',
+                    'partition' => 2,
+                    'offset' => 10,
+                    'payload' => 'first',
+                    'key' => null,
+                    'headers' => [],
+                    'timestamp' => 111,
+                ]),
+                self::message([
+                    'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
+                    'topic_name' => 'test-topic',
+                    'partition' => 2,
+                    'offset' => 11,
+                    'payload' => 'second',
+                    'key' => null,
+                    'headers' => [],
+                    'timestamp' => 222,
+                ]),
+            )
+        ;
+
+        $spy = new SpyStreamObserver();
+        $generator = (new KafkaMessageStream($this->buildConsumer($rdKafka), 500, $spy))->stream();
+
+        $first = $generator->current();
+        $generator->next();
+        $second = $generator->current();
+
+        self::assertCount(2, $spy->messages);
+        self::assertSame($first, $spy->messages[0]);
+        self::assertSame($second, $spy->messages[1]);
+        self::assertCount(1, $spy->timeouts);
+        self::assertInstanceOf(KafkaConsumeTimeout::class, $spy->timeouts[0]);
+        self::assertCount(1, $spy->brokersDown);
+        self::assertInstanceOf(KafkaBrokersDown::class, $spy->brokersDown[0]);
+        self::assertCount(1, $spy->eofs);
+        self::assertInstanceOf(KafkaPartitionEof::class, $spy->eofs[0]);
+    }
+
+    public function testStreamIsInterruptedByObserverException(): void
+    {
+        // Исключение из хука прерывает генератор: второй результат
+        // (сообщение) уже не потребляется, итератор мёртв.
+        $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
+        $rdKafka->method('getSubscription')->willReturn(['test-topic']);
+        $rdKafka->expects($this->once())
+            ->method('consume')
+            ->willReturn(self::message([
+                'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
+                'partition' => -1,
+                'offset' => -1,
+            ]))
+        ;
+
+        $observer = new class implements StreamObserver {
+            public function onMessage(KafkaConsumerMessage $message): void {}
+
+            public function onTimeout(KafkaConsumeTimeout $timeout): void {}
+
+            public function onEof(KafkaPartitionEof $eof): void {}
+
+            public function onBrokersDown(KafkaBrokersDown $brokersDown): void
+            {
+                throw new \RuntimeException('observer decided to stop');
+            }
+        };
+
+        $generator = (new KafkaMessageStream($this->buildConsumer($rdKafka), 100, $observer))->stream();
+
+        try {
+            $generator->current();
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            self::assertSame('observer decided to stop', $e->getMessage());
+        }
+
+        self::assertFalse($generator->valid());
     }
 
     public function testStreamThrowsNotSubscribedWithoutSubscription(): void
