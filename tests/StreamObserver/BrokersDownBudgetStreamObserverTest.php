@@ -12,6 +12,7 @@ use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\StreamObserver\BrokersDownBudgetStreamObserver;
 use Anktx\Kafka\Client\Tests\Support\FakeClock;
+use Anktx\Kafka\Client\Topic\Topic;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -84,7 +85,7 @@ final class BrokersDownBudgetStreamObserverTest extends TestCase
             }
 
             $clock->advanceMs(1000);
-            $observer->onEof(new KafkaPartitionEof(topic: 'test-topic', partition: 1, offset: 7));
+            $observer->onEof(new KafkaPartitionEof(topic: new Topic('test-topic'), partition: 1, offset: 7));
 
             foreach (range(1, 6) as $i) {
                 $clock->advanceMs(1000);
@@ -150,7 +151,7 @@ final class BrokersDownBudgetStreamObserverTest extends TestCase
     private static function message(string $body): KafkaConsumerMessage
     {
         return new KafkaConsumerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             partition: 2,
             offset: 10,
             body: $body,

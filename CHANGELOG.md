@@ -7,6 +7,68 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-20
+
+### Added
+
+- `Config\Brokers` — value object списка брокеров (`host[:port][,...]`,
+  свойство `$value`): пустой список и формат `host[:port]` (DNS-имя, IPv4,
+  IPv6 в квадратных скобках, порт 0–65535) валидируются в собственном
+  конструкторе с теми же сообщениями `InvalidConfigException`. Тип
+  гарантирует валидный список без конвенции «не забыть вызвать
+  валидатор» в каждом конфиге.
+- `Topic` — value object имени топика (свойство `$name`): инвариант
+  «непустая строка» заменяет одинаковые inline-проверки в
+  `TopicSubscription`, `KafkaProducerMessage` и `KafkaConsumerMessage`
+  (пустое имя → новое исключение `InvalidTopicException`).
+- `InvalidTopicException` (`Exception\Logic`): пустое имя топика.
+
+### Changed
+
+- **BC:** `TopicSubscriptionList` переименован в `TopicList`; классы
+  `Topic` и `TopicList` переехали в неймспейс `Anktx\Kafka\Client\Topic`
+  (`Topic` — из корня `Anktx\Kafka\Client`, `TopicSubscriptionList` —
+  из `Anktx\Kafka\Client\TopicSubscription`). API списка не изменился:
+  `TopicList::create(new Topic(...))`, конструктор
+  `new TopicList(new Topic(...))` и `topicNames(): string[]`.
+- **BC:** `ProducerConfig`/`ConsumerConfig` принимают `brokers` как
+  `Config\Brokers` вместо строки: `new ProducerConfig(brokers: new
+  Brokers('kafka:9092'))`. Проверки пустого списка и формата уехали в
+  конструктор VO и в конфигах не дублируются.
+- **BC:** `KafkaProducerMessage`, `KafkaConsumerMessage`,
+  `TopicList::create()` и `KafkaPartitionEof` принимают/хранят `Topic`
+  вместо строки; чтение имени — через `->topic->name` (для подписок —
+  `TopicList::topicNames()` без изменений возвращает `string[]`).
+- **BC:** пустое имя топика бросает `InvalidTopicException` вместо
+  `InvalidMessageException` (сообщения) и `InvalidSubscriptionException`
+  (подписки); для доставленного сообщения без `topic_name` (практически
+  недостижимо) `consume()` тоже бросает `InvalidTopicException`.
+- **BC:** `consume()` на `RD_KAFKA_RESP_ERR__PARTITION_EOF` без
+  `topic_name` (практически недостижимо) бросает `InvalidTopicException`
+  вместо результата `KafkaPartitionEof` с пустым topic.
+
+### Removed
+
+- **BC:** `TopicSubscription` — после удаления `partition`/`offset` в
+  0.9.0 класс стал чистой обёрткой над `Topic` без данных и поведения.
+  `TopicList` принимает и хранит `Topic` напрямую; конструкцию
+  `new TopicSubscription($topic)` заменяет передача `Topic` в список
+  напрямую.
+- **BC:** `Config\Brokers::assertValid()` — статический валидатор заменён
+  конструктором value object.
+- **BC:** `InvalidSubscriptionException` — единственный throw-сайт
+  (пустой topic подписки) покрыт инвариантом `Topic`; пустой topic
+  сообщения больше не отдельный контракт `InvalidMessageException`
+  (фабрика `emptyString()` удалена, `nonNegativeInt()` и
+  `partitionBelowUnassigned()` остаются).
+
+### Fixed
+
+- Makefile: `-e KAFKA_BROKERS` в `test-integration`/`test-all`/`test-file`
+  стоял после имени образа — docker трактовал его как команду контейнера
+  (`Could not open input file: KAFKA_BROKERS=...`), и адрес брокера
+  никогда не пробрасывался. Имя образа вынесено в конец команды docker run.
+
 ## [0.10.0] - 2026-08-20
 
 ### Added
@@ -441,7 +503,8 @@
   Обратно совместимо — существующий код, передающий `instanceId`, работает
   без изменений.
 
-[Unreleased]: https://git.anom.ru/anktx/kafka-client/compare/0.10.0...master
+[Unreleased]: https://git.anom.ru/anktx/kafka-client/compare/0.11.0...master
+[0.11.0]: https://git.anom.ru/anktx/kafka-client/compare/0.10.0...0.11.0
 [0.10.0]: https://git.anom.ru/anktx/kafka-client/compare/0.9.0...0.10.0
 [0.9.0]: https://git.anom.ru/anktx/kafka-client/compare/0.8.0...0.9.0
 [0.8.0]: https://git.anom.ru/anktx/kafka-client/compare/0.7.2...0.8.0

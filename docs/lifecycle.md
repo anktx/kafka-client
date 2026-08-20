@@ -144,7 +144,7 @@ trade-off: детерминированный жизненный цикл важ
 ## Рекомендуемый шаблон worker-цикла
 
 ```php
-$consumer->subscribe($subscriptions);
+$consumer->subscribe($topics);
 
 try {
     while ($running) {

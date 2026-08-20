@@ -10,19 +10,20 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Юнит-тесты формата списка брокеров {@see Brokers} — общего валидатора
+ * Юнит-тесты value object {@see Brokers}: валидация списка брокеров
+ * `host[:port][,host[:port]...]` — инвариант конструктора, общий для
  * ProducerConfig/ConsumerConfig. Полный набор граничных случаев живёт
- * здесь; конфиги дополнительно проверяют только сам факт подключения
- * валидатора.
+ * здесь; конфиги принимают уже провалидированный тип и собственных
+ * проверок brokers не дублируют.
  */
 final class BrokersTest extends TestCase
 {
     #[DataProvider('provideValidBrokerLists')]
     public function testAcceptsValidBrokerLists(string $brokers): void
     {
-        Brokers::assertValid($brokers);
+        $valueObject = new Brokers($brokers);
 
-        self::assertTrue(true, 'Broker list is valid: ' . $brokers);
+        self::assertSame($brokers, $valueObject->value);
     }
 
     /**
@@ -49,6 +50,14 @@ final class BrokersTest extends TestCase
         yield 'port boundary 65535' => ['kafka:65535'];
     }
 
+    public function testRejectsEmptyList(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "brokers" must not be an empty string');
+
+        new Brokers('');
+    }
+
     #[DataProvider('provideInvalidBrokerLists')]
     public function testRejectsInvalidBrokerLists(string $brokers): void
     {
@@ -58,7 +67,7 @@ final class BrokersTest extends TestCase
             $brokers,
         ));
 
-        Brokers::assertValid($brokers);
+        new Brokers($brokers);
     }
 
     /**

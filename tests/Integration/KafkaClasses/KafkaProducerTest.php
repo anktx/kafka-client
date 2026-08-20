@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Integration\KafkaClasses;
 
+use Anktx\Kafka\Client\Config\Brokers;
 use Anktx\Kafka\Client\Config\Enum\CompressionType;
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
@@ -11,6 +12,7 @@ use Anktx\Kafka\Client\KafkaProducer;
 use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;
 use Anktx\Kafka\Client\PollStrategy\TimeoutPollStrategy;
 use Anktx\Kafka\Client\Tests\Integration\Support\KafkaBroker;
+use Anktx\Kafka\Client\Topic\Topic;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -28,7 +30,7 @@ final class KafkaProducerTest extends TestCase
 
     public function testConstructor(): void
     {
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
 
         self::assertInstanceOf(KafkaProducer::class, $producer);
     }
@@ -36,7 +38,7 @@ final class KafkaProducerTest extends TestCase
     public function testConstructorWithCustomPollStrategy(): void
     {
         $producer = new KafkaProducer(
-            new ProducerConfig(brokers: $this->brokers),
+            new ProducerConfig(brokers: new Brokers($this->brokers)),
             new TimeoutPollStrategy(pollIntervalMs: 1000),
         );
 
@@ -46,7 +48,7 @@ final class KafkaProducerTest extends TestCase
     public function testConstructorWithNeverPollStrategy(): void
     {
         $producer = new KafkaProducer(
-            new ProducerConfig(brokers: $this->brokers),
+            new ProducerConfig(brokers: new Brokers($this->brokers)),
             new NeverPollStrategy(),
         );
 
@@ -56,7 +58,7 @@ final class KafkaProducerTest extends TestCase
     public function testConstructorWithDebugEnabled(): void
     {
         $producer = new KafkaProducer(new ProducerConfig(
-            brokers: $this->brokers,
+            brokers: new Brokers($this->brokers),
             isDebug: true,
         ));
 
@@ -66,7 +68,7 @@ final class KafkaProducerTest extends TestCase
     public function testConstructorWithCustomBatchSize(): void
     {
         $producer = new KafkaProducer(new ProducerConfig(
-            brokers: $this->brokers,
+            brokers: new Brokers($this->brokers),
             batchSize: 51200,
         ));
 
@@ -76,7 +78,7 @@ final class KafkaProducerTest extends TestCase
     public function testConstructorWithCompression(): void
     {
         $producer = new KafkaProducer(new ProducerConfig(
-            brokers: $this->brokers,
+            brokers: new Brokers($this->brokers),
             compressionType: CompressionType::Gzip,
         ));
 
@@ -85,11 +87,11 @@ final class KafkaProducerTest extends TestCase
 
     public function testProduce(): void
     {
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
         self::assertInstanceOf(KafkaProducer::class, $producer);
 
         $producer->produce(new KafkaProducerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             body: 'test message',
             partition: 0,
         ));
@@ -99,11 +101,11 @@ final class KafkaProducerTest extends TestCase
 
     public function testProduceWithAllParameters(): void
     {
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
         self::assertInstanceOf(KafkaProducer::class, $producer);
 
         $producer->produce(new KafkaProducerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             body: 'test message',
             partition: 0,
             key: 'test-key',
@@ -116,11 +118,11 @@ final class KafkaProducerTest extends TestCase
 
     public function testProduceWithUnassignedPartition(): void
     {
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
         self::assertInstanceOf(KafkaProducer::class, $producer);
 
         $producer->produce(new KafkaProducerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             body: 'test message',
         ));
 
@@ -129,21 +131,21 @@ final class KafkaProducerTest extends TestCase
 
     public function testProduceWithNullBody(): void
     {
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
         self::assertInstanceOf(KafkaProducer::class, $producer);
 
-        $producer->produce(new KafkaProducerMessage(topic: 'test-topic'));
+        $producer->produce(new KafkaProducerMessage(topic: new Topic('test-topic')));
 
         $producer->flush(5000);
     }
 
     public function testProduceWithEmptyHeaders(): void
     {
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
         self::assertInstanceOf(KafkaProducer::class, $producer);
 
         $producer->produce(new KafkaProducerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             body: 'test',
             headers: [],
         ));
@@ -153,12 +155,12 @@ final class KafkaProducerTest extends TestCase
 
     public function testProduceMultipleMessages(): void
     {
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
         self::assertInstanceOf(KafkaProducer::class, $producer);
 
         for ($i = 0; $i < 10; ++$i) {
             $producer->produce(new KafkaProducerMessage(
-                topic: 'test-topic',
+                topic: new Topic('test-topic'),
                 body: "message {$i}",
                 partition: 0,
             ));
@@ -169,11 +171,11 @@ final class KafkaProducerTest extends TestCase
 
     public function testProduceAndFlush(): void
     {
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
         self::assertInstanceOf(KafkaProducer::class, $producer);
 
         $producer->produce(new KafkaProducerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             body: 'test message',
         ));
         $producer->flush(5000);
@@ -181,11 +183,11 @@ final class KafkaProducerTest extends TestCase
 
     public function testFlushWithCustomTimeout(): void
     {
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
         self::assertInstanceOf(KafkaProducer::class, $producer);
 
         $producer->produce(new KafkaProducerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             body: 'test message',
         ));
         $producer->flush(10000);

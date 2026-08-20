@@ -6,15 +6,16 @@ namespace Anktx\Kafka\Client\Tests\Message;
 
 use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
+use Anktx\Kafka\Client\Topic\Topic;
 use PHPUnit\Framework\TestCase;
 
 final class KafkaProducerMessageTest extends TestCase
 {
     public function testCreate(): void
     {
-        $message = new KafkaProducerMessage(topic: 'test-topic');
+        $message = new KafkaProducerMessage(topic: new Topic('test-topic'));
 
-        self::assertSame('test-topic', $message->topic);
+        self::assertSame('test-topic', $message->topic->name);
         self::assertNull($message->body);
         self::assertSame(\RD_KAFKA_PARTITION_UA, $message->partition);
         self::assertNull($message->key);
@@ -26,7 +27,7 @@ final class KafkaProducerMessageTest extends TestCase
     {
         $headers = ['content-type' => 'application/json', 'retry-count' => 3];
         $message = new KafkaProducerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             body: 'test body',
             partition: 1,
             key: 'test-key',
@@ -34,20 +35,12 @@ final class KafkaProducerMessageTest extends TestCase
             timestampMs: 123456789,
         );
 
-        self::assertSame('test-topic', $message->topic);
+        self::assertSame('test-topic', $message->topic->name);
         self::assertSame('test body', $message->body);
         self::assertSame(1, $message->partition);
         self::assertSame('test-key', $message->key);
         self::assertSame($headers, $message->headers);
         self::assertSame(123456789, $message->timestampMs);
-    }
-
-    public function testRejectsEmptyTopic(): void
-    {
-        $this->expectException(InvalidMessageException::class);
-        $this->expectExceptionMessage('Message property "topic" must not be an empty string');
-
-        new KafkaProducerMessage(topic: '');
     }
 
     public function testRejectsPartitionBelowUnassigned(): void
@@ -57,7 +50,7 @@ final class KafkaProducerMessageTest extends TestCase
             'Message property "partition" must not be less than RD_KAFKA_PARTITION_UA (-1), -2 given',
         );
 
-        new KafkaProducerMessage(topic: 'test-topic', partition: -2);
+        new KafkaProducerMessage(topic: new Topic('test-topic'), partition: -2);
     }
 
     public function testRejectsNegativeTimestamp(): void
@@ -65,6 +58,6 @@ final class KafkaProducerMessageTest extends TestCase
         $this->expectException(InvalidMessageException::class);
         $this->expectExceptionMessage('Message property "timestampMs" must not be negative, -1 given');
 
-        new KafkaProducerMessage(topic: 'test-topic', timestampMs: -1);
+        new KafkaProducerMessage(topic: new Topic('test-topic'), timestampMs: -1);
     }
 }

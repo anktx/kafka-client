@@ -6,6 +6,7 @@ namespace Anktx\Kafka\Client\KafkaMessage;
 
 use Anktx\Kafka\Client\ConsumeResult\ConsumeResult;
 use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
+use Anktx\Kafka\Client\Topic\Topic;
 
 /**
  * Сообщение, прочитанное из Kafka.
@@ -14,8 +15,9 @@ use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
  * сообщение всегда знает, где находится. timestampMs = null означает, что
  * брокер не передал время создания сообщения.
  *
- * @throws InvalidMessageException Если topic пустой либо partition, offset
- *                                 или timestampMs отрицательны
+ * @throws InvalidMessageException Если partition, offset или timestampMs
+ *                                 отрицательны; пустое имя топика невозможно
+ *                                 by construction ({@see Topic})
  */
 final readonly class KafkaConsumerMessage implements ConsumeResult
 {
@@ -23,7 +25,7 @@ final readonly class KafkaConsumerMessage implements ConsumeResult
      * @param null|array<string, int|string> $headers
      */
     public function __construct(
-        public string $topic,
+        public Topic $topic,
         public int $partition,
         public int $offset,
         public ?string $body = null,
@@ -31,10 +33,6 @@ final readonly class KafkaConsumerMessage implements ConsumeResult
         public ?array $headers = null,
         public ?int $timestampMs = null,
     ) {
-        if ($this->topic === '') {
-            throw InvalidMessageException::emptyString('topic');
-        }
-
         if ($this->partition < 0) {
             throw InvalidMessageException::nonNegativeInt('partition', $this->partition);
         }

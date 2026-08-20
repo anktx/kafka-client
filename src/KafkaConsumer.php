@@ -16,7 +16,8 @@ use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
 use Anktx\Kafka\Client\StreamObserver\BrokersDownBudgetStreamObserver;
-use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
+use Anktx\Kafka\Client\Topic\Topic;
+use Anktx\Kafka\Client\Topic\TopicList;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RdKafka\Exception;
@@ -68,7 +69,7 @@ final class KafkaConsumer
             // InvalidConfigException ещё до try), group.id гарантированно непуст;
             // отказ rd_kafka_new() возможен только на уровне процесса (OOM/EMFILE).
             $this->logger->error('Failed to create RdKafka consumer', [
-                'brokers' => $config->brokers,
+                'brokers' => $config->brokers->value,
                 'group_id' => $config->groupId,
                 'reason' => $e->getMessage(),
                 'exception' => $e,
@@ -79,7 +80,7 @@ final class KafkaConsumer
         }
 
         $this->logger->info('KafkaConsumer created', [
-            'brokers' => $config->brokers,
+            'brokers' => $config->brokers->value,
             'group_id' => $config->groupId,
             'instance_id' => $config->instanceId,
             'offset_reset' => $config->offsetReset->value,
@@ -107,13 +108,13 @@ final class KafkaConsumer
      * набор топиков (старые отписываются, в фоне запускается rebalance).
      * Для изменения набора топиков передавайте новый полный список.
      *
-     * @param TopicSubscriptionList $subscriptionList Список подписок на топики
+     * @param TopicList $subscriptionList Список подписок на топики
      *
      * @throws ClientClosedException       Если консьюмер закрыт через close()
      * @throws EmptySubscriptionsException Если список подписок пуст
      * @throws KafkaConsumerException      Если librdkafka не принял подписку
      */
-    public function subscribe(TopicSubscriptionList $subscriptionList): void
+    public function subscribe(TopicList $subscriptionList): void
     {
         $this->assertNotClosed(__METHOD__);
 
@@ -233,7 +234,9 @@ final class KafkaConsumer
             \RD_KAFKA_RESP_ERR_NO_ERROR => new KafkaConsumerMessage(
                 // topic_name нативно nullable; для доставленного сообщения
                 // ext-rdkafka заполняет его всегда, null нормализуется в ''
-                topic: $message->topic_name ?? '',
+                // и отвергается инвариантом Topic — осмысленное исключение
+                // библиотеки вместо TypeError.
+                topic: new Topic($message->topic_name ?? ''),
                 partition: $message->partition,
                 offset: $message->offset,
                 body: $message->payload,
@@ -246,8 +249,11 @@ final class KafkaConsumer
                     : null,
             ),
 
+            // EOF всегда относится к конкретной партиции: topic_name у него
+            // ext-rdkafka заполняет всегда, null нормализуется в '' и
+            // отвергается инвариантом Topic.
             \RD_KAFKA_RESP_ERR__PARTITION_EOF => new KafkaPartitionEof(
-                topic: $message->topic_name ?? '',
+                topic: new Topic($message->topic_name ?? ''),
                 partition: $message->partition,
                 offset: $message->offset,
             ),
@@ -284,11 +290,11 @@ final class KafkaConsumer
 
         try {
             $this->consumer->commit([
-                new TopicPartition($message->topic, $message->partition, $message->offset + 1),
+                new TopicPartition($message->topic->name, $message->partition, $message->offset + 1),
             ]);
         } catch (Exception $e) {
             $this->logger->error('Failed to commit message', [
-                'topic' => $message->topic,
+                'topic' => $message->topic->name,
                 'partition' => $message->partition,
                 'offset' => $message->offset,
                 'reason' => $e->getMessage(),
@@ -296,7 +302,7 @@ final class KafkaConsumer
             ]);
 
             throw KafkaConsumerException::commitFailed(
-                topic: $message->topic,
+                topic: $message->topic->name,
                 partition: $message->partition,
                 offset: $message->offset,
                 e: $e,

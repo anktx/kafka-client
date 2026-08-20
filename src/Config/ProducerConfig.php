@@ -12,19 +12,13 @@ use RdKafka\Exception;
 final readonly class ProducerConfig
 {
     public function __construct(
-        public string $brokers,
+        public Brokers $brokers,
         public int $queueBufferingMaxKBytes = 20480,
         public int $batchSize = 102400,
         public int $lingerMs = 10,
         public CompressionType $compressionType = CompressionType::Snappy,
         public bool $isDebug = false,
     ) {
-        if ($this->brokers === '') {
-            throw InvalidConfigException::emptyString('brokers');
-        }
-
-        Brokers::assertValid($this->brokers);
-
         if ($this->queueBufferingMaxKBytes <= 0) {
             throw InvalidConfigException::positiveInt('queueBufferingMaxKBytes', $this->queueBufferingMaxKBytes);
         }
@@ -53,7 +47,7 @@ final readonly class ProducerConfig
                 $conf->set('debug', 'all');
             }
 
-            $conf->set('bootstrap.servers', $this->brokers);
+            $conf->set('bootstrap.servers', $this->brokers->value);
             $conf->set('compression.type', $this->compressionType->value);
             $conf->set('queue.buffering.max.kbytes', (string) $this->queueBufferingMaxKBytes);
             $conf->set('batch.size', (string) $this->batchSize);

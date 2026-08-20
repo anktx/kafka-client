@@ -6,11 +6,6 @@ namespace Anktx\Kafka\Client\Exception\Logic;
 
 final class InvalidMessageException extends LogicException
 {
-    public static function emptyString(string $property): self
-    {
-        return new self(\sprintf('Message property "%s" must not be an empty string', $property));
-    }
-
     public static function nonNegativeInt(string $property, int $value): self
     {
         return new self(\sprintf('Message property "%s" must not be negative, %d given', $property, $value));

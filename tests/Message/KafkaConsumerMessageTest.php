@@ -6,15 +6,16 @@ namespace Anktx\Kafka\Client\Tests\Message;
 
 use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
+use Anktx\Kafka\Client\Topic\Topic;
 use PHPUnit\Framework\TestCase;
 
 final class KafkaConsumerMessageTest extends TestCase
 {
     public function testCreate(): void
     {
-        $message = new KafkaConsumerMessage(topic: 'test-topic', partition: 1, offset: 100);
+        $message = new KafkaConsumerMessage(topic: new Topic('test-topic'), partition: 1, offset: 100);
 
-        self::assertSame('test-topic', $message->topic);
+        self::assertSame('test-topic', $message->topic->name);
         self::assertSame(1, $message->partition);
         self::assertSame(100, $message->offset);
         self::assertNull($message->body);
@@ -27,7 +28,7 @@ final class KafkaConsumerMessageTest extends TestCase
     {
         $headers = ['content-type' => 'application/json', 'retry-count' => 3];
         $message = new KafkaConsumerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             partition: 1,
             offset: 100,
             body: 'test body',
@@ -36,7 +37,7 @@ final class KafkaConsumerMessageTest extends TestCase
             timestampMs: 123456789,
         );
 
-        self::assertSame('test-topic', $message->topic);
+        self::assertSame('test-topic', $message->topic->name);
         self::assertSame(1, $message->partition);
         self::assertSame(100, $message->offset);
         self::assertSame('test body', $message->body);
@@ -47,19 +48,11 @@ final class KafkaConsumerMessageTest extends TestCase
 
     public function testAcceptsZeroOffsetAndTimestamp(): void
     {
-        $message = new KafkaConsumerMessage(topic: 'test-topic', partition: 0, offset: 0, timestampMs: 0);
+        $message = new KafkaConsumerMessage(topic: new Topic('test-topic'), partition: 0, offset: 0, timestampMs: 0);
 
         self::assertSame(0, $message->partition);
         self::assertSame(0, $message->offset);
         self::assertSame(0, $message->timestampMs);
-    }
-
-    public function testRejectsEmptyTopic(): void
-    {
-        $this->expectException(InvalidMessageException::class);
-        $this->expectExceptionMessage('Message property "topic" must not be an empty string');
-
-        new KafkaConsumerMessage(topic: '', partition: 1, offset: 100);
     }
 
     public function testRejectsNegativePartition(): void
@@ -67,7 +60,7 @@ final class KafkaConsumerMessageTest extends TestCase
         $this->expectException(InvalidMessageException::class);
         $this->expectExceptionMessage('Message property "partition" must not be negative, -1 given');
 
-        new KafkaConsumerMessage(topic: 'test-topic', partition: -1, offset: 100);
+        new KafkaConsumerMessage(topic: new Topic('test-topic'), partition: -1, offset: 100);
     }
 
     public function testRejectsNegativeOffset(): void
@@ -75,7 +68,7 @@ final class KafkaConsumerMessageTest extends TestCase
         $this->expectException(InvalidMessageException::class);
         $this->expectExceptionMessage('Message property "offset" must not be negative, -1 given');
 
-        new KafkaConsumerMessage(topic: 'test-topic', partition: 1, offset: -1);
+        new KafkaConsumerMessage(topic: new Topic('test-topic'), partition: 1, offset: -1);
     }
 
     public function testRejectsNegativeTimestamp(): void
@@ -83,6 +76,6 @@ final class KafkaConsumerMessageTest extends TestCase
         $this->expectException(InvalidMessageException::class);
         $this->expectExceptionMessage('Message property "timestampMs" must not be negative, -1 given');
 
-        new KafkaConsumerMessage(topic: 'test-topic', partition: 1, offset: 100, timestampMs: -1);
+        new KafkaConsumerMessage(topic: new Topic('test-topic'), partition: 1, offset: 100, timestampMs: -1);
     }
 }

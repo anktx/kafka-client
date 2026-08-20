@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Integration\KafkaClasses;
 
+use Anktx\Kafka\Client\Config\Brokers;
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use Anktx\Kafka\Client\Config\ProducerConfig;
@@ -13,7 +14,8 @@ use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaMessageStream;
 use Anktx\Kafka\Client\KafkaProducer;
 use Anktx\Kafka\Client\Tests\Integration\Support\KafkaBroker;
-use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
+use Anktx\Kafka\Client\Topic\Topic;
+use Anktx\Kafka\Client\Topic\TopicList;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -32,7 +34,7 @@ final class KafkaMessageStreamTest extends TestCase
     public function testConstructor(): void
     {
         $consumer = new KafkaConsumer(new ConsumerConfig(
-            brokers: $this->brokers,
+            brokers: new Brokers($this->brokers),
             groupId: 'stream-test-' . uniqid('', true),
         ));
 
@@ -46,7 +48,7 @@ final class KafkaMessageStreamTest extends TestCase
     public function testConstructorWithCustomTimeout(): void
     {
         $consumer = new KafkaConsumer(new ConsumerConfig(
-            brokers: $this->brokers,
+            brokers: new Brokers($this->brokers),
             groupId: 'stream-test-' . uniqid('', true),
         ));
 
@@ -62,7 +64,7 @@ final class KafkaMessageStreamTest extends TestCase
         // stream() делегирует consume(), который без подписки бросает
         // NotSubscribedException — контракт задокументирован в @throws.
         $consumer = new KafkaConsumer(new ConsumerConfig(
-            brokers: $this->brokers,
+            brokers: new Brokers($this->brokers),
             groupId: 'stream-test-' . uniqid('', true),
         ));
 
@@ -83,22 +85,22 @@ final class KafkaMessageStreamTest extends TestCase
         // → stream() отдаёт ровно отправленное сообщение.
         $topic = 'stream-test-topic-' . uniqid('', true);
 
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
         $producer->produce(new KafkaProducerMessage(
-            topic: $topic,
+            topic: new Topic($topic),
             body: 'streamed',
             key: 'k',
         ));
         $producer->flush(5000);
 
         $consumer = new KafkaConsumer(new ConsumerConfig(
-            brokers: $this->brokers,
+            brokers: new Brokers($this->brokers),
             groupId: 'stream-test-' . uniqid('', true),
             offsetReset: OffsetReset::Earliest,
         ));
 
         try {
-            $consumer->subscribe(TopicSubscriptionList::create($topic));
+            $consumer->subscribe(TopicList::create(new Topic($topic)));
 
             $received = 0;
 

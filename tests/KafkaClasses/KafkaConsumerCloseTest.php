@@ -10,7 +10,8 @@ use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
 use Anktx\Kafka\Client\Tests\Support\KafkaConsumers;
-use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
+use Anktx\Kafka\Client\Topic\Topic;
+use Anktx\Kafka\Client\Topic\TopicList;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Exception;
@@ -66,7 +67,7 @@ final class KafkaConsumerCloseTest extends TestCase
     public function testSubscribeAfterCloseThrowsClientClosed(): void
     {
         $this->assertMethodRejectedAfterClose('subscribe', static fn(KafkaConsumer $c) => $c->subscribe(
-            TopicSubscriptionList::create('test-topic'),
+            TopicList::create(new Topic('test-topic')),
         ));
     }
 
@@ -86,10 +87,10 @@ final class KafkaConsumerCloseTest extends TestCase
     public function testCommitAfterCloseThrowsClientClosed(): void
     {
         $message = new KafkaConsumerMessage(
-            topic: 'test-topic',
-            body: 'hello',
+            topic: new Topic('test-topic'),
             partition: 0,
             offset: 42,
+            body: 'hello',
         );
 
         $this->assertMethodRejectedAfterClose('commit', static fn(KafkaConsumer $c) => $c->commit($message));

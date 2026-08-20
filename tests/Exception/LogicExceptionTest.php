@@ -6,7 +6,7 @@ namespace Anktx\Kafka\Client\Tests\Exception;
 
 use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
 use Anktx\Kafka\Client\Exception\Logic\EmptySubscriptionsException;
-use Anktx\Kafka\Client\Exception\Logic\InvalidSubscriptionException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidTopicException;
 use Anktx\Kafka\Client\Exception\Logic\LogicException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use PHPUnit\Framework\TestCase;
@@ -96,17 +96,17 @@ final class LogicExceptionTest extends TestCase
         self::assertSame($previous, $exception->getPrevious());
     }
 
-    public function testInvalidSubscriptionExceptionEmptyTopic(): void
+    public function testInvalidTopicExceptionEmptyName(): void
     {
-        $exception = InvalidSubscriptionException::emptyTopic();
+        $exception = InvalidTopicException::emptyName();
 
         self::assertInstanceOf(LogicException::class, $exception);
-        self::assertInstanceOf(InvalidSubscriptionException::class, $exception);
-        self::assertSame('Subscription topic must not be an empty string', $exception->getMessage());
+        self::assertInstanceOf(InvalidTopicException::class, $exception);
+        self::assertSame('Topic name must not be an empty string', $exception->getMessage());
     }
 
-    public function testInvalidSubscriptionExceptionIsLogicException(): void
+    public function testInvalidTopicExceptionIsLogicException(): void
     {
-        self::assertInstanceOf(\LogicException::class, InvalidSubscriptionException::emptyTopic());
+        self::assertInstanceOf(\LogicException::class, InvalidTopicException::emptyName());
     }
 }

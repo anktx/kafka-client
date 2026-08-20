@@ -18,21 +18,23 @@ composer require anktx/kafka-client
 ### Producer
 
 ```php
+use Anktx\Kafka\Client\Config\Brokers;
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Config\Enum\CompressionType;
 use Anktx\Kafka\Client\KafkaProducer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
+use Anktx\Kafka\Client\Topic\Topic;
 
 $producer = new KafkaProducer(
     new ProducerConfig(
-        brokers: 'kafka:9092',
+        brokers: new Brokers('kafka:9092'),
         compressionType: CompressionType::Snappy,
     )
 );
 
 $producer->produce(
     new KafkaProducerMessage(
-        topic: 'events',
+        topic: new Topic('events'),
         body: json_encode(['event' => 'order_created', 'id' => 123]),
         key: 'order-123',
         headers: ['source' => 'api'],
@@ -45,15 +47,17 @@ $producer->flush();
 ### Consumer
 
 ```php
+use Anktx\Kafka\Client\Config\Brokers;
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
-use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
+use Anktx\Kafka\Client\Topic\Topic;
+use Anktx\Kafka\Client\Topic\TopicList;
 
 $consumer = new KafkaConsumer(
     new ConsumerConfig(
-        brokers: 'kafka:9092',
+        brokers: new Brokers('kafka:9092'),
         groupId: 'order-processor',
         instanceId: 'worker-1',
         offsetReset: OffsetReset::Latest,
@@ -61,7 +65,7 @@ $consumer = new KafkaConsumer(
 );
 
 $consumer->subscribe(
-    TopicSubscriptionList::create('events')
+    TopicList::create(new Topic('events'))
 );
 
 while (true) {
@@ -158,7 +162,7 @@ $producer = new KafkaProducer(
 
 ```php
 $config = new ProducerConfig(
-    brokers: string,                    // Обязательно
+    brokers: Brokers,                   // Обязательно (VO: host[:port][,...] )
     queueBufferingMaxKBytes: int,       // По умолчанию: 20480
     batchSize: int,                     // По умолчанию: 102400
     lingerMs: int,                      // По умолчанию: 10
@@ -171,7 +175,7 @@ $config = new ProducerConfig(
 
 ```php
 $config = new ConsumerConfig(
-    brokers: string,                    // Обязательно
+    brokers: Brokers,                   // Обязательно (VO: host[:port][,...])
     groupId: string,                    // Обязательно
     instanceId: ?string,                // По умолчанию: null
     offsetReset: OffsetReset,           // По умолчанию: earliest
@@ -184,9 +188,11 @@ $config = new ConsumerConfig(
 );
 ```
 
-Невалидные значения (пустые `brokers`/`groupId`, отрицательные интервалы,
-`reconnectBackoffMaxMs < reconnectBackoffMs`) отбрасываются в конструкторе
-исключением `InvalidConfigException`.
+Невалидные значения отбрасываются в конструкторах `Brokers` (пустой
+список или запись вне формата `host[:port]`), конфигов (пустой `groupId`,
+отрицательные интервалы, `reconnectBackoffMaxMs < reconnectBackoffMs`)
+и сообщений/подписок (пустое имя топика — `Topic`) исключением
+`InvalidConfigException` / `InvalidTopicException`.
 
 #### OffsetReset: политика при отсутствии закоммиченного смещения
 
@@ -267,6 +273,7 @@ src/
 │   └── SystemClock.php              # Системные часы PSR-20 (по умолчанию)
 │
 ├── Config/                          # Конфигурация
+│   ├── Brokers.php                  # Список брокеров (VO: host[:port][,...] )
 │   ├── ConsumerConfig.php           # Конфигурация консьюмера
 │   ├── ProducerConfig.php           # Конфигурация продюсера
 │   └── Enum/                        # Перечисления
@@ -302,9 +309,9 @@ src/
 │   ├── SilentStreamObserver.php     # Молчаливая реакция (по умолчанию)
 │   └── BrokersDownBudgetStreamObserver.php # Fail-fast: брокеры недоступны дольше maxBrokersDownMs
 │
-├── TopicSubscription/               # Подписки на топики
-│   ├── TopicSubscription.php        # Одна подписка
-│   └── TopicSubscriptionList.php    # Список подписок
+├── Topic/                           # Топики
+│   ├── Topic.php                    # Имя топика (VO: непустая строка)
+│   └── TopicList.php                # Список топиков для подписки
 │
 ├── KafkaConsumer.php                # Главный класс консьюмера
 ├── KafkaProducer.php                # Главный класс продюсера
@@ -326,8 +333,8 @@ KafkaClientException                 # Маркер: всё, что кидает
     ├── ClientClosedException         # Операция после close() клиента
     ├── EmptySubscriptionsException   # Пустой список подписок
     ├── InvalidConfigException        # Невалидная конфигурация или параметры
-    ├── InvalidMessageException       # Невалидные свойства сообщения (пустой topic и т.п.)
-    ├── InvalidSubscriptionException  # Пустой topic в подписке
+    ├── InvalidMessageException       # Невалидные свойства сообщения (partition, timestampMs)
+    ├── InvalidTopicException         # Пустое имя топика (Topic VO)
     └── NotSubscribedException        # Не подписан на топики
 ```
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
+use Anktx\Kafka\Client\Config\Brokers;
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaFlushTimeoutException;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaProducerException;
@@ -13,6 +14,7 @@ use Anktx\Kafka\Client\KafkaProducer;
 use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;
 use Anktx\Kafka\Client\PollStrategy\PollStrategy;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
+use Anktx\Kafka\Client\Topic\Topic;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Exception;
@@ -40,7 +42,7 @@ final class KafkaProducerTest extends TestCase
         // асинхронно в фоновых потоках, до первого produce() сети нет.
         $logger = new InMemoryLogger();
 
-        $producer = new KafkaProducer(new ProducerConfig(brokers: 'localhost:1'), logger: $logger);
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers('localhost:1')), logger: $logger);
 
         self::assertInstanceOf(KafkaProducer::class, $producer);
 
@@ -223,8 +225,8 @@ final class KafkaProducerTest extends TestCase
 
         $kafkaProducer = $this->buildProducer($producer);
 
-        $kafkaProducer->produce(new KafkaProducerMessage(topic: 'events', body: 'e'));
-        $kafkaProducer->produce(new KafkaProducerMessage(topic: 'orders', body: 'o'));
+        $kafkaProducer->produce(new KafkaProducerMessage(topic: new Topic('events'), body: 'e'));
+        $kafkaProducer->produce(new KafkaProducerMessage(topic: new Topic('orders'), body: 'o'));
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -390,7 +392,7 @@ final class KafkaProducerTest extends TestCase
 
     private static function message(): KafkaProducerMessage
     {
-        return new KafkaProducerMessage(topic: 'test-topic', body: 'hello');
+        return new KafkaProducerMessage(topic: new Topic('test-topic'), body: 'hello');
     }
 
     private function buildProducer(

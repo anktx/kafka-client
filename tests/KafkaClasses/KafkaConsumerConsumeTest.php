@@ -9,14 +9,15 @@ use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
-use Anktx\Kafka\Client\Exception\Logic\InvalidMessageException;
+use Anktx\Kafka\Client\Exception\Logic\InvalidTopicException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
 use Anktx\Kafka\Client\Tests\Support\KafkaConsumers;
 use Anktx\Kafka\Client\Tests\Support\RdKafkaMessages;
-use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
+use Anktx\Kafka\Client\Topic\Topic;
+use Anktx\Kafka\Client\Topic\TopicList;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -49,12 +50,12 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]));
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         $result = $consumer->consume(100);
 
         self::assertInstanceOf(KafkaConsumerMessage::class, $result);
-        self::assertSame('test-topic', $result->topic);
+        self::assertSame('test-topic', $result->topic->name);
         self::assertSame('hello', $result->body);
         self::assertSame(3, $result->partition);
         self::assertSame(42, $result->offset);
@@ -70,7 +71,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         $rdKafka->expects($this->never())->method('consume');
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         try {
             $consumer->consume(-1);
@@ -92,7 +93,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]));
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         self::assertInstanceOf(KafkaConsumeTimeout::class, $consumer->consume(0));
     }
@@ -111,7 +112,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]));
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         self::assertInstanceOf(KafkaConsumeTimeout::class, $consumer->consume());
     }
@@ -133,7 +134,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]));
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         $result = $consumer->consume(100);
 
@@ -164,12 +165,12 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]));
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         $result = $consumer->consume(100);
 
         self::assertInstanceOf(KafkaPartitionEof::class, $result);
-        self::assertSame('test-topic', $result->topic);
+        self::assertSame('test-topic', $result->topic->name);
         self::assertSame(1, $result->partition);
         self::assertSame(7, $result->offset);
     }
@@ -178,9 +179,9 @@ final class KafkaConsumerConsumeTest extends TestCase
     public function testConsumeRejectsDeliveredMessageWithoutTopic(): void
     {
         // topic_name нативно nullable; для NO_ERROR-сообщения без топика
-        // нормализация null → '' доходит до инварианта KafkaConsumerMessage
-        // и даёт осмысленное исключение библиотеки вместо TypeError.
-        $this->expectException(InvalidMessageException::class);
+        // нормализация null → '' доходит до инварианта Topic и даёт
+        // осмысленное исключение библиотеки вместо TypeError.
+        $this->expectException(InvalidTopicException::class);
 
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
@@ -193,16 +194,19 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]));
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         $consumer->consume(100);
     }
 
     #[AllowMockObjectsWithoutExpectations]
-    public function testConsumeNormalizesMissingTopicToEmptyStringOnPartitionEof(): void
+    public function testConsumeRejectsPartitionEofWithoutTopic(): void
     {
-        // KafkaPartitionEof не валидирует topic: нормализация null → ''
-        // наблюдаема напрямую в результате.
+        // EOF всегда относится к конкретной партиции, topic_name у него
+        // ext-rdkafka заполняет всегда; для гипотетического null
+        // нормализация '' отвергается инвариантом Topic.
+        $this->expectException(InvalidTopicException::class);
+
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')->willReturn(RdKafkaMessages::fromValues([
@@ -213,12 +217,9 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]));
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
-        $result = $consumer->consume(100);
-
-        self::assertInstanceOf(KafkaPartitionEof::class, $result);
-        self::assertSame('', $result->topic);
+        $consumer->consume(100);
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -233,7 +234,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]));
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         $result = $consumer->consume(100);
 
@@ -256,7 +257,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]));
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         $result = $consumer->consume(100);
 
@@ -293,7 +294,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         ;
 
         $consumer = KafkaConsumers::build($rdKafka);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         // Первая итерация: брокер недоступен — consume() работает, не бросает.
         $result1 = $consumer->consume(100);
@@ -320,7 +321,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         ]));
 
         $consumer = KafkaConsumers::build($rdKafka, $logger);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         try {
             $consumer->consume(100);
@@ -365,7 +366,7 @@ final class KafkaConsumerConsumeTest extends TestCase
         ;
 
         $consumer = KafkaConsumers::build($rdKafka, $logger);
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         try {
             $consumer->consume(100);
@@ -433,7 +434,7 @@ final class KafkaConsumerConsumeTest extends TestCase
 
         $consumer = KafkaConsumers::build($rdKafka);
         $consumer->commit(new KafkaConsumerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             body: 'hello',
             partition: 3,
             offset: 42,
@@ -454,7 +455,7 @@ final class KafkaConsumerConsumeTest extends TestCase
 
         try {
             $consumer->commit(new KafkaConsumerMessage(
-                topic: 'test-topic',
+                topic: new Topic('test-topic'),
                 body: 'hello',
                 partition: 3,
                 offset: 42,

@@ -19,10 +19,11 @@ PHPStan level 9 + strict-rules, PHP-CS-Fixer, Infection
 1. **Конфигурация** (`src/Config/`)
    - `ConsumerConfig`, `ProducerConfig` — immutable readonly-объекты значений,
       настраиваются именованными аргументами конструктора
-    - Валидация в конструкторе: пустые `brokers`/`groupId`, формат списка
-      `brokers` (`host[:port]` через запятую — общий валидатор `Config\Brokers`),
-      отрицательные интервалы, инвертированный диапазон reconnect-backoff →
-      `InvalidConfigException`
+    - `Brokers` — value object списка брокеров (`host[:port]` через запятую):
+      валидация в собственном конструкторе (`InvalidConfigException`), тип
+      гарантирует валидный список без дублирования проверок в конфигах
+    - Валидация в конструкторе: пустой `groupId`, отрицательные интервалы,
+      инвертированный диапазон reconnect-backoff → `InvalidConfigException`
    - Содержит enum'ы для `CompressionType` и `OffsetReset`
 
 2. **Продюсер** (`src/KafkaProducer.php`)
@@ -34,7 +35,7 @@ PHPStan level 9 + strict-rules, PHP-CS-Fixer, Infection
      сбой — error-лог (отчёты доезжают только при poll()/flush())
 
 3. **Консьюмер** (`src/KafkaConsumer.php`)
-   - Подписка на топики через `TopicSubscription`/`TopicSubscriptionList`
+   - Подписка на топики через `TopicList` (список `Topic`)
    - Чтение сообщений через `consume()` с таймаутом
    - Ручной коммит обработанных сообщений через `commit()`
    - Возврат union-типа `KafkaConsumerMessage|KafkaConsumeTimeout|KafkaBrokersDown|KafkaPartitionEof`
@@ -98,7 +99,10 @@ PHPStan level 9 + strict-rules, PHP-CS-Fixer, Infection
 
 ## Ключевые паттерны проектирования
 
-- **Immutable Value Objects**: конфигурационные классы — readonly, без сеттеров
+- **Immutable Value Objects**: конфигурационные классы — readonly, без сеттеров;
+  доменные скаляры оборачиваются в VO с валидацией в конструкторе
+  (`Config\Brokers` — список брокеров, `Topic` — имя топика): инвариант
+  гарантируется типом, а не конвенцией «не забыть проверить»
 - **Strategy Pattern**: полиморфные стратегии опроса (PollStrategy)
 - **Observer**: реакция на результаты consume() в потоке сообщений (StreamObserver)
 - **Null Object**: `SilentStreamObserver` — дефолт без реакции

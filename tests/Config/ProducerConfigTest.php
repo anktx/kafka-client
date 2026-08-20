@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Config;
 
+use Anktx\Kafka\Client\Config\Brokers;
 use Anktx\Kafka\Client\Config\Enum\CompressionType;
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
@@ -13,14 +14,14 @@ final class ProducerConfigTest extends TestCase
 {
     public function testCreate(): void
     {
-        $config = new ProducerConfig('kafka:9092');
+        $config = new ProducerConfig(new Brokers('kafka:9092'));
 
-        self::assertSame('kafka:9092', $config->brokers);
+        self::assertSame('kafka:9092', $config->brokers->value);
     }
 
     public function testAsKafkaConfig(): void
     {
-        $config = new ProducerConfig('kafka:9092');
+        $config = new ProducerConfig(new Brokers('kafka:9092'));
         $dump = $config->asKafkaConfig()->dump();
 
         // bootstrap.servers / linger.ms — алиасы: dump() отдаёт
@@ -34,7 +35,7 @@ final class ProducerConfigTest extends TestCase
 
     public function testAsKafkaConfigMapsDefaultCompressionType(): void
     {
-        $config = new ProducerConfig('kafka:9092');
+        $config = new ProducerConfig(new Brokers('kafka:9092'));
         $dump = $config->asKafkaConfig()->dump();
 
         // compression.type — алиас: dump() отдаёт канонический compression.codec
@@ -44,7 +45,7 @@ final class ProducerConfigTest extends TestCase
     public function testAsKafkaConfigAcceptsAllCompressionTypeBackingValues(): void
     {
         foreach (CompressionType::cases() as $compressionType) {
-            $config = new ProducerConfig('kafka:9092', compressionType: $compressionType);
+            $config = new ProducerConfig(new Brokers('kafka:9092'), compressionType: $compressionType);
             $dump = $config->asKafkaConfig()->dump();
 
             self::assertSame($compressionType->value, $dump['compression.codec']);
@@ -56,7 +57,7 @@ final class ProducerConfigTest extends TestCase
         // linger.ms вне диапазона librdkafka (0..900000): конструктор проходит
         // (значение неотрицательное), а Conf::set() бросает сырой RdKafka\Exception
         // — asKafkaConfig() обязан обернуть его в наш тип.
-        $config = new ProducerConfig('kafka:9092', lingerMs: \PHP_INT_MAX);
+        $config = new ProducerConfig(new Brokers('kafka:9092'), lingerMs: \PHP_INT_MAX);
 
         try {
             $config->asKafkaConfig();
@@ -69,7 +70,7 @@ final class ProducerConfigTest extends TestCase
 
     public function testDefaults(): void
     {
-        $config = new ProducerConfig('kafka:9092');
+        $config = new ProducerConfig(new Brokers('kafka:9092'));
 
         self::assertSame(20480, $config->queueBufferingMaxKBytes);
         self::assertSame(102400, $config->batchSize);
@@ -81,7 +82,7 @@ final class ProducerConfigTest extends TestCase
     public function testWithCustomQueueBufferingMaxKBytes(): void
     {
         $config = new ProducerConfig(
-            'kafka:9092',
+            new Brokers('kafka:9092'),
             queueBufferingMaxKBytes: 10240,
         );
 
@@ -91,7 +92,7 @@ final class ProducerConfigTest extends TestCase
     public function testWithCustomBatchSize(): void
     {
         $config = new ProducerConfig(
-            'kafka:9092',
+            new Brokers('kafka:9092'),
             batchSize: 51200,
         );
 
@@ -101,7 +102,7 @@ final class ProducerConfigTest extends TestCase
     public function testWithCustomLingerMs(): void
     {
         $config = new ProducerConfig(
-            'kafka:9092',
+            new Brokers('kafka:9092'),
             lingerMs: 100,
         );
 
@@ -111,7 +112,7 @@ final class ProducerConfigTest extends TestCase
     public function testWithGzipCompression(): void
     {
         $config = new ProducerConfig(
-            'kafka:9092',
+            new Brokers('kafka:9092'),
             compressionType: CompressionType::Gzip,
         );
 
@@ -121,7 +122,7 @@ final class ProducerConfigTest extends TestCase
     public function testWithLz4Compression(): void
     {
         $config = new ProducerConfig(
-            'kafka:9092',
+            new Brokers('kafka:9092'),
             compressionType: CompressionType::Lz4,
         );
 
@@ -131,7 +132,7 @@ final class ProducerConfigTest extends TestCase
     public function testWithZstdCompression(): void
     {
         $config = new ProducerConfig(
-            'kafka:9092',
+            new Brokers('kafka:9092'),
             compressionType: CompressionType::Zstd,
         );
 
@@ -141,7 +142,7 @@ final class ProducerConfigTest extends TestCase
     public function testWithNoneCompression(): void
     {
         $config = new ProducerConfig(
-            'kafka:9092',
+            new Brokers('kafka:9092'),
             compressionType: CompressionType::None,
         );
 
@@ -151,7 +152,7 @@ final class ProducerConfigTest extends TestCase
     public function testWithDebugEnabled(): void
     {
         $config = new ProducerConfig(
-            'kafka:9092',
+            new Brokers('kafka:9092'),
             isDebug: true,
         );
 
@@ -161,7 +162,7 @@ final class ProducerConfigTest extends TestCase
     public function testAsKafkaConfigWithAllOptions(): void
     {
         $config = new ProducerConfig(
-            'kafka:9092',
+            new Brokers('kafka:9092'),
             queueBufferingMaxKBytes: 10240,
             batchSize: 51200,
             lingerMs: 100,
@@ -180,33 +181,32 @@ final class ProducerConfigTest extends TestCase
         self::assertStringContainsString('all', $dump['debug']);
     }
 
-    public function testEmptyBrokersThrowsInvalidConfigException(): void
+    public function testEmptyBrokersIsRejectedByBrokersValueObject(): void
     {
+        // Пустой список и его формат — инварианты Brokers VO (полный набор
+        // граничных случаев — в BrokersTest): невалидный Brokers невозможно
+        // даже сконструировать, отдельные проверки в конфиге не дублируются.
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "brokers" must not be an empty string');
 
-        new ProducerConfig('');
+        new ProducerConfig(new Brokers(''));
     }
 
-    public function testInvalidBrokersFormatThrows(): void
+    public function testInvalidBrokersFormatIsRejectedByBrokersValueObject(): void
     {
-        // Формат списка валидируется в конструкторе (общий валидатор
-        // Brokers, полный набор граничных случаев — в BrokersTest):
-        // опечатка ловится на этапе конфигурации, а не первым сетевым
-        // отказом librdkafka.
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage(
             'Config parameter "brokers" must be a comma-separated list of host[:port] entries, "kafka:9092," given',
         );
 
-        new ProducerConfig('kafka:9092,');
+        new ProducerConfig(new Brokers('kafka:9092,'));
     }
 
     public function testValidMultiBrokerListPasses(): void
     {
-        $config = new ProducerConfig('kafka:9092,[::1]:9093');
+        $config = new ProducerConfig(new Brokers('kafka:9092,[::1]:9093'));
 
-        self::assertSame('kafka:9092,[::1]:9093', $config->brokers);
+        self::assertSame('kafka:9092,[::1]:9093', $config->brokers->value);
     }
 
     public function testZeroQueueBufferingMaxKBytesThrows(): void
@@ -214,7 +214,7 @@ final class ProducerConfigTest extends TestCase
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "queueBufferingMaxKBytes" must be positive, 0 given');
 
-        new ProducerConfig('kafka:9092', queueBufferingMaxKBytes: 0);
+        new ProducerConfig(new Brokers('kafka:9092'), queueBufferingMaxKBytes: 0);
     }
 
     public function testZeroBatchSizeThrows(): void
@@ -222,7 +222,7 @@ final class ProducerConfigTest extends TestCase
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "batchSize" must be positive, 0 given');
 
-        new ProducerConfig('kafka:9092', batchSize: 0);
+        new ProducerConfig(new Brokers('kafka:9092'), batchSize: 0);
     }
 
     public function testNegativeBatchSizeThrows(): void
@@ -230,7 +230,7 @@ final class ProducerConfigTest extends TestCase
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "batchSize" must be positive, -1 given');
 
-        new ProducerConfig('kafka:9092', batchSize: -1);
+        new ProducerConfig(new Brokers('kafka:9092'), batchSize: -1);
     }
 
     public function testNegativeLingerMsThrows(): void
@@ -238,12 +238,12 @@ final class ProducerConfigTest extends TestCase
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "lingerMs" must not be negative, -10 given');
 
-        new ProducerConfig('kafka:9092', lingerMs: -10);
+        new ProducerConfig(new Brokers('kafka:9092'), lingerMs: -10);
     }
 
     public function testZeroLingerMsIsValid(): void
     {
-        $config = new ProducerConfig('kafka:9092', lingerMs: 0);
+        $config = new ProducerConfig(new Brokers('kafka:9092'), lingerMs: 0);
 
         self::assertSame(0, $config->lingerMs);
     }

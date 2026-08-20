@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Integration\KafkaClasses;
 
+use Anktx\Kafka\Client\Config\Brokers;
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use Anktx\Kafka\Client\Config\ProducerConfig;
@@ -15,7 +16,8 @@ use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\KafkaProducer;
 use Anktx\Kafka\Client\Tests\Integration\Support\KafkaBroker;
-use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
+use Anktx\Kafka\Client\Topic\Topic;
+use Anktx\Kafka\Client\Topic\TopicList;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -75,7 +77,7 @@ final class KafkaConsumerTest extends TestCase
     {
         $consumer = new KafkaConsumer($this->consumerConfig());
 
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         $consumer->unsubscribe();
         $consumer->close();
@@ -91,7 +93,7 @@ final class KafkaConsumerTest extends TestCase
         $this->expectExceptionMessage('At least one subscription is required');
 
         try {
-            $consumer->subscribe(new TopicSubscriptionList());
+            $consumer->subscribe(new TopicList());
         } finally {
             $consumer->close();
         }
@@ -101,7 +103,7 @@ final class KafkaConsumerTest extends TestCase
     {
         $consumer = new KafkaConsumer($this->consumerConfig());
 
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
         $consumer->unsubscribe();
         $consumer->close();
 
@@ -124,10 +126,10 @@ final class KafkaConsumerTest extends TestCase
     public function testCommit(): void
     {
         $consumer = new KafkaConsumer($this->consumerConfig());
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         $consumer->commit(new KafkaConsumerMessage(
-            topic: 'test-topic',
+            topic: new Topic('test-topic'),
             body: 'test',
             partition: 0,
             offset: 100,
@@ -141,7 +143,7 @@ final class KafkaConsumerTest extends TestCase
     public function testConsume(): void
     {
         $consumer = new KafkaConsumer($this->consumerConfig());
-        $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
+        $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
         try {
             $result = $consumer->consume(timeoutMs: 100);
@@ -174,10 +176,10 @@ final class KafkaConsumerTest extends TestCase
 
         // Producer: пишем сообщения с разными ключами, чтобы librdkafka распределил
         // их по всем доступным partition'ам (для multi-partition topic).
-        $producer = new KafkaProducer(new ProducerConfig(brokers: $this->brokers));
+        $producer = new KafkaProducer(new ProducerConfig(brokers: new Brokers($this->brokers)));
         for ($i = 0; $i < $messageCount; ++$i) {
             $producer->produce(new KafkaProducerMessage(
-                topic: $topic,
+                topic: new Topic($topic),
                 body: "regression-{$i}",
                 key: "key-{$i}",
             ));
@@ -187,13 +189,13 @@ final class KafkaConsumerTest extends TestCase
         // Consumer: уникальная group.id → committed offsets пустые, earliest
         // гарантирует чтение с начала partition'а.
         $consumer = new KafkaConsumer(new ConsumerConfig(
-            brokers: $this->brokers,
+            brokers: new Brokers($this->brokers),
             groupId: 'subscribe-regression-' . uniqid('', true),
             offsetReset: OffsetReset::Earliest,
         ));
 
         try {
-            $consumer->subscribe(TopicSubscriptionList::create($topic));
+            $consumer->subscribe(TopicList::create(new Topic($topic)));
 
             $seenPartitions = [];
             $seenBodies = [];
@@ -247,7 +249,7 @@ final class KafkaConsumerTest extends TestCase
         // (KIP-345) не покидают группу при close(), и переиспользование пары
         // group+instance в соседнем тесте приводит к фенсингу консьюмера.
         return new ConsumerConfig(
-            brokers: $this->brokers,
+            brokers: new Brokers($this->brokers),
             groupId: 'test-group-' . uniqid('', true),
             instanceId: 'test-instance-' . uniqid('', true),
             offsetReset: $offsetReset,

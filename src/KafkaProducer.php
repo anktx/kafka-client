@@ -12,6 +12,7 @@ use Anktx\Kafka\Client\KafkaMessage\KafkaProducerMessage;
 use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
 use Anktx\Kafka\Client\PollStrategy\NeverPollStrategy;
 use Anktx\Kafka\Client\PollStrategy\PollStrategy;
+use Anktx\Kafka\Client\Topic\Topic;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RdKafka\Exception;
@@ -66,7 +67,7 @@ final class KafkaProducer
             // InvalidConfigException ещё до try); отказ rd_kafka_new()
             // возможен только на уровне процесса (OOM/EMFILE).
             $this->logger->error('Failed to create RdKafka producer', [
-                'brokers' => $config->brokers,
+                'brokers' => $config->brokers->value,
                 'reason' => $e->getMessage(),
                 'exception' => $e,
             ]);
@@ -76,7 +77,7 @@ final class KafkaProducer
         }
 
         $this->logger->info('KafkaProducer created', [
-            'brokers' => $config->brokers,
+            'brokers' => $config->brokers->value,
             'compression' => $config->compressionType->value,
             'poll_strategy' => $pollStrategy::class,
         ]);
@@ -115,7 +116,7 @@ final class KafkaProducer
             // поэтому error_code здесь не логируется: исключение целиком
             // передаётся в PSR-3 context['exception'].
             $this->logger->error('Failed to produce message', [
-                'topic' => $message->topic,
+                'topic' => $message->topic->name,
                 'partition' => $message->partition,
                 'key' => $message->key,
                 'reason' => $e->getMessage(),
@@ -123,7 +124,7 @@ final class KafkaProducer
             ]);
 
             throw KafkaProducerException::produceFailed(
-                topic: $message->topic,
+                topic: $message->topic->name,
                 partition: $message->partition,
                 e: $e,
             );
@@ -229,17 +230,17 @@ final class KafkaProducer
      *
      * Топики кэшируются для повторного использования.
      *
-     * @param string $name Имя топика
+     * @param Topic $topic Имя топика
      *
      * @return ProducerTopic Объект топика RdKafka
      */
-    private function topic(string $name): ProducerTopic
+    private function topic(Topic $topic): ProducerTopic
     {
-        if (!isset($this->topics[$name])) {
-            $this->topics[$name] = $this->producer->newTopic($name);
+        if (!isset($this->topics[$topic->name])) {
+            $this->topics[$topic->name] = $this->producer->newTopic($topic->name);
         }
 
-        return $this->topics[$name];
+        return $this->topics[$topic->name];
     }
 
     /**

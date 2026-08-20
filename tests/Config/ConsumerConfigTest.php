@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Config;
 
+use Anktx\Kafka\Client\Config\Brokers;
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
 use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
@@ -16,12 +17,12 @@ final class ConsumerConfigTest extends TestCase
     public function testCreate(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
         );
 
-        self::assertSame('kafka:9092', $config->brokers);
+        self::assertSame('kafka:9092', $config->brokers->value);
         self::assertSame('test-group', $config->groupId);
         self::assertSame('test-instance', $config->instanceId);
     }
@@ -29,7 +30,7 @@ final class ConsumerConfigTest extends TestCase
     public function testAsKafkaConfig(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
         );
@@ -49,7 +50,7 @@ final class ConsumerConfigTest extends TestCase
         // но librdkafka валидирует значение при set(), поэтому «asKafkaConfig()
         // не бросил» означает, что бэкинг-значение принято.
         foreach (OffsetReset::cases() as $offsetReset) {
-            $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', offsetReset: $offsetReset);
+            $config = new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', offsetReset: $offsetReset);
 
             self::assertInstanceOf(Conf::class, $config->asKafkaConfig());
         }
@@ -58,7 +59,7 @@ final class ConsumerConfigTest extends TestCase
     public function testDefaults(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
         );
@@ -75,7 +76,7 @@ final class ConsumerConfigTest extends TestCase
     public function testInstanceIdIsOptional(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
         );
 
@@ -93,7 +94,7 @@ final class ConsumerConfigTest extends TestCase
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "instanceId" must not be an empty string');
 
-        new ConsumerConfig(brokers: 'kafka:9092', groupId: 'test-group', instanceId: '');
+        new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'test-group', instanceId: '');
     }
 
     public function testAsKafkaConfigWrapsRdKafkaExceptionIntoInvalidConfigException(): void
@@ -102,7 +103,7 @@ final class ConsumerConfigTest extends TestCase
         // проходит (значение положительное), а Conf::set() бросает сырой
         // RdKafka\Exception — asKafkaConfig() обязан обернуть его в наш тип.
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             sessionTimeoutMs: \PHP_INT_MAX,
         );
@@ -120,7 +121,7 @@ final class ConsumerConfigTest extends TestCase
     public function testWithDebugEnabled(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
             isDebug: true,
@@ -132,7 +133,7 @@ final class ConsumerConfigTest extends TestCase
     public function testWithAutoCommitEnabled(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
             autoCommitMs: 5000,
@@ -144,7 +145,7 @@ final class ConsumerConfigTest extends TestCase
     public function testWithSessionTimeout(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
             sessionTimeoutMs: 10000,
@@ -156,7 +157,7 @@ final class ConsumerConfigTest extends TestCase
     public function testWithLatestOffsetReset(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
             offsetReset: OffsetReset::Latest,
@@ -170,7 +171,7 @@ final class ConsumerConfigTest extends TestCase
         // 7000, а не дефолтные librdkafka 5000: иначе удаление set()
         // auto.commit.interval.ms неотличимо в dump() от значения по умолчанию.
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
             autoCommitMs: 7000,
@@ -185,7 +186,7 @@ final class ConsumerConfigTest extends TestCase
     public function testAsKafkaConfigWithSessionTimeout(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
             sessionTimeoutMs: 10000,
@@ -199,7 +200,7 @@ final class ConsumerConfigTest extends TestCase
     public function testAsKafkaConfigWithDebugEnabled(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
             isDebug: true,
@@ -214,7 +215,7 @@ final class ConsumerConfigTest extends TestCase
     public function testAsKafkaConfigWithLatestOffsetReset(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
             offsetReset: OffsetReset::Latest,
@@ -229,7 +230,7 @@ final class ConsumerConfigTest extends TestCase
     public function testAsKafkaConfigWithAllOptions(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'test-group',
             instanceId: 'test-instance',
             offsetReset: OffsetReset::Latest,
@@ -252,7 +253,7 @@ final class ConsumerConfigTest extends TestCase
 
     public function testDefaultSocketKeepaliveEnableIsTrue(): void
     {
-        $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g');
+        $config = new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g');
         $dump = $config->asKafkaConfig()->dump();
 
         self::assertSame('true', $dump['socket.keepalive.enable']);
@@ -261,7 +262,7 @@ final class ConsumerConfigTest extends TestCase
     public function testSocketKeepaliveDisabled(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'g',
             socketKeepaliveEnable: false,
         );
@@ -273,7 +274,7 @@ final class ConsumerConfigTest extends TestCase
     public function testReconnectBackoffConfiguredWhenSet(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'g',
             reconnectBackoffMs: 50,
             reconnectBackoffMaxMs: 5000,
@@ -284,24 +285,25 @@ final class ConsumerConfigTest extends TestCase
         self::assertSame('5000', $dump['reconnect.backoff.max.ms']);
     }
 
-    public function testEmptyBrokersThrowsInvalidConfigException(): void
+    public function testEmptyBrokersIsRejectedByBrokersValueObject(): void
     {
+        // Пустой список и его формат — инварианты Brokers VO (полный набор
+        // граничных случаев — в BrokersTest): невалидный Brokers невозможно
+        // даже сконструировать, отдельные проверки в конфиге не дублируются.
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "brokers" must not be an empty string');
 
-        new ConsumerConfig(brokers: '', groupId: 'g');
+        new ConsumerConfig(brokers: new Brokers(''), groupId: 'g');
     }
 
-    public function testInvalidBrokersFormatThrows(): void
+    public function testInvalidBrokersFormatIsRejectedByBrokersValueObject(): void
     {
-        // Формат списка валидируется в конструкторе общим валидатором
-        // Brokers (граничные случаи — в BrokersTest).
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage(
             'Config parameter "brokers" must be a comma-separated list of host[:port] entries, "kafka:abc" given',
         );
 
-        new ConsumerConfig(brokers: 'kafka:abc', groupId: 'g');
+        new ConsumerConfig(brokers: new Brokers('kafka:abc'), groupId: 'g');
     }
 
     public function testEmptyGroupIdThrowsInvalidConfigException(): void
@@ -309,7 +311,7 @@ final class ConsumerConfigTest extends TestCase
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "groupId" must not be an empty string');
 
-        new ConsumerConfig(brokers: 'kafka:9092', groupId: '');
+        new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: '');
     }
 
     public function testNegativeAutoCommitMsThrows(): void
@@ -317,7 +319,7 @@ final class ConsumerConfigTest extends TestCase
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "autoCommitMs" must not be negative, -1 given');
 
-        new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', autoCommitMs: -1);
+        new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', autoCommitMs: -1);
     }
 
     public function testZeroSessionTimeoutMsThrows(): void
@@ -325,7 +327,7 @@ final class ConsumerConfigTest extends TestCase
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "sessionTimeoutMs" must be positive, 0 given');
 
-        new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', sessionTimeoutMs: 0);
+        new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', sessionTimeoutMs: 0);
     }
 
     public function testNegativeReconnectBackoffThrows(): void
@@ -333,7 +335,7 @@ final class ConsumerConfigTest extends TestCase
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "reconnectBackoffMs" must not be negative, -5 given');
 
-        new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMs: -5);
+        new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', reconnectBackoffMs: -5);
     }
 
     public function testNegativeReconnectBackoffMaxThrows(): void
@@ -341,14 +343,14 @@ final class ConsumerConfigTest extends TestCase
         $this->expectException(InvalidConfigException::class);
         $this->expectExceptionMessage('Config parameter "reconnectBackoffMaxMs" must not be negative, -50 given');
 
-        new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMaxMs: -50);
+        new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', reconnectBackoffMaxMs: -50);
     }
 
     public function testReconnectBackoffMsWithoutMaxIsValid(): void
     {
         // reconnectBackoffMs задан, reconnectBackoffMaxMs нет: librdkafka
         // подставит дефолт для max — инверсии диапазона быть не может.
-        $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMs: 100);
+        $config = new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', reconnectBackoffMs: 100);
 
         self::assertNull($config->reconnectBackoffMaxMs);
     }
@@ -361,7 +363,7 @@ final class ConsumerConfigTest extends TestCase
         );
 
         new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'g',
             reconnectBackoffMs: 500,
             reconnectBackoffMaxMs: 100,
@@ -371,21 +373,21 @@ final class ConsumerConfigTest extends TestCase
     public function testZeroAutoCommitMsIsValid(): void
     {
         // auto.commit.interval.ms = 0 — валидное значение (коммит после каждого сообщения).
-        $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', autoCommitMs: 0);
+        $config = new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', autoCommitMs: 0);
 
         self::assertSame(0, $config->autoCommitMs);
     }
 
     public function testZeroReconnectBackoffMsIsValid(): void
     {
-        $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMs: 0);
+        $config = new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', reconnectBackoffMs: 0);
 
         self::assertSame(0, $config->reconnectBackoffMs);
     }
 
     public function testZeroReconnectBackoffMaxIsValid(): void
     {
-        $config = new ConsumerConfig(brokers: 'kafka:9092', groupId: 'g', reconnectBackoffMaxMs: 0);
+        $config = new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', reconnectBackoffMaxMs: 0);
 
         self::assertSame(0, $config->reconnectBackoffMaxMs);
     }
@@ -393,7 +395,7 @@ final class ConsumerConfigTest extends TestCase
     public function testReconnectBackoffMaxEqualToMinIsValid(): void
     {
         $config = new ConsumerConfig(
-            brokers: 'kafka:9092',
+            brokers: new Brokers('kafka:9092'),
             groupId: 'g',
             reconnectBackoffMs: 500,
             reconnectBackoffMaxMs: 500,
@@ -405,7 +407,7 @@ final class ConsumerConfigTest extends TestCase
     public function testInvalidConfigExceptionIsCatchableAsLogicException(): void
     {
         try {
-            new ConsumerConfig(brokers: '', groupId: 'g');
+            new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: '');
             self::fail('Expected InvalidConfigException');
         } catch (LogicException $e) {
             self::assertInstanceOf(InvalidConfigException::class, $e);

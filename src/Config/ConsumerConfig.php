@@ -12,7 +12,7 @@ use RdKafka\Exception;
 final readonly class ConsumerConfig
 {
     public function __construct(
-        public string $brokers,
+        public Brokers $brokers,
         public string $groupId,
         public ?string $instanceId = null,
         public OffsetReset $offsetReset = OffsetReset::Earliest,
@@ -23,12 +23,6 @@ final readonly class ConsumerConfig
         public bool $socketKeepaliveEnable = true,
         public bool $isDebug = false,
     ) {
-        if ($this->brokers === '') {
-            throw InvalidConfigException::emptyString('brokers');
-        }
-
-        Brokers::assertValid($this->brokers);
-
         if ($this->groupId === '') {
             throw InvalidConfigException::emptyString('groupId');
         }
@@ -92,7 +86,7 @@ final readonly class ConsumerConfig
 
     private function configureEssentials(Conf $conf): void
     {
-        $conf->set('metadata.broker.list', $this->brokers);
+        $conf->set('metadata.broker.list', $this->brokers->value);
         $conf->set('group.id', $this->groupId);
 
         if ($this->instanceId !== null) {
