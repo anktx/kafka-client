@@ -43,14 +43,14 @@ final readonly class KafkaMessageStream
     /**
      * Создаёт новый поток сообщений.
      *
-     * @param KafkaConsumer  $consumer      Консьюмер Kafka
-     * @param int            $pollTimeoutMs Таймаут опроса в миллисекундах (по умолчанию 1000 мс)
-     * @param StreamObserver $observer      Реакция на результаты consume() (по умолчанию — молчаливая)
+     * @param KafkaConsumerInterface $consumer      Консьюмер Kafka
+     * @param int                    $pollTimeoutMs Таймаут опроса в миллисекундах (по умолчанию 1000 мс)
+     * @param StreamObserver         $observer      Реакция на результаты consume() (по умолчанию — молчаливая)
      *
      * @throws InvalidConfigException Если таймаут опроса отрицательный
      */
     public function __construct(
-        private KafkaConsumer $consumer,
+        private KafkaConsumerInterface $consumer,
         private int $pollTimeoutMs = self::DEFAULT_POLL_TIMEOUT_MS,
         private StreamObserver $observer = new SilentStreamObserver(),
     ) {

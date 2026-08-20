@@ -35,6 +35,11 @@ PHPStan level 9 + strict-rules, PHP-CS-Fixer, Infection
      сбой — error-лог (отчёты доезжают только при poll()/flush())
 
 3. **Консьюмер** (`src/KafkaConsumer.php`)
+   - `KafkaConsumerInterface` — контракт публичного API консьюмера
+     (`subscribe()`/`unsubscribe()`/`consume()`/`commit()`/`close()`),
+     реализуется final-классом: сигнатуры контракта не содержат RdKafka-типов,
+     поэтому downstream-пакеты тайп-хинтят интерфейс и мокают его PHPUnit'ом
+     в юнит-тестах без ext-rdkafka (final-класс PHPUnit 12 мокать не умеет)
    - Подписка на топики через `TopicList` (список `Topic`)
    - Чтение сообщений через `consume()` с таймаутом
    - Ручной коммит обработанных сообщений через `commit()`

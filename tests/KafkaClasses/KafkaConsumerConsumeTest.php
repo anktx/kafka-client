@@ -100,9 +100,9 @@ final class KafkaConsumerConsumeTest extends TestCase
 
     public function testConsumeUsesDefaultTimeoutWhenOmitted(): void
     {
-        // KafkaConsumer::DEFAULT_CONSUME_TIMEOUT_MS = 1000: литерал пинсует
-        // дефолт параметра consume() (передаётся в RdKafka без вычислений —
-        // точный with() детерминирован).
+        // KafkaConsumerInterface::DEFAULT_CONSUME_TIMEOUT_MS = 1000: литерал
+        // пинсует дефолт параметра consume() (передаётся в RdKafka без
+        // вычислений — точный with() детерминирован).
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->expects($this->once())->method('consume')->with(1000)->willReturn(RdKafkaMessages::fromValues([

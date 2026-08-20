@@ -32,9 +32,8 @@ use RdKafka\TopicPartition;
  *
  * @see https://github.com/edenhill/librdkafka/blob/master/README.md
  */
-final class KafkaConsumer
+final class KafkaConsumer implements KafkaConsumerInterface
 {
-    private const int DEFAULT_CONSUME_TIMEOUT_MS = 1000;
     private \RdKafka\KafkaConsumer $consumer;
     private bool $closed = false;
 

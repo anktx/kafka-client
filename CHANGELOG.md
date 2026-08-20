@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+### Added
+
+- `KafkaConsumerInterface` — контракт публичного API консьюмера, который
+  реализует final-класс `KafkaConsumer` (поведение не изменилось):
+  `subscribe()`/`unsubscribe()`/`consume()`/`commit()`/`close()` и публичная
+  константа `DEFAULT_CONSUME_TIMEOUT_MS` — дефолт таймаута `consume()`,
+  ранее приватная константа класса. Сигнатуры контракта не содержат
+  RdKafka-типов, поэтому downstream-пакеты могут тайп-хинтить интерфейс и
+  мокать его PHPUnit'ом в юнит-тестах без ext-rdkafka (final-класс PHPUnit
+  не мокает, а его загрузка без расширения требует «shadow»-двойников).
+
+### Changed
+
+- `KafkaMessageStream` принимает консьюмера по `KafkaConsumerInterface`
+  вместо конкретного класса (для callers обратно совместимо).
+
 ## [0.11.0] - 2026-08-20
 
 ### Added
