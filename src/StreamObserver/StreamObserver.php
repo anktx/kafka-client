@@ -8,11 +8,13 @@ use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
-use Anktx\Kafka\Client\KafkaMessageStream;
 
 /**
- * Реакция на результаты consume() в потоке сообщений
- * {@see KafkaMessageStream}.
+ * Реакция на результаты consume() в потоке сообщений.
+ *
+ * Ссылки на слой потока ({@see KafkaMessageStream}) здесь намеренно
+ * нет: листовые слои не ссылаются вверх — поток ссылается на
+ * наблюдателя, не наоборот.
  *
  * Хуки вызываются по каждому результату consume() до выдачи
  * сообщения наружу:

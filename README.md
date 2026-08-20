@@ -47,10 +47,8 @@ $producer->flush();
 ```php
 use Anktx\Kafka\Client\Config\ConsumerConfig;
 use Anktx\Kafka\Client\Config\Enum\OffsetReset;
-use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
-use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 
 $consumer = new KafkaConsumer(
@@ -63,9 +61,7 @@ $consumer = new KafkaConsumer(
 );
 
 $consumer->subscribe(
-    new TopicSubscriptionList(
-        new TopicSubscription(topic: 'events'),
-    )
+    TopicSubscriptionList::create('events')
 );
 
 while (true) {

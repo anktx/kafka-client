@@ -83,6 +83,16 @@ final class KafkaExceptionTest extends TestCase
         self::assertSame(300, $exception->getCode());
     }
 
+    public function testKafkaExceptionIsRuntimeExceptionButNotRdKafkaException(): void
+    {
+        // База сознательно не RdKafka\Exception: исключения библиотеки не
+        // должны ловиться чужим catch (RdKafka\Exception) в вызывающем коде.
+        $exception = KafkaConsumerException::create('boom');
+
+        self::assertInstanceOf(\RuntimeException::class, $exception);
+        self::assertNotInstanceOf(\RdKafka\Exception::class, $exception);
+    }
+
     public function testKafkaConsumerExceptionConstructor(): void
     {
         $exception = new KafkaConsumerException('Test message');
@@ -119,11 +129,11 @@ final class KafkaExceptionTest extends TestCase
 
     public function testKafkaFlushTimeoutExceptionFlushTimeout(): void
     {
-        $exception = KafkaFlushTimeoutException::flushTimeout(5000);
+        $exception = KafkaFlushTimeoutException::flushTimeout(5000, 3);
 
         self::assertInstanceOf(KafkaException::class, $exception);
         self::assertInstanceOf(KafkaFlushTimeoutException::class, $exception);
-        self::assertSame('Flush timed out in 5000ms', $exception->getMessage());
+        self::assertSame('Flush timed out in 5000ms: 3 message(s) still in local queue', $exception->getMessage());
         self::assertSame(\RD_KAFKA_RESP_ERR__TIMED_OUT, $exception->getCode());
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\PollStrategy;
 
 use Anktx\Kafka\Client\Clock\SystemClock;
+use Anktx\Kafka\Client\Clock\UnixMilliseconds;
 use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use Psr\Clock\ClockInterface;
 
@@ -40,6 +41,6 @@ final class TimeoutPollStrategy implements PollStrategy
 
     private function nowMs(): int
     {
-        return (int) $this->clock->now()->format('Uv');
+        return UnixMilliseconds::of($this->clock->now());
     }
 }

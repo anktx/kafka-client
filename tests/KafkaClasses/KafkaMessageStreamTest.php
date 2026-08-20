@@ -16,12 +16,12 @@ use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\KafkaMessageStream;
 use Anktx\Kafka\Client\StreamObserver\StreamObserver;
-use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
+use Anktx\Kafka\Client\Tests\Support\KafkaConsumers;
+use Anktx\Kafka\Client\Tests\Support\RdKafkaMessages;
 use Anktx\Kafka\Client\Tests\Support\SpyStreamObserver;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Exception;
-use RdKafka\Message;
 
 /**
  * Юнит-тесты для {@see KafkaMessageStream::stream()}. KafkaConsumer — final,
@@ -44,7 +44,7 @@ final class KafkaMessageStreamTest extends TestCase
     public function testConstructorRejectsNegativePollTimeout(): void
     {
         try {
-            new KafkaMessageStream($this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class)), -1);
+            new KafkaMessageStream(KafkaConsumers::build($this->createMock(\RdKafka\KafkaConsumer::class)), -1);
             self::fail('Expected InvalidConfigException');
         } catch (InvalidConfigException $e) {
             self::assertSame('Config parameter "pollTimeoutMs" must not be negative, -1 given', $e->getMessage());
@@ -56,7 +56,7 @@ final class KafkaMessageStreamTest extends TestCase
     {
         // Граница валидации: 0 — легитимный неблокирующий опрос consume(0).
         $stream = new KafkaMessageStream(
-            $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class)),
+            KafkaConsumers::build($this->createMock(\RdKafka\KafkaConsumer::class)),
             0,
         );
 
@@ -73,7 +73,7 @@ final class KafkaMessageStreamTest extends TestCase
         $unexpected = new class implements ConsumeResult {};
 
         $stream = new KafkaMessageStream(
-            $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class)),
+            KafkaConsumers::build($this->createMock(\RdKafka\KafkaConsumer::class)),
         );
 
         try {
@@ -97,23 +97,23 @@ final class KafkaMessageStreamTest extends TestCase
         $rdKafka->expects($this->exactly(5))
             ->method('consume')
             ->willReturnOnConsecutiveCalls(
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
                     'partition' => 0,
                     'offset' => 0,
                 ]),
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
                     'partition' => -1,
                     'offset' => -1,
                 ]),
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,
                     'topic_name' => 'test-topic',
                     'partition' => 1,
                     'offset' => 7,
                 ]),
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
                     'topic_name' => 'test-topic',
                     'partition' => 2,
@@ -123,7 +123,7 @@ final class KafkaMessageStreamTest extends TestCase
                     'headers' => [],
                     'timestamp' => 111,
                 ]),
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
                     'topic_name' => 'test-topic',
                     'partition' => 2,
@@ -136,7 +136,7 @@ final class KafkaMessageStreamTest extends TestCase
             )
         ;
 
-        $stream = new KafkaMessageStream($this->buildConsumer($rdKafka), 500);
+        $stream = new KafkaMessageStream(KafkaConsumers::build($rdKafka), 500);
         $generator = $stream->stream();
 
         self::assertInstanceOf(\Generator::class, $generator);
@@ -162,13 +162,13 @@ final class KafkaMessageStreamTest extends TestCase
             ->method('consume')
             ->with(250)
             ->willReturnOnConsecutiveCalls(
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,
                     'topic_name' => 'test-topic',
                     'partition' => 1,
                     'offset' => 7,
                 ]),
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
                     'topic_name' => 'test-topic',
                     'partition' => 2,
@@ -181,7 +181,7 @@ final class KafkaMessageStreamTest extends TestCase
             )
         ;
 
-        $generator = (new KafkaMessageStream($this->buildConsumer($rdKafka), 250))->stream();
+        $generator = (new KafkaMessageStream(KafkaConsumers::build($rdKafka), 250))->stream();
 
         self::assertSame('delivered', $generator->current()->body);
     }
@@ -196,13 +196,13 @@ final class KafkaMessageStreamTest extends TestCase
             ->method('consume')
             ->with(1000)
             ->willReturnOnConsecutiveCalls(
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,
                     'topic_name' => 'test-topic',
                     'partition' => 1,
                     'offset' => 7,
                 ]),
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
                     'topic_name' => 'test-topic',
                     'partition' => 2,
@@ -215,7 +215,7 @@ final class KafkaMessageStreamTest extends TestCase
             )
         ;
 
-        $generator = (new KafkaMessageStream($this->buildConsumer($rdKafka)))->stream();
+        $generator = (new KafkaMessageStream(KafkaConsumers::build($rdKafka)))->stream();
 
         self::assertSame('default', $generator->current()->body);
     }
@@ -230,23 +230,23 @@ final class KafkaMessageStreamTest extends TestCase
         $rdKafka->expects($this->exactly(5))
             ->method('consume')
             ->willReturnOnConsecutiveCalls(
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
                     'partition' => 0,
                     'offset' => 0,
                 ]),
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
                     'partition' => -1,
                     'offset' => -1,
                 ]),
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,
                     'topic_name' => 'test-topic',
                     'partition' => 1,
                     'offset' => 7,
                 ]),
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
                     'topic_name' => 'test-topic',
                     'partition' => 2,
@@ -256,7 +256,7 @@ final class KafkaMessageStreamTest extends TestCase
                     'headers' => [],
                     'timestamp' => 111,
                 ]),
-                self::message([
+                RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
                     'topic_name' => 'test-topic',
                     'partition' => 2,
@@ -270,7 +270,7 @@ final class KafkaMessageStreamTest extends TestCase
         ;
 
         $spy = new SpyStreamObserver();
-        $generator = (new KafkaMessageStream($this->buildConsumer($rdKafka), 500, $spy))->stream();
+        $generator = (new KafkaMessageStream(KafkaConsumers::build($rdKafka), 500, $spy))->stream();
 
         $first = $generator->current();
         $generator->next();
@@ -295,7 +295,7 @@ final class KafkaMessageStreamTest extends TestCase
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->expects($this->once())
             ->method('consume')
-            ->willReturn(self::message([
+            ->willReturn(RdKafkaMessages::fromValues([
                 'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
                 'partition' => -1,
                 'offset' => -1,
@@ -315,7 +315,7 @@ final class KafkaMessageStreamTest extends TestCase
             }
         };
 
-        $generator = (new KafkaMessageStream($this->buildConsumer($rdKafka), 100, $observer))->stream();
+        $generator = (new KafkaMessageStream(KafkaConsumers::build($rdKafka), 100, $observer))->stream();
 
         try {
             $generator->current();
@@ -333,7 +333,7 @@ final class KafkaMessageStreamTest extends TestCase
         $rdKafka->method('getSubscription')->willReturn([]);
         $rdKafka->expects($this->never())->method('consume');
 
-        $generator = (new KafkaMessageStream($this->buildConsumer($rdKafka)))->stream();
+        $generator = (new KafkaMessageStream(KafkaConsumers::build($rdKafka)))->stream();
 
         try {
             $generator->current();
@@ -351,7 +351,7 @@ final class KafkaMessageStreamTest extends TestCase
             ->willThrowException(new Exception('transport failure'))
         ;
 
-        $generator = (new KafkaMessageStream($this->buildConsumer($rdKafka), 100))->stream();
+        $generator = (new KafkaMessageStream(KafkaConsumers::build($rdKafka), 100))->stream();
 
         try {
             $generator->current();
@@ -370,7 +370,7 @@ final class KafkaMessageStreamTest extends TestCase
         $rdKafka->expects($this->never())->method('getSubscription');
         $rdKafka->expects($this->never())->method('consume');
 
-        $consumer = $this->buildConsumer($rdKafka);
+        $consumer = KafkaConsumers::build($rdKafka);
         $consumer->close();
 
         $generator = (new KafkaMessageStream($consumer))->stream();
@@ -380,36 +380,5 @@ final class KafkaMessageStreamTest extends TestCase
             self::fail('Expected ClientClosedException');
         } catch (ClientClosedException) {
         }
-    }
-
-    /**
-     * @param array<string, mixed> $values
-     */
-    private static function message(array $values): Message
-    {
-        $message = new Message();
-        foreach ($values as $name => $value) {
-            // @phpstan-ignore property.dynamicName
-            $message->{$name} = $value;
-        }
-
-        return $message;
-    }
-
-    /**
-     * Собирает KafkaConsumer без вызова конструктора (чтобы избежать реального
-     * подключения к брокерам) и инжектит mock RdKafka\KafkaConsumer в приватные
-     * свойства.
-     */
-    private function buildConsumer(
-        \RdKafka\KafkaConsumer $rdKafka,
-        ?InMemoryLogger $logger = null,
-    ): KafkaConsumer {
-        $consumer = (new \ReflectionClass(KafkaConsumer::class))->newInstanceWithoutConstructor();
-
-        (new \ReflectionProperty(KafkaConsumer::class, 'consumer'))->setValue($consumer, $rdKafka);
-        (new \ReflectionProperty(KafkaConsumer::class, 'logger'))->setValue($consumer, $logger ?? new InMemoryLogger());
-
-        return $consumer;
     }
 }

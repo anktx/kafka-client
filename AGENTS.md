@@ -7,8 +7,9 @@
 PHP-обёртка над Apache Kafka / RedPanda на расширении `ext-rdkafka`:
 продюсер, консьюмер, типобезопасный API, сжатие сообщений, стратегии опроса.
 
-Стек: PHP 8.4+, ext-rdkafka ^6.0, PHPUnit 12, PHPStan level 8 + strict-rules
-+ deprecation-rules + phpstan-phpunit, PHP-CS-Fixer (PER-CS2.0), Infection.
+Стек: PHP 8.4+, ext-rdkafka ^6.0, PHPUnit 12, PHPStan level 9 + strict-rules
++ deprecation-rules + phpstan-phpunit (treatPhpDocTypesAsCertain: false,
+стабы ext-rdkafka в phpstan/stubs/), PHP-CS-Fixer (PER-CS2.0), Infection.
 
 ## Команды
 

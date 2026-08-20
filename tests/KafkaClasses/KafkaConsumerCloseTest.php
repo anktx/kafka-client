@@ -9,6 +9,7 @@ use Anktx\Kafka\Client\Exception\Logic\ClientClosedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
+use Anktx\Kafka\Client\Tests\Support\KafkaConsumers;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
@@ -30,7 +31,7 @@ final class KafkaConsumerCloseTest extends TestCase
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->expects($this->once())->method('close');
 
-        $consumer = $this->buildConsumer($rdKafka, $logger);
+        $consumer = KafkaConsumers::build($rdKafka, $logger);
 
         $consumer->close();
         $consumer->close();
@@ -49,7 +50,7 @@ final class KafkaConsumerCloseTest extends TestCase
         $rdKafka->method('close')->willThrowException($failure = new Exception('close failed'));
 
         try {
-            $this->buildConsumer($rdKafka, $logger)->close();
+            KafkaConsumers::build($rdKafka, $logger)->close();
             self::fail('Expected KafkaConsumerException');
         } catch (KafkaConsumerException $e) {
             self::assertSame('close failed', $e->getMessage());
@@ -114,7 +115,7 @@ final class KafkaConsumerCloseTest extends TestCase
         $rdKafka->expects($this->never())->method('consume');
         $rdKafka->expects($this->never())->method('commit');
 
-        $consumer = $this->buildConsumer($rdKafka, $logger);
+        $consumer = KafkaConsumers::build($rdKafka, $logger);
 
         $consumer->close();
 
@@ -128,19 +129,5 @@ final class KafkaConsumerCloseTest extends TestCase
         $warnings = $logger->findByMessage('Attempted to use a closed KafkaConsumer');
         self::assertCount(1, $warnings);
         self::assertSame($fullMethod, $warnings[0]['context']['method']);
-    }
-
-    /**
-     * Собирает KafkaConsumer без вызова конструктора и инжектит mock
-     * RdKafka\KafkaConsumer в приватное свойство.
-     */
-    private function buildConsumer(\RdKafka\KafkaConsumer $rdKafka, ?InMemoryLogger $logger = null): KafkaConsumer
-    {
-        $consumer = (new \ReflectionClass(KafkaConsumer::class))->newInstanceWithoutConstructor();
-
-        (new \ReflectionProperty(KafkaConsumer::class, 'consumer'))->setValue($consumer, $rdKafka);
-        (new \ReflectionProperty(KafkaConsumer::class, 'logger'))->setValue($consumer, $logger ?? new InMemoryLogger());
-
-        return $consumer;
     }
 }

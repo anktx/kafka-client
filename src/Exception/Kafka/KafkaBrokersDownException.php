@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Exception\Kafka;
 
-use Anktx\Kafka\Client\StreamObserver\BrokersDownBudgetStreamObserver;
-
 /**
- * Брокеры недоступны непрерывно дольше бюджета
- * {@see BrokersDownBudgetStreamObserver::maxBrokersDownMs}:
- * поток сообщений прерван, процесс должен упасть и пересоздаться супервизором.
+ * Брокеры недоступны непрерывно дольше бюджета maxBrokersDownMs
+ * fail-fast наблюдателя (BrokersDownBudgetStreamObserver): поток
+ * сообщений прерван, процесс должен упасть и пересоздаться супервизором.
+ * Листовый слой исключений на слой наблюдателей не ссылается —
+ * ссылка направлена в обратную сторону.
  */
 final class KafkaBrokersDownException extends KafkaException
 {

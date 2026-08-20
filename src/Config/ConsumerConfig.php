@@ -27,6 +27,8 @@ final readonly class ConsumerConfig
             throw InvalidConfigException::emptyString('brokers');
         }
 
+        Brokers::assertValid($this->brokers);
+
         if ($this->groupId === '') {
             throw InvalidConfigException::emptyString('groupId');
         }

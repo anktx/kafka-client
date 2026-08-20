@@ -122,7 +122,11 @@ final class KafkaProducer
                 'exception' => $e,
             ]);
 
-            throw KafkaProducerException::fromKafkaException($e);
+            throw KafkaProducerException::produceFailed(
+                topic: $message->topic,
+                partition: $message->partition,
+                e: $e,
+            );
         }
     }
 
@@ -187,7 +191,10 @@ final class KafkaProducer
             'out_queue_len' => $this->producer->getOutQLen(),
         ]);
 
-        throw KafkaFlushTimeoutException::flushTimeout($timeoutMs);
+        throw KafkaFlushTimeoutException::flushTimeout(
+            timeoutMs: $timeoutMs,
+            outQueueLen: $this->producer->getOutQLen(),
+        );
     }
 
     /**

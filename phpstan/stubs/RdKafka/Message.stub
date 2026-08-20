@@ -1,0 +1,45 @@
+<?php
+
+declare(strict_types=1);
+
+namespace RdKafka;
+
+/**
+ * Stub для RdKafka\Message: расширение типизирует свойства нативно,
+ * но не описывает shape массива заголовков. Стаб дополняет его до
+ * array<string, int|string>|null — типа, совместимого с VO сообщений
+ * библиотеки (KafkaConsumerMessage::$headers).
+ *
+ * Типы остальных свойств повторяют нативные (ReflectionClass).
+ */
+class Message
+{
+    /** @var int */
+    public $err;
+
+    /** @var string|null */
+    public $topic_name;
+
+    /** @var int|null */
+    public $timestamp;
+
+    /** @var int */
+    public $partition;
+
+    /** @var string|null */
+    public $payload;
+
+    /** @var string|null */
+    public $key;
+
+    /** @var int */
+    public $offset;
+
+    /** @var array<string, int|string>|null */
+    public $headers;
+
+    /** @var int|null */
+    public $len;
+
+    public function errstr(): string {}
+}

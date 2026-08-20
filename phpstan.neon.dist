@@ -4,11 +4,15 @@ includes:
     - vendor/phpstan/phpstan-strict-rules/rules.neon
 
 parameters:
-    level: 8
+    level: 9
+    treatPhpDocTypesAsCertain: false
     paths:
         - src
         - tests
         - bin
+
+    stubFiles:
+        - phpstan/stubs/RdKafka/Message.stub
 
     ignoreErrors:
         # phpstan-phpunit помечает assertInstanceOf() с уже известным типом

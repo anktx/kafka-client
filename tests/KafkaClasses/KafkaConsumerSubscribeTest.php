@@ -11,12 +11,13 @@ use Anktx\Kafka\Client\Exception\Logic\EmptySubscriptionsException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
+use Anktx\Kafka\Client\Tests\Support\KafkaConsumers;
+use Anktx\Kafka\Client\Tests\Support\RdKafkaMessages;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscription;
 use Anktx\Kafka\Client\TopicSubscription\TopicSubscriptionList;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Exception;
-use RdKafka\Message;
 
 /**
  * Юнит-тесты для {@see KafkaConsumer::subscribe()} на mock'е RdKafka\KafkaConsumer.
@@ -71,7 +72,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
         $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic']);
         $rdKafka->expects($this->never())->method('assign');
 
-        $this->buildConsumer($rdKafka)->subscribe(TopicSubscriptionList::create('test-topic'));
+        KafkaConsumers::build($rdKafka)->subscribe(TopicSubscriptionList::create('test-topic'));
     }
 
     public function testSubscribeDeduplicatesTopicNames(): void
@@ -88,7 +89,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
         $rdKafka->expects($this->once())->method('subscribe')->with(['test-topic', 'notifications']);
         $rdKafka->expects($this->never())->method('assign');
 
-        $this->buildConsumer($rdKafka)->subscribe($list);
+        KafkaConsumers::build($rdKafka)->subscribe($list);
     }
 
     public function testSecondSubscribeReplacesPreviousSubscription(): void
@@ -110,7 +111,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
         ;
         $rdKafka->expects($this->never())->method('assign');
 
-        $consumer = $this->buildConsumer($rdKafka);
+        $consumer = KafkaConsumers::build($rdKafka);
 
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
         $consumer->subscribe(TopicSubscriptionList::create('other-topic', 'notifications'));
@@ -133,13 +134,14 @@ final class KafkaConsumerSubscribeTest extends TestCase
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->expects($this->never())->method('assign');
 
-        $timeoutMessage = new Message();
-        $timeoutMessage->err = \RD_KAFKA_RESP_ERR__TIMED_OUT;
-        $timeoutMessage->partition = 0;
-        $timeoutMessage->offset = 0;
+        $timeoutMessage = RdKafkaMessages::fromValues([
+            'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
+            'partition' => 0,
+            'offset' => 0,
+        ]);
         $rdKafka->method('consume')->willReturn($timeoutMessage);
 
-        $consumer = $this->buildConsumer($rdKafka, $logger);
+        $consumer = KafkaConsumers::build($rdKafka, $logger);
 
         $consumer->subscribe(TopicSubscriptionList::create('test-topic'));
 
@@ -166,7 +168,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
 
         $list = TopicSubscriptionList::create('test-topic', 'notifications');
 
-        $consumer = $this->buildConsumer($rdKafka, $logger);
+        $consumer = KafkaConsumers::build($rdKafka, $logger);
 
         try {
             $consumer->subscribe($list);
@@ -193,7 +195,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
         $this->expectException(EmptySubscriptionsException::class);
 
         try {
-            $this->buildConsumer($rdKafka, $logger)->subscribe(new TopicSubscriptionList());
+            KafkaConsumers::build($rdKafka, $logger)->subscribe(new TopicSubscriptionList());
         } finally {
             self::assertSame([], $logger->records);
         }
@@ -205,7 +207,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
         $logger = new InMemoryLogger();
 
         try {
-            $this->buildConsumer($this->createMock(\RdKafka\KafkaConsumer::class), $logger)->consume(100);
+            KafkaConsumers::build($this->createMock(\RdKafka\KafkaConsumer::class), $logger)->consume(100);
             self::fail('Expected NotSubscribedException');
         } catch (NotSubscribedException) {
         }
@@ -213,25 +215,5 @@ final class KafkaConsumerSubscribeTest extends TestCase
         $warnings = $logger->findByMessage('Attempted to consume without subscription');
         self::assertCount(1, $warnings);
         self::assertSame('warning', $warnings[0]['level']);
-    }
-
-    /**
-     * Собирает KafkaConsumer без вызова конструктора (чтобы избежать реального
-     * подключения к брокерам) и инжектит mock RdKafka\KafkaConsumer в приватный
-     * readonly-параметр.
-     */
-    private function buildConsumer(\RdKafka\KafkaConsumer $rdKafka, ?InMemoryLogger $logger = null): KafkaConsumer
-    {
-        $consumer = (new \ReflectionClass(KafkaConsumer::class))->newInstanceWithoutConstructor();
-
-        $this->setProp($consumer, 'consumer', $rdKafka);
-        $this->setProp($consumer, 'logger', $logger ?? new InMemoryLogger());
-
-        return $consumer;
-    }
-
-    private function setProp(KafkaConsumer $consumer, string $name, mixed $value): void
-    {
-        (new \ReflectionProperty(KafkaConsumer::class, $name))->setValue($consumer, $value);
     }
 }

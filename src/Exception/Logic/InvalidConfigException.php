@@ -18,6 +18,14 @@ final class InvalidConfigException extends LogicException
         return new self(\sprintf('Config parameter "%s" must not be an empty string', $parameter));
     }
 
+    public static function brokers(string $brokers): self
+    {
+        return new self(\sprintf(
+            'Config parameter "brokers" must be a comma-separated list of host[:port] entries, "%s" given',
+            $brokers,
+        ));
+    }
+
     public static function positiveInt(string $parameter, int $value): self
     {
         return new self(\sprintf('Config parameter "%s" must be positive, %d given', $parameter, $value));

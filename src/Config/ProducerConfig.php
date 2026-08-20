@@ -23,6 +23,8 @@ final readonly class ProducerConfig
             throw InvalidConfigException::emptyString('brokers');
         }
 
+        Brokers::assertValid($this->brokers);
+
         if ($this->queueBufferingMaxKBytes <= 0) {
             throw InvalidConfigException::positiveInt('queueBufferingMaxKBytes', $this->queueBufferingMaxKBytes);
         }

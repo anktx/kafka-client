@@ -36,6 +36,29 @@
 - **BC:** `KafkaConsumer::consume()` расширил возвращаемый union
   (`…|KafkaBrokersDown|…`). Пользовательские исчерпывающие `match`
   по результату нужно дополнить новой веткой.
+- **BC:** база `KafkaException` наследует `\RuntimeException` вместо
+  `RdKafka\Exception`: исключения библиотеки больше не ловятся чужим
+  `catch (RdKafka\Exception)`. Единая точка поимки — маркер
+  `KafkaClientException` (или `\RuntimeException`).
+- **BC:** `KafkaFlushTimeoutException::flushTimeout()` требует второй
+  аргумент `int $outQueueLen` — размер недренжированной очереди
+  включён в сообщение исключения, как и в контекст warning-лога.
+- Исключения `produce()`/`commit()`/unrecognized-consume-error несут
+  контекст позиции (topic/partition/offset, для produce — destination)
+  в сообщении, а не только в PSR-3 логе.
+- Формат `brokers` (список `host[:port]` через запятую, без порта вне
+  диапазона и пустых записей) валидируется в конструкторах
+  `ProducerConfig`/`ConsumerConfig` (`InvalidConfigException`) вместо
+  отказа на первом сетевом вызове librdkafka.
+- `RdKafkaLogLevel::toPsrLevel()` при severity вне 0–7 бросает
+  `InvalidLogLevelException` вместо молчаливой подстановки `'error'`.
+- PHPStan поднят до level 9 c `treatPhpDocTypesAsCertain: false`;
+  shape `RdKafka\Message::$headers` зафиксирован стабом
+  (`phpstan/stubs/RdKafka/Message.stub`).
+- PHP-CS-Fixer: фактический ruleset приведён к заявленному PER-CS2.0 —
+  пресет `@PhpCsFixer` (+risky) снят, расширения сверх PER-CS2.0
+  перечислены явно; `final_class` не включён (SilentStreamObserver —
+  намеренно расширяемая база Null Object).
 
 ### Removed
 
@@ -58,6 +81,12 @@
   новых результатов).
 - Dev-контент (tests, docs, bin, CI, Makefile, конфиги инструментов)
   больше не попадает в dist-архив пакета (`.gitattributes`).
+- `bin/coverage-check.php` отвергает пустой отчёт (0 executable lines):
+  гейт 100% line coverage больше не проходит «впустую» на сломанном
+  source-фильтре.
+- Makefile: `$(CURDIR)` вместо `$(PWD)`, docker-запуск с маппингом
+  пользователя (`-u`, без root-owned артефактов), `KAFKA_BROKERS`
+  пробрасывается в `test-all`/`test-file`, `clean` удаляет `.cache/`.
 
 ## [0.9.0] - 2026-08-20
 

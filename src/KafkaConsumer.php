@@ -231,7 +231,9 @@ final class KafkaConsumer
 
         return match ($message->err) {
             \RD_KAFKA_RESP_ERR_NO_ERROR => new KafkaConsumerMessage(
-                topic: $message->topic_name,
+                // topic_name нативно nullable; для доставленного сообщения
+                // ext-rdkafka заполняет его всегда, null нормализуется в ''
+                topic: $message->topic_name ?? '',
                 partition: $message->partition,
                 offset: $message->offset,
                 body: $message->payload,
@@ -245,7 +247,7 @@ final class KafkaConsumer
             ),
 
             \RD_KAFKA_RESP_ERR__PARTITION_EOF => new KafkaPartitionEof(
-                topic: $message->topic_name,
+                topic: $message->topic_name ?? '',
                 partition: $message->partition,
                 offset: $message->offset,
             ),
@@ -293,7 +295,12 @@ final class KafkaConsumer
                 'exception' => $e,
             ]);
 
-            throw KafkaConsumerException::fromKafkaException($e);
+            throw KafkaConsumerException::commitFailed(
+                topic: $message->topic,
+                partition: $message->partition,
+                offset: $message->offset,
+                e: $e,
+            );
         }
     }
 
@@ -344,16 +351,32 @@ final class KafkaConsumer
     /**
      * Логирует и бросает исключение для кода ошибки, не имеющего типизированной ветки в consume().
      *
+     * Позиция (топик/партиция/смещение) переносится и в лог, и в исключение:
+     * код ошибки без позиции не привязать к партиции при разборе инцидента.
+     * topic_name у RdKafka\Message нативно nullable и при ряде ошибок не
+     * заполняется — null нормализуется в пустую строку.
+     *
      * @param Message $message Сообщение с кодом ошибки RD_KAFKA_RESP_ERR__*
      */
     private function throwOnUnrecognizedConsumeError(Message $message): never
     {
+        $topic = $message->topic_name ?? '';
+
         $this->logger->error('Consume failed with unrecognized error', [
             'error_code' => $message->err,
             'reason' => $message->errstr(),
+            'topic' => $topic,
+            'partition' => $message->partition,
+            'offset' => $message->offset,
         ]);
 
-        throw KafkaConsumerException::create($message->errstr(), $message->err);
+        throw KafkaConsumerException::consumeFailed(
+            errstr: $message->errstr(),
+            errorCode: $message->err,
+            topic: $topic,
+            partition: $message->partition,
+            offset: $message->offset,
+        );
     }
 
     /**

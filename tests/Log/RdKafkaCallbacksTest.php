@@ -6,13 +6,13 @@ namespace Anktx\Kafka\Client\Tests\Log;
 
 use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
+use Anktx\Kafka\Client\Tests\Support\RdKafkaMessages;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 use RdKafka\Conf;
 use RdKafka\KafkaConsumer;
-use RdKafka\Message;
 use RdKafka\Producer;
 
 /**
@@ -133,7 +133,7 @@ final class RdKafkaCallbacksTest extends TestCase
             static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachDeliveryReportCallback($conf),
         );
 
-        $onDeliveryReport($this->createMock(Producer::class), self::message([
+        $onDeliveryReport($this->createMock(Producer::class), RdKafkaMessages::fromValues([
             'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
             'topic_name' => 'test-topic',
             'partition' => 2,
@@ -161,7 +161,7 @@ final class RdKafkaCallbacksTest extends TestCase
             static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachDeliveryReportCallback($conf),
         );
 
-        $onDeliveryReport($this->createMock(Producer::class), self::message([
+        $onDeliveryReport($this->createMock(Producer::class), RdKafkaMessages::fromValues([
             'err' => \RD_KAFKA_RESP_ERR__MSG_TIMED_OUT,
             'topic_name' => 'test-topic',
             'partition' => 1,
@@ -200,19 +200,5 @@ final class RdKafkaCallbacksTest extends TestCase
         self::assertInstanceOf(\Closure::class, $captured);
 
         return $captured;
-    }
-
-    /**
-     * @param array<string, mixed> $values
-     */
-    private static function message(array $values): Message
-    {
-        $message = new Message();
-        foreach ($values as $name => $value) {
-            // @phpstan-ignore property.dynamicName
-            $message->{$name} = $value;
-        }
-
-        return $message;
     }
 }

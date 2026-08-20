@@ -21,8 +21,11 @@
         "@default": true,
         "global-ignoreSourceCodeByRegex": [
             // KafkaProducer::flush(): тайминговые мутанты границ бюджета
-            // retry-цикла (пересчёт ns->ms, clamp остатка, условие выхода) —
-            // убиваются только ассертами реального времени, т.е. flaky-тестами.
+            // retry-цикла. Сам факт и величина передаваемого бюджета
+            // пинсуются тестами (захват аргументов flush($remainingMs) в
+            // KafkaProducerTest), но sign-flip арифметики на elapsed=0мс
+            // (мгновенный мок) неотличим без ассертов реального времени,
+            // т.е. без flaky-тестов.
             "\\$remainingMs = max\\(0, \\$timeoutMs - self::elapsedMs\\(\\$startedAtNs\\)\\);",
             "\\} while \\(self::elapsedMs\\(\\$startedAtNs\\) < \\$timeoutMs\\);",
             "return intdiv\\(hrtime\\(true\\) - \\$startedAtNs, 1_000_000\\);",

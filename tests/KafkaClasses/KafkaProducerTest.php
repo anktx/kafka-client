@@ -129,7 +129,7 @@ final class KafkaProducerTest extends TestCase
         $logger = new InMemoryLogger();
 
         $producer = $this->createMock(Producer::class);
-        $producer->method('newTopic')->willThrowException($failure = new Exception('invalid topic name'));
+        $producer->method('newTopic')->willThrowException($failure = new Exception('invalid topic name', 42));
 
         $kafkaProducer = $this->buildProducer($producer, logger: $logger);
 
@@ -137,7 +137,14 @@ final class KafkaProducerTest extends TestCase
             $kafkaProducer->produce(self::message());
             self::fail('Expected KafkaProducerException');
         } catch (KafkaProducerException $e) {
-            self::assertSame('invalid topic name', $e->getMessage());
+            // Destination (топик/партиция) — в сообщение исключения: без него
+            // невозможно понять, какое именно сообщение не ушло.
+            self::assertSame(
+                'Failed to produce message to topic "test-topic" partition -1: invalid topic name',
+                $e->getMessage(),
+            );
+            self::assertSame(42, $e->getCode());
+            self::assertSame($failure, $e->getPrevious());
         }
 
         $errorRecords = $logger->findByMessage('Failed to produce message');
@@ -158,7 +165,7 @@ final class KafkaProducerTest extends TestCase
         $logger = new InMemoryLogger();
 
         $topic = $this->createMock(ProducerTopic::class);
-        $topic->method('producev')->willThrowException($failure = new Exception('local queue full'));
+        $topic->method('producev')->willThrowException($failure = new Exception('local queue full', 7));
 
         $producer = $this->createMock(Producer::class);
         $producer->method('newTopic')->willReturn($topic);
@@ -169,13 +176,55 @@ final class KafkaProducerTest extends TestCase
             $kafkaProducer->produce(self::message());
             self::fail('Expected KafkaProducerException');
         } catch (KafkaProducerException $e) {
-            self::assertSame('local queue full', $e->getMessage());
+            self::assertSame(
+                'Failed to produce message to topic "test-topic" partition -1: local queue full',
+                $e->getMessage(),
+            );
+            self::assertSame(7, $e->getCode());
+            self::assertSame($failure, $e->getPrevious());
         }
 
         $errorRecords = $logger->findByMessage('Failed to produce message');
         self::assertCount(1, $errorRecords);
         self::assertSame('local queue full', $errorRecords[0]['context']['reason']);
         self::assertSame($failure, $errorRecords[0]['context']['exception']);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testProduceReusesCachedTopicForSameName(): void
+    {
+        // Кэш ProducerTopic: повторный produce в тот же топик не создаёт
+        // новый RdKafka\ProducerTopic — newTopic() вызывается один раз.
+        $topic = $this->createMock(ProducerTopic::class);
+        $topic->expects($this->exactly(2))->method('producev');
+
+        $producer = $this->createMock(Producer::class);
+        $producer->expects($this->once())->method('newTopic')->with('test-topic')->willReturn($topic);
+
+        $kafkaProducer = $this->buildProducer($producer);
+
+        $kafkaProducer->produce(self::message());
+        $kafkaProducer->produce(self::message());
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testProduceCreatesDistinctTopicPerName(): void
+    {
+        $events = $this->createMock(ProducerTopic::class);
+        $events->expects($this->once())->method('producev');
+
+        $orders = $this->createMock(ProducerTopic::class);
+        $orders->expects($this->once())->method('producev');
+
+        $producer = $this->createMock(Producer::class);
+        $producer->expects($this->exactly(2))->method('newTopic')
+            ->willReturnOnConsecutiveCalls($events, $orders)
+        ;
+
+        $kafkaProducer = $this->buildProducer($producer);
+
+        $kafkaProducer->produce(new KafkaProducerMessage(topic: 'events', body: 'e'));
+        $kafkaProducer->produce(new KafkaProducerMessage(topic: 'orders', body: 'o'));
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -196,21 +245,63 @@ final class KafkaProducerTest extends TestCase
     }
 
     #[AllowMockObjectsWithoutExpectations]
+    public function testFlushUsesDefaultTimeoutWhenOmitted(): void
+    {
+        // KafkaProducer::DEFAULT_FLUSH_TIMEOUT_MS = 1000: пинсуется бюджет,
+        // переданный в RdKafka (±допуск на нулевой elapsed между hrtime и
+        // моком — точный with() здесь был бы flaky).
+        $captured = null;
+
+        $producer = $this->createMock(Producer::class);
+        $producer->expects($this->once())->method('flush')->willReturnCallback(
+            static function (int $remainingMs) use (&$captured): int {
+                $captured = $remainingMs;
+
+                return \RD_KAFKA_RESP_ERR_NO_ERROR;
+            },
+        );
+
+        $this->buildProducer($producer)->flush();
+
+        self::assertNotNull($captured);
+        self::assertGreaterThanOrEqual(950, $captured);
+        self::assertLessThanOrEqual(1000, $captured);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
     public function testFlushRetriesTransientTimeoutUntilSuccess(): void
     {
         // Один вызов RdKafka\Producer::flush() может вернуть TIMED_OUT
         // транзитно (установка соединения): до истечения суммарного дедлайна
         // вызов повторяется, исключение — только после исчерпания бюджета.
+        // Аргумент каждого повтора — остаток бюджета: мгновенный мок не
+        // тратит времени, поэтому все попытки получают почти полный бюджет
+        // (допуск 50мс на планировщик CI), неубывающий между попытками.
+        $budgets = [];
+
         $producer = $this->createMock(Producer::class);
-        $producer->expects($this->exactly(3))->method('flush')->willReturnOnConsecutiveCalls(
-            \RD_KAFKA_RESP_ERR__TIMED_OUT,
-            \RD_KAFKA_RESP_ERR__TIMED_OUT,
-            \RD_KAFKA_RESP_ERR_NO_ERROR,
+        $producer->expects($this->exactly(3))->method('flush')->willReturnCallback(
+            static function (int $remainingMs) use (&$budgets): int {
+                $budgets[] = $remainingMs;
+
+                return \count($budgets) < 3 ? \RD_KAFKA_RESP_ERR__TIMED_OUT : \RD_KAFKA_RESP_ERR_NO_ERROR;
+            },
         );
 
         $logger = new InMemoryLogger();
 
         $this->buildProducer($producer, logger: $logger)->flush(10_000);
+
+        self::assertCount(3, $budgets);
+
+        foreach ($budgets as $budget) {
+            self::assertGreaterThanOrEqual(9_950, $budget);
+            self::assertLessThanOrEqual(10_000, $budget);
+        }
+
+        $descending = $budgets;
+        rsort($descending);
+        self::assertSame($descending, $budgets);
 
         $debugRecords = $logger->findByMessage('Producer flushed successfully');
         self::assertCount(1, $debugRecords);
@@ -233,7 +324,9 @@ final class KafkaProducerTest extends TestCase
             $this->buildProducer($producer, logger: $logger)->flush(25);
             self::fail('Expected KafkaFlushTimeoutException');
         } catch (KafkaFlushTimeoutException $e) {
-            self::assertSame('Flush timed out in 25ms', $e->getMessage());
+            // out_queue_len — в сообщение: размер недренжированной очереди
+            // показывает, сколько сообщений осталось непризнанными.
+            self::assertSame('Flush timed out in 25ms: 7 message(s) still in local queue', $e->getMessage());
             self::assertSame(\RD_KAFKA_RESP_ERR__TIMED_OUT, $e->getCode());
         }
 

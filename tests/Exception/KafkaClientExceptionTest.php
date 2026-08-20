@@ -29,6 +29,7 @@ final class KafkaClientExceptionTest extends TestCase
         );
 
         foreach ($files as $file) {
+            \assert($file instanceof \SplFileInfo);
             require_once $file->getPathname();
         }
 

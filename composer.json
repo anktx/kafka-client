@@ -50,7 +50,7 @@
     ]
   },
   "scripts-descriptions": {
-    "analyse": "Runs PHPStan static analysis (level 8 + strict-rules)",
+    "analyse": "Runs PHPStan static analysis (level 9 + strict-rules)",
     "analyse:baseline": "Generates PHPStan baseline for remaining errors",
     "cs-fix": "Fixes code style with PHP CS Fixer",
     "cs-check": "Checks code style with PHP CS Fixer without modifying files",

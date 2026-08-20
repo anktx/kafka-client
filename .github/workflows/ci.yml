@@ -50,7 +50,7 @@ jobs:
       - name: Style check (PHP-CS-Fixer)
         run: vendor/bin/php-cs-fixer fix --dry-run --diff --show-progress=dots
 
-      - name: Static analysis (PHPStan level 8 + strict-rules)
+      - name: Static analysis (PHPStan level 9 + strict-rules)
         run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress
 
       - name: Unit tests (PHPUnit)

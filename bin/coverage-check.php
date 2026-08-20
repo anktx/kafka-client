@@ -24,6 +24,17 @@ if (!$coverage instanceof CodeCoverage) {
 }
 
 $report = $coverage->getReport();
+$totalExecutableLines = $report->numberOfExecutableLines();
+
+if ($totalExecutableLines === 0) {
+    // Пустой отчёт (0/0) без этой проверки проходит гейт «впустую»:
+    // например, при сломанном source-фильтре phpunit или устаревшем дампе.
+    fwrite(\STDERR, "Coverage report contains no executable lines, the gate would pass vacuously.\n");
+    fwrite(\STDERR, "Check that the phpunit source config includes src/ and the dump is fresh.\n");
+
+    exit(1);
+}
+
 $uncoveredLines = [];
 
 foreach ($report as $node) {
@@ -45,7 +56,7 @@ foreach ($report as $node) {
 printf(
     "Line coverage: %d/%d (%s)\n",
     $report->numberOfExecutedLines(),
-    $report->numberOfExecutableLines(),
+    $totalExecutableLines,
     $report->percentageOfExecutedLines()->asString(),
 );
 

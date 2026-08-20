@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\ConsumeResult;
 
-use Anktx\Kafka\Client\StreamObserver\BrokersDownBudgetStreamObserver;
-
 /**
  * Маркер полной потери соединения со всеми брокерами (ALL_BROKERS_DOWN).
  *
@@ -14,7 +12,8 @@ use Anktx\Kafka\Client\StreamObserver\BrokersDownBudgetStreamObserver;
  * смещений. Отличается от {@see KafkaConsumeTimeout} тем, что это диагноз
  * «прямо сейчас нет ни одного живого соединения», а не «за окно опроса
  * не пришло сообщений». «Вечная» ли потеря — изнутри клиента неопределимо:
- * порог остановки — политика вызывающего кода (см. {@see BrokersDownBudgetStreamObserver}),
- * а не факт, известный библиотеке.
+ * порог остановки — политика вызывающего кода (fail-fast наблюдатели
+ * слоя StreamObserver), а не факт, известный библиотеке; листовый слой
+ * на верхние слои не ссылается.
  */
 final readonly class KafkaBrokersDown implements ConsumeResult {}

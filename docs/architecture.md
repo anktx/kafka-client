@@ -12,15 +12,17 @@
 стратегиями опроса. Работает как с Apache Kafka, так и с RedPanda.
 
 **Технический стек:** PHP 8.4+, ext-rdkafka, PHPUnit 12,
-PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
+PHPStan level 9 + strict-rules, PHP-CS-Fixer, Infection
 
 ## Основные компоненты
 
 1. **Конфигурация** (`src/Config/`)
    - `ConsumerConfig`, `ProducerConfig` — immutable readonly-объекты значений,
-     настраиваются именованными аргументами конструктора
-   - Валидация в конструкторе: пустые `brokers`/`groupId`, отрицательные
-     интервалы, инвертированный диапазон reconnect-backoff → `InvalidConfigException`
+      настраиваются именованными аргументами конструктора
+    - Валидация в конструкторе: пустые `brokers`/`groupId`, формат списка
+      `brokers` (`host[:port]` через запятую — общий валидатор `Config\Brokers`),
+      отрицательные интервалы, инвертированный диапазон reconnect-backoff →
+      `InvalidConfigException`
    - Содержит enum'ы для `CompressionType` и `OffsetReset`
 
 2. **Продюсер** (`src/KafkaProducer.php`)
@@ -50,14 +52,18 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
    - `ProbabilityPollStrategy` — опрос с заданной вероятностью (инъекция `\Random\Randomizer`)
 
 5. **Исключения** (`src/Exception/`)
-   - Два семейства по природе сбоя: `Kafka\` — рантайм-сбои инфраструктуры
-     (база наследует `RdKafka\Exception`), `Logic\` — детерминированные
-     ошибки программиста (база наследует `\LogicException`: невалидный
-     конфиг, неверное использование API, пустые подписки)
-   - Маркерный интерфейс `KafkaClientException` (`extends \Throwable`)
-     реализован обеими базами — единая точка поимки всех исключений
-     библиотеки одним catch
-   - Статические factory-методы (например, `KafkaException::fromKafkaException()`)
+    - Два семейства по природе сбоя: `Kafka\` — рантайм-сбои инфраструктуры
+      (база наследует `\RuntimeException`, а не `RdKafka\Exception` — исключения
+      библиотеки не должны ловиться чужим `catch (RdKafka\Exception)`),
+      `Logic\` — детерминированные ошибки программиста (база наследует
+      `\LogicException`: невалидный конфиг, неверное использование API,
+      пустые подписки)
+    - Маркерный интерфейс `KafkaClientException` (`extends \Throwable`)
+      реализован обеими базами — единая точка поимки всех исключений
+      библиотеки одним catch
+    - Статические factory-методы (например, `KafkaException::fromKafkaException()`);
+      исключения операций несут контекст позиции (topic/partition/offset,
+      `out_queue_len`) прямо в сообщении
 
 6. **ConsumeResult** (`src/ConsumeResult/`)
    - Union-типы для разных результатов потребления
@@ -113,13 +119,20 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
   неймспейс всех тестов — `Anktx\Kafka\Client\Tests\`
 - Тест-двойники RdKafka — моки PHPUnit + reflection-инъекция
   в readonly-свойства (`newInstanceWithoutConstructor()`)
+- Общие фабрики двойников в `tests/Support/`: `KafkaConsumers::build()`
+  (KafkaConsumer + инъекция mock RdKafka), `RdKafkaMessages::fromValues()`
+  (двойник `RdKafka\Message`), `FakeClock`, `InMemoryLogger`,
+  `SpyStreamObserver`
 
 ## Стандарты кодирования
 
-Проект использует **PER-CS2.0** стандарт с дополнительными risky правилами:
+Проект использует **PER-CS2.0** (оба пресета, включая risky) плюс явно
+перечисленные расширения сверх него (см. `.php-cs-fixer.dist.php`):
 
 - `declare(strict_types=1)` во всех файлах
 - Final классы/методы там, где наследование не предполагается
+  (`final_class` не форсируется правилом: `SilentStreamObserver` —
+  намеренно расширяемая база Null Object)
 - Ordered imports и class elements
 - Nullable type declarations для значений по умолчанию `null`
 - Native constant invocation (`ClassName::CONSTANT` вместо `self::CONSTANT`)
@@ -146,7 +159,8 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
      (`Conf` создаётся внутри, перехват `set*Cb()` требует живого брокера)
    - Для ослабленных проверок используйте `make infection-relaxed`
 
-3. **Static Analysis** (PHPStan level 8 + strict-rules) требует 512MB памяти.
+3. **Static Analysis** (PHPStan level 9 + strict-rules,
+   `treatPhpDocTypesAsCertain: false`) требует 512MB памяти.
 
 4. **Совместимость**: работает как с Apache Kafka, так и с RedPanda.
 
@@ -161,7 +175,7 @@ PHPStan level 8 + strict-rules, PHP-CS-Fixer, Infection
 composer qa               # Полный цикл QA (validate + style check + static analysis + unit tests)
 composer tests            # Только unit-тесты (PHPUnit testsuite "Unit")
 composer tests-integration # Integration-тесты (брокер из KAFKA_BROKERS, default localhost:9092)
-composer analyse          # PHPStan статический анализ (level 8 + strict-rules)
+composer analyse          # PHPStan статический анализ (level 9 + strict-rules)
 composer cs-check         # Проверка стиля кода (dry-run)
 composer cs-fix           # Исправление стиля кода
 composer validate         # composer validate --strict
@@ -199,8 +213,11 @@ make clean               # Очистка сгенерированных фай�
 ## Конфигурация инструментов
 
 - **PHPUnit**: `phpunit.dist.xml` — сьюты Unit/Integration, strict-режимы
-- **PHP-CS-Fixer**: `.php-cs-fixer.dist.php` — PER preset с risky rules и custom настройками
-- **PHPStan**: `phpstan.neon.dist` — level 8 + strict-rules + deprecation-rules + phpstan-phpunit
+- **PHP-CS-Fixer**: `.php-cs-fixer.dist.php` — PER-CS2.0 (+risky) и явно
+  перечисленные расширения сверх пресета
+- **PHPStan**: `phpstan.neon.dist` — level 9 + strict-rules + deprecation-rules
+  + phpstan-phpunit, `treatPhpDocTypesAsCertain: false`, стабы ext-rdkafka
+  (`phpstan/stubs/RdKafka/Message.stub` — shape `$headers`)
 - **Infection**: `infection.json5.dist` — MSI 100% / Covered MSI 100%, 10 threads,
   только testsuite Unit, все мутаторы `@default` (точечные ignore — с
   обоснованиями в комментариях внутри конфига)

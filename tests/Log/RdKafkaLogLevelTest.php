@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\Log;
 
+use Anktx\Kafka\Client\Exception\Logic\InvalidLogLevelException;
 use Anktx\Kafka\Client\Log\RdKafkaLogLevel;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -39,9 +40,21 @@ final class RdKafkaLogLevelTest extends TestCase
         yield 'debug (7)' => [7, LogLevel::DEBUG];
     }
 
-    public function testOutOfRangeSeverityFallsBackToError(): void
+    public function testSeverityAboveRangeThrows(): void
     {
-        self::assertSame(LogLevel::ERROR, RdKafkaLogLevel::toPsrLevel(8));
-        self::assertSame(LogLevel::ERROR, RdKafkaLogLevel::toPsrLevel(-1));
+        // Выход за 0–7 — баг расширения или привязки: типизированный отказ
+        // вместо молчаливого фолбэка на 'error'.
+        $this->expectException(InvalidLogLevelException::class);
+        $this->expectExceptionMessage('Unknown librdkafka log severity 8, expected 0-7');
+
+        RdKafkaLogLevel::toPsrLevel(8);
+    }
+
+    public function testNegativeSeverityThrows(): void
+    {
+        $this->expectException(InvalidLogLevelException::class);
+        $this->expectExceptionMessage('Unknown librdkafka log severity -1, expected 0-7');
+
+        RdKafkaLogLevel::toPsrLevel(-1);
     }
 }

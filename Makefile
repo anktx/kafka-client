@@ -4,7 +4,12 @@
 
 # Docker configuration
 DOCKER_IMAGE = local-php-cli:8.4-dev
-DOCKER_RUN = docker run --rm -v "$(PWD):/app" -w /app $(DOCKER_IMAGE)
+# -u + HOME: файлы-артефакты (.phpunit.cache, .infection, vendor-кэш) остаются
+# принадлежащими текущему пользователю, а не root.
+DOCKER_RUN = docker run --rm -u "$(shell id -u):$(shell id -g)" -e HOME=/tmp -v "$(CURDIR):/app" -w /app $(DOCKER_IMAGE)
+
+# Адрес брокера для интеграционных тестов (пробрасывается в контейнер)
+KAFKA_BROKERS ?= localhost:9092
 
 # Default target
 .DEFAULT_GOAL := help
@@ -32,11 +37,11 @@ test-integration: ## Run integration tests (requires Kafka at KAFKA_BROKERS, def
 
 test-all: ## Run all tests (unit + integration)
 	@echo '$(BLUE)Running all tests...$(NC)'
-	$(DOCKER_RUN) vendor/bin/phpunit tests --colors=never
+	$(DOCKER_RUN) -e KAFKA_BROKERS="$(KAFKA_BROKERS)" vendor/bin/phpunit tests --colors=never
 
 test-file: ## Run a single test file (usage: make test-file FILE=tests/Path/ToTest.php)
 	@echo '$(BLUE)Running test file: $(FILE)$(NC)'
-	$(DOCKER_RUN) vendor/bin/phpunit $(FILE) --colors=never
+	$(DOCKER_RUN) -e KAFKA_BROKERS="$(KAFKA_BROKERS)" vendor/bin/phpunit $(FILE) --colors=never
 
 test-coverage: ## Run PHPUnit tests with coverage (XML for filtered Infection runs)
 	@echo '$(BLUE)Running PHPUnit tests with coverage (XML)...$(NC)'
@@ -79,8 +84,8 @@ cs-dry: ## Run PHP CS Fixer in dry-run mode
 	@echo '$(BLUE)Running PHP CS Fixer (dry-run)...$(NC)'
 	$(DOCKER_RUN) vendor/bin/php-cs-fixer fix --dry-run -v --diff --show-progress=dots
 
-analyse: ## Run PHPStan static analysis (level 8)
-	@echo '$(BLUE)Running PHPStan analysis (level 8)...$(NC)'
+analyse: ## Run PHPStan static analysis (level 9)
+	@echo '$(BLUE)Running PHPStan analysis (level 9)...$(NC)'
 	$(DOCKER_RUN) vendor/bin/phpstan analyse --memory-limit=512M --no-progress
 
 analyse-baseline: ## Generate PHPStan baseline
@@ -94,6 +99,7 @@ clean: ## Clean up generated files
 	@echo '$(BLUE)Cleaning up...$(NC)'
 	rm -rf .infection
 	rm -rf .phpunit.cache
+	rm -rf .cache
 	rm -rf phpstan-baseline.neon
 	@echo '$(GREEN)Cleaned up!$(NC)'
 

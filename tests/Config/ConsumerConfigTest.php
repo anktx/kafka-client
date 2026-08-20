@@ -292,6 +292,18 @@ final class ConsumerConfigTest extends TestCase
         new ConsumerConfig(brokers: '', groupId: 'g');
     }
 
+    public function testInvalidBrokersFormatThrows(): void
+    {
+        // Формат списка валидируется в конструкторе общим валидатором
+        // Brokers (граничные случаи — в BrokersTest).
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage(
+            'Config parameter "brokers" must be a comma-separated list of host[:port] entries, "kafka:abc" given',
+        );
+
+        new ConsumerConfig(brokers: 'kafka:abc', groupId: 'g');
+    }
+
     public function testEmptyGroupIdThrowsInvalidConfigException(): void
     {
         $this->expectException(InvalidConfigException::class);

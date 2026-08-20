@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\StreamObserver;
 
 use Anktx\Kafka\Client\Clock\SystemClock;
+use Anktx\Kafka\Client\Clock\UnixMilliseconds;
 use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
@@ -56,7 +57,7 @@ final class BrokersDownBudgetStreamObserver implements StreamObserver
 
     public function onBrokersDown(KafkaBrokersDown $brokersDown): void
     {
-        $nowMs = (int) $this->clock->now()->format('Uv');
+        $nowMs = UnixMilliseconds::of($this->clock->now());
 
         if ($this->downSinceMs === null) {
             $this->downSinceMs = $nowMs;

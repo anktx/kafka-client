@@ -188,6 +188,27 @@ final class ProducerConfigTest extends TestCase
         new ProducerConfig('');
     }
 
+    public function testInvalidBrokersFormatThrows(): void
+    {
+        // Формат списка валидируется в конструкторе (общий валидатор
+        // Brokers, полный набор граничных случаев — в BrokersTest):
+        // опечатка ловится на этапе конфигурации, а не первым сетевым
+        // отказом librdkafka.
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage(
+            'Config parameter "brokers" must be a comma-separated list of host[:port] entries, "kafka:9092," given',
+        );
+
+        new ProducerConfig('kafka:9092,');
+    }
+
+    public function testValidMultiBrokerListPasses(): void
+    {
+        $config = new ProducerConfig('kafka:9092,[::1]:9093');
+
+        self::assertSame('kafka:9092,[::1]:9093', $config->brokers);
+    }
+
     public function testZeroQueueBufferingMaxKBytesThrows(): void
     {
         $this->expectException(InvalidConfigException::class);

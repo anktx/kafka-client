@@ -7,6 +7,7 @@ namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
 use Anktx\Kafka\Client\KafkaConsumer;
 use Anktx\Kafka\Client\Tests\Support\InMemoryLogger;
+use Anktx\Kafka\Client\Tests\Support\KafkaConsumers;
 use PHPUnit\Framework\TestCase;
 use RdKafka\Exception;
 
@@ -26,7 +27,7 @@ final class KafkaConsumerUnsubscribeTest extends TestCase
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->expects($this->once())->method('unsubscribe');
 
-        $this->buildConsumer($rdKafka, $logger)->unsubscribe();
+        KafkaConsumers::build($rdKafka, $logger)->unsubscribe();
 
         $infoRecords = $logger->findByMessage('Unsubscribed from all topics');
         self::assertCount(1, $infoRecords);
@@ -44,7 +45,7 @@ final class KafkaConsumerUnsubscribeTest extends TestCase
         ;
 
         try {
-            $this->buildConsumer($rdKafka, $logger)->unsubscribe();
+            KafkaConsumers::build($rdKafka, $logger)->unsubscribe();
             self::fail('Expected KafkaConsumerException');
         } catch (KafkaConsumerException $e) {
             self::assertSame('unsubscribe failed', $e->getMessage());
@@ -55,20 +56,5 @@ final class KafkaConsumerUnsubscribeTest extends TestCase
         self::assertCount(1, $errorRecords);
         self::assertSame('unsubscribe failed', $errorRecords[0]['context']['reason']);
         self::assertSame($failure, $errorRecords[0]['context']['exception']);
-    }
-
-    /**
-     * Собирает KafkaConsumer без вызова конструктора (чтобы избежать реального
-     * подключения к брокерам) и инжектит mock RdKafka\KafkaConsumer в приватные
-     * свойства.
-     */
-    private function buildConsumer(\RdKafka\KafkaConsumer $rdKafka, InMemoryLogger $logger): KafkaConsumer
-    {
-        $consumer = (new \ReflectionClass(KafkaConsumer::class))->newInstanceWithoutConstructor();
-
-        (new \ReflectionProperty(KafkaConsumer::class, 'consumer'))->setValue($consumer, $rdKafka);
-        (new \ReflectionProperty(KafkaConsumer::class, 'logger'))->setValue($consumer, $logger);
-
-        return $consumer;
     }
 }
