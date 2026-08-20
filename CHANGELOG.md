@@ -7,6 +7,8 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-20
+
 ### Added
 
 - `KafkaConsumerInterface` — контракт публичного API консьюмера, который
@@ -519,7 +521,8 @@
   Обратно совместимо — существующий код, передающий `instanceId`, работает
   без изменений.
 
-[Unreleased]: https://git.anom.ru/anktx/kafka-client/compare/0.11.0...master
+[Unreleased]: https://git.anom.ru/anktx/kafka-client/compare/0.12.0...master
+[0.12.0]: https://git.anom.ru/anktx/kafka-client/compare/0.11.0...0.12.0
 [0.11.0]: https://git.anom.ru/anktx/kafka-client/compare/0.10.0...0.11.0
 [0.10.0]: https://git.anom.ru/anktx/kafka-client/compare/0.9.0...0.10.0
 [0.9.0]: https://git.anom.ru/anktx/kafka-client/compare/0.8.0...0.9.0
