@@ -7,6 +7,8 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-20
+
 ### Added
 
 - `StreamObserver` — инжектируемая в `KafkaMessageStream` реакция на
@@ -439,7 +441,9 @@
   Обратно совместимо — существующий код, передающий `instanceId`, работает
   без изменений.
 
-[0.9.0]: https://git.anom.ru/anktx/kafka-client/compare/0.8.0...master
+[Unreleased]: https://git.anom.ru/anktx/kafka-client/compare/0.10.0...master
+[0.10.0]: https://git.anom.ru/anktx/kafka-client/compare/0.9.0...0.10.0
+[0.9.0]: https://git.anom.ru/anktx/kafka-client/compare/0.8.0...0.9.0
 [0.8.0]: https://git.anom.ru/anktx/kafka-client/compare/0.7.2...0.8.0
 [0.7.2]: https://git.anom.ru/anktx/kafka-client/compare/0.7.1...0.7.2
 [0.7.1]: https://git.anom.ru/anktx/kafka-client/compare/0.7.0...0.7.1
