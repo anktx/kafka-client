@@ -61,7 +61,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
             'instance_id' => null,
             'offset_reset' => 'earliest',
             'auto_commit_ms' => null,
-            'session_timeout_ms' => null,
+            'session_timeout_ms' => 30000,
         ], $createdRecords[0]['context']);
 
         $consumer->close();

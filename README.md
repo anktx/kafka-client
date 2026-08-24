@@ -167,6 +167,12 @@ $config = new ProducerConfig(
     batchSize: int,                     // По умолчанию: 102400
     lingerMs: int,                      // По умолчанию: 10
     compressionType: CompressionType,   // По умолчанию: snappy; none — отключить сжатие
+    enableIdempotence: bool,            // По умолчанию: true
+    messageTimeoutMs: int,              // По умолчанию: 120000
+    connectionsMaxIdleMs: int,          // По умолчанию: 180000
+    reconnectBackoffMs: int,            // По умолчанию: 100
+    reconnectBackoffMaxMs: int,         // По умолчанию: 10000
+    socketKeepaliveEnable: bool,        // По умолчанию: true
     isDebug: bool,                      // По умолчанию: false
 );
 ```
@@ -180,9 +186,12 @@ $config = new ConsumerConfig(
     instanceId: ?string,                // По умолчанию: null
     offsetReset: OffsetReset,           // По умолчанию: earliest
     autoCommitMs: ?int,                 // По умолчанию: null (ручной коммит)
-    sessionTimeoutMs: ?int,             // По умолчанию: null
-    reconnectBackoffMs: ?int,           // По умолчанию: null
-    reconnectBackoffMaxMs: ?int,        // По умолчанию: null
+    sessionTimeoutMs: int,              // По умолчанию: 30000
+    heartbeatIntervalMs: int,           // По умолчанию: 3000
+    maxPollIntervalMs: int,             // По умолчанию: 300000
+    connectionsMaxIdleMs: int,          // По умолчанию: 540000
+    reconnectBackoffMs: int,            // По умолчанию: 100
+    reconnectBackoffMaxMs: int,         // По умолчанию: 10000
     socketKeepaliveEnable: bool,        // По умолчанию: true
     isDebug: bool,                      // По умолчанию: false
 );
@@ -190,9 +199,75 @@ $config = new ConsumerConfig(
 
 Невалидные значения отбрасываются в конструкторах `Brokers` (пустой
 список или запись вне формата `host[:port]`), конфигов (пустой `groupId`,
-отрицательные интервалы, `reconnectBackoffMaxMs < reconnectBackoffMs`)
+неположительные интервалы, `reconnectBackoffMaxMs < reconnectBackoffMs`,
+`heartbeatIntervalMs > sessionTimeoutMs / 3`)
 и сообщений/подписок (пустое имя топика — `Topic`) исключением
 `InvalidConfigException` / `InvalidTopicException`.
+
+### Production defaults: сокеты и надёжность
+
+Дефолты библиотеки ужесточены относительно librdkafka под продовый сценарий
+«молчаливого» отвала брокера: при обрыве сети без RST (NAT/conntrack выкинул
+state, firewall дропает пакеты) образуется half-open TCP, и клиент видит лишь
+`RD_KAFKA_RESP_ERR__TIMED_OUT` — неотличимо от тишины в топике. У librdkafka
+из коробки нет ни одного механизма детекта такого соединения: keepalive
+выключен, `connections.max.idle.ms = 0` (не закрывать никогда). У Java-клиента
+idle-close есть, но занимает 9 минут.
+
+Механизмом детекта в наших дефолтах является **TCP keepalive** (ядро
+закрывает мёртвое соединение за ~105 с при рекомендованных ниже sysctl) плюс
+`sessionTimeoutMs` для группы и `messageTimeoutMs` для доставки.
+`connections.max.idle.ms` — гигиена соединений, а не детект, поэтому
+значения для консьюмера и продюсера разные (см. rationale).
+
+| Параметр | Default | Rationale |
+|---|---|---|
+| `socketKeepaliveEnable` | `true` | TCP keepalive на сокетах к брокерам — главный механизм детекта half-open соединения силами ядра; дефолт librdkafka `false` |
+| `connectionsMaxIdleMs` (consumer) | `540000` | Дефолт Java-клиента (9 мин — чуть ниже 10-минутного idle брокера, чтобы клиент закрывал соединение первым). Документация Apache: для classic-консьюмера idle ≥ `max.poll.interval.ms` (rebalance timeout), иначе соединение с координатором закроется посреди ребаланса большой группы. Соединениям консьюмера детект не нужен: их держит живыми трафик (heartbeat каждые 3 с, постоянные fetch-запросы) |
+| `connectionsMaxIdleMs` (producer) | `180000` | Официальная рекомендация Azure Event Hubs (must be < 240000 — их idle-таймаут); укладывается и в 350-секундный idle NLB у AWS MSK. Простаивающий продюсер сам закрывает соединения до того, как это сделает инфраструктурный балансировщик, — не будет записи в уже закрытый сокет |
+| `reconnectBackoffMs` / `MaxMs` | `100` / `10000` | Равны дефолтам librdkafka, зафиксированы явно: экспоненциальный бэкофф реконнекта предсказуем |
+| `sessionTimeoutMs` | `30000` | Для static membership (`group.instance.id`): мёртвый инстанс держит партиции до истечения session timeout; 30 с — баланс скорости failover и ложных срабатываний (рекомендованный Confluent диапазон 6–45 с). Heartbeat шлёт фоновый поток librdkafka, паузы PHP-воркера на сессию не влияют |
+| `heartbeatIntervalMs` | `3000` | Дефолт обоих эталонных клиентов (Java и librdkafka): 10 попыток за сессию вместо 3 при session/3 — устойчивость к одиночным задержкам сети и быстрая реакция на ребалансы. Правило документации Kafka «heartbeat ≤ session/3» проверяется в конструкторе (`3 × heartbeat ≤ session`) |
+| `maxPollIntervalMs` | `300000` | Экспозиция контракта «обработка между poll'ами должна укладываться» — см. ниже |
+| `enableIdempotence` (producer) | `true` | Для event transport дубликаты хуже задержек; KIP-679 сделал idempotence дефолтом Java-клиента 3.0+. `acks`/`message.send.max.retries` вручную не выставляйте — librdkafka подберёт совместимые значения сам |
+| `messageTimeoutMs` (producer) | `120000` | Соответствует `delivery.timeout.ms` Java-клиента (его самый обкатанный пресет): зависшая доставка вскрывается delivery report'ом за 2 минуты вместо 5 |
+
+`messageTimeoutMs` задаёт бюджет доставки одного сообщения силами librdkafka.
+Прикладной таймаут `flush()` у потребителя библиотеки должен быть
+**не меньше** `messageTimeoutMs` — иначе flush закончится раньше, чем
+librdkafka перестанет ретраить, и статус доставки станет неизвестен
+(`KafkaFlushTimeoutException` при недоставленной очереди).
+
+#### Требования к хосту: TCP keepalive
+
+`socket.keepalive.enable` включает SO_KEEPALIVE, но тайминги проб
+задаются системными sysctl на хосте (в контейнере — на воркер-ноде).
+Рекомендуемые значения:
+
+```sysctl
+net.ipv4.tcp_keepalive_time=60
+net.ipv4.tcp_keepalive_intvl=15
+net.ipv4.tcp_keepalive_probes=3
+```
+
+С такими таймингами мёртвое соединение ядро закрывает за ~60+3×15=105 с —
+детект срабатывает, даже когда приложение полностью молчит: keepalive-таймер
+отсчитывается от последнего пакета в соединении. Если же приложение пишет
+в мёртвое соединение, детект берут на себя TCP-ретрансмиссии
+(`tcp_retries2` ≈ 15–30 мин). Побочный эффект: пробы сами являются
+трафиком не реже раза в 60 с — живое простаивающее соединение не выглядит
+простаивающим для idle-таймаутов балансировщиков. Дефолты Linux
+(7200/75/9 = 2 ч 11 мин) для продакшена непригодны.
+
+#### Контракт `max.poll.interval.ms`
+
+`maxPollIntervalMs` — максимальная задержка между вызовами `consume()`.
+Если обработка пакета сообщений занимает дольше — консьюмер покидает группу
+(партиции отзываются, rebalance), а следующий commit упирается в fencing.
+Контракт потребителя библиотеки: время обработки батча между poll'ами +
+коммит ≤ `maxPollIntervalMs`. Тяжёлая обработка — выносите наружу
+(бустер-очередь, acknowledge после завершения), не увеличивая таймаут
+без нужды: он же работает как watchdog зависшего воркера.
 
 #### OffsetReset: политика при отсутствии закоммиченного смещения
 

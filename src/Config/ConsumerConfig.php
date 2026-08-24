@@ -17,9 +17,12 @@ final readonly class ConsumerConfig
         public ?string $instanceId = null,
         public OffsetReset $offsetReset = OffsetReset::Earliest,
         public ?int $autoCommitMs = null,
-        public ?int $sessionTimeoutMs = null,
-        public ?int $reconnectBackoffMs = null,
-        public ?int $reconnectBackoffMaxMs = null,
+        public int $sessionTimeoutMs = 30000,
+        public int $heartbeatIntervalMs = 3000,
+        public int $maxPollIntervalMs = 300000,
+        public int $connectionsMaxIdleMs = 540000,
+        public int $reconnectBackoffMs = 100,
+        public int $reconnectBackoffMaxMs = 10000,
         public bool $socketKeepaliveEnable = true,
         public bool $isDebug = false,
     ) {
@@ -35,21 +38,35 @@ final readonly class ConsumerConfig
             throw InvalidConfigException::nonNegativeInt('autoCommitMs', $this->autoCommitMs);
         }
 
-        if ($this->sessionTimeoutMs !== null && $this->sessionTimeoutMs <= 0) {
+        if ($this->sessionTimeoutMs <= 0) {
             throw InvalidConfigException::positiveInt('sessionTimeoutMs', $this->sessionTimeoutMs);
         }
 
-        if ($this->reconnectBackoffMs !== null && $this->reconnectBackoffMs < 0) {
+        if ($this->heartbeatIntervalMs <= 0) {
+            throw InvalidConfigException::positiveInt('heartbeatIntervalMs', $this->heartbeatIntervalMs);
+        }
+
+        if ($this->maxPollIntervalMs <= 0) {
+            throw InvalidConfigException::positiveInt('maxPollIntervalMs', $this->maxPollIntervalMs);
+        }
+
+        if ($this->connectionsMaxIdleMs < 0) {
+            throw InvalidConfigException::nonNegativeInt('connectionsMaxIdleMs', $this->connectionsMaxIdleMs);
+        }
+
+        if (3 * $this->heartbeatIntervalMs > $this->sessionTimeoutMs) {
+            throw InvalidConfigException::heartbeatSessionRange($this->heartbeatIntervalMs, $this->sessionTimeoutMs);
+        }
+
+        if ($this->reconnectBackoffMs < 0) {
             throw InvalidConfigException::nonNegativeInt('reconnectBackoffMs', $this->reconnectBackoffMs);
         }
 
-        if ($this->reconnectBackoffMaxMs !== null && $this->reconnectBackoffMaxMs < 0) {
+        if ($this->reconnectBackoffMaxMs < 0) {
             throw InvalidConfigException::nonNegativeInt('reconnectBackoffMaxMs', $this->reconnectBackoffMaxMs);
         }
 
-        if ($this->reconnectBackoffMs !== null && $this->reconnectBackoffMaxMs !== null
-            && $this->reconnectBackoffMaxMs < $this->reconnectBackoffMs
-        ) {
+        if ($this->reconnectBackoffMaxMs < $this->reconnectBackoffMs) {
             throw InvalidConfigException::backoffRange($this->reconnectBackoffMs, $this->reconnectBackoffMaxMs);
         }
     }
@@ -69,7 +86,7 @@ final readonly class ConsumerConfig
             $this->configureEssentials($conf);
             $this->configureCommit($conf);
             $this->configureTimeouts($conf);
-            $this->configureReconnect($conf);
+            $this->configureConnection($conf);
         } catch (Exception $e) {
             throw InvalidConfigException::fromKafkaException($e);
         }
@@ -109,21 +126,16 @@ final readonly class ConsumerConfig
 
     private function configureTimeouts(Conf $conf): void
     {
-        if ($this->sessionTimeoutMs !== null) {
-            $conf->set('session.timeout.ms', (string) $this->sessionTimeoutMs);
-        }
+        $conf->set('session.timeout.ms', (string) $this->sessionTimeoutMs);
+        $conf->set('heartbeat.interval.ms', (string) $this->heartbeatIntervalMs);
+        $conf->set('max.poll.interval.ms', (string) $this->maxPollIntervalMs);
     }
 
-    private function configureReconnect(Conf $conf): void
+    private function configureConnection(Conf $conf): void
     {
-        if ($this->reconnectBackoffMs !== null) {
-            $conf->set('reconnect.backoff.ms', (string) $this->reconnectBackoffMs);
-        }
-
-        if ($this->reconnectBackoffMaxMs !== null) {
-            $conf->set('reconnect.backoff.max.ms', (string) $this->reconnectBackoffMaxMs);
-        }
-
+        $conf->set('connections.max.idle.ms', (string) $this->connectionsMaxIdleMs);
+        $conf->set('reconnect.backoff.ms', (string) $this->reconnectBackoffMs);
+        $conf->set('reconnect.backoff.max.ms', (string) $this->reconnectBackoffMaxMs);
         $conf->set('socket.keepalive.enable', $this->socketKeepaliveEnable ? 'true' : 'false');
     }
 }

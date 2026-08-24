@@ -35,6 +35,11 @@
             // самим set(), но факт вызова через публичный API не наблюдаем.
             "\\$conf->set\\('auto\\.offset\\.reset', \\$this->offsetReset->value\\);",
 
+            // ProducerConfig: message.timeout.ms — topic-level свойство,
+            // RdKafka\Conf::dump() его не возвращает; значение валидируется
+            // самим set(), но факт вызова через публичный API не наблюдаем.
+            "\\$conf->set\\('message\\.timeout\\.ms', \\(string\\) \\$this->messageTimeoutMs\\);",
+
             // ConsumerConfig: 'true' совпадает с дефолтом librdkafka — удаление
             // set() неотличимо в dump(). Инверсия ветки ('false') наблюдаема
             // и покрыта тестом; парный set() auto.commit.interval.ms — тоже.

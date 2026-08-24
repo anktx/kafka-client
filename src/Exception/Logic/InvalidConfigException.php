@@ -49,4 +49,13 @@ final class InvalidConfigException extends LogicException
             $backoffMs,
         ));
     }
+
+    public static function heartbeatSessionRange(int $heartbeatIntervalMs, int $sessionTimeoutMs): self
+    {
+        return new self(\sprintf(
+            'Config parameter "heartbeatIntervalMs" (%d) must not exceed one third of "sessionTimeoutMs" (%d)',
+            $heartbeatIntervalMs,
+            $sessionTimeoutMs,
+        ));
+    }
 }

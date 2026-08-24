@@ -9,6 +9,7 @@ use Anktx\Kafka\Client\Config\Enum\CompressionType;
 use Anktx\Kafka\Client\Config\ProducerConfig;
 use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use PHPUnit\Framework\TestCase;
+use RdKafka\Conf;
 
 final class ProducerConfigTest extends TestCase
 {
@@ -30,7 +31,22 @@ final class ProducerConfigTest extends TestCase
         self::assertSame('20480', $dump['queue.buffering.max.kbytes']);
         self::assertSame('102400', $dump['batch.size']);
         self::assertSame('10', $dump['queue.buffering.max.ms']);
+        self::assertSame('true', $dump['enable.idempotence']);
+        self::assertSame('180000', $dump['connections.max.idle.ms']);
+        self::assertSame('100', $dump['reconnect.backoff.ms']);
+        self::assertSame('10000', $dump['reconnect.backoff.max.ms']);
+        self::assertSame('true', $dump['socket.keepalive.enable']);
         self::assertSame('', $dump['debug']);
+    }
+
+    public function testAsKafkaConfigAcceptsCustomMessageTimeout(): void
+    {
+        // message.timeout.ms — topic-level свойство: в Conf::dump() не виден,
+        // но librdkafka валидирует значение при set(), поэтому «asKafkaConfig()
+        // не бросил» означает, что значение принято.
+        $config = new ProducerConfig(new Brokers('kafka:9092'), messageTimeoutMs: 600000);
+
+        self::assertInstanceOf(Conf::class, $config->asKafkaConfig());
     }
 
     public function testAsKafkaConfigMapsDefaultCompressionType(): void
@@ -76,7 +92,39 @@ final class ProducerConfigTest extends TestCase
         self::assertSame(102400, $config->batchSize);
         self::assertSame(10, $config->lingerMs);
         self::assertSame(CompressionType::Snappy, $config->compressionType);
+        self::assertTrue($config->enableIdempotence);
+        self::assertSame(120000, $config->messageTimeoutMs);
+        self::assertSame(180000, $config->connectionsMaxIdleMs);
+        self::assertSame(100, $config->reconnectBackoffMs);
+        self::assertSame(10000, $config->reconnectBackoffMaxMs);
+        self::assertTrue($config->socketKeepaliveEnable);
         self::assertFalse($config->isDebug);
+    }
+
+    public function testIdempotenceDisabled(): void
+    {
+        $config = new ProducerConfig(new Brokers('kafka:9092'), enableIdempotence: false);
+        $dump = $config->asKafkaConfig()->dump();
+
+        self::assertFalse($config->enableIdempotence);
+        self::assertSame('false', $dump['enable.idempotence']);
+    }
+
+    public function testAsKafkaConfigWithCustomConnectionSettings(): void
+    {
+        $config = new ProducerConfig(
+            new Brokers('kafka:9092'),
+            connectionsMaxIdleMs: 90000,
+            reconnectBackoffMs: 250,
+            reconnectBackoffMaxMs: 25000,
+            socketKeepaliveEnable: false,
+        );
+        $dump = $config->asKafkaConfig()->dump();
+
+        self::assertSame('90000', $dump['connections.max.idle.ms']);
+        self::assertSame('250', $dump['reconnect.backoff.ms']);
+        self::assertSame('25000', $dump['reconnect.backoff.max.ms']);
+        self::assertSame('false', $dump['socket.keepalive.enable']);
     }
 
     public function testWithCustomQueueBufferingMaxKBytes(): void
@@ -167,6 +215,12 @@ final class ProducerConfigTest extends TestCase
             batchSize: 51200,
             lingerMs: 100,
             compressionType: CompressionType::Gzip,
+            enableIdempotence: false,
+            messageTimeoutMs: 600000,
+            connectionsMaxIdleMs: 90000,
+            reconnectBackoffMs: 250,
+            reconnectBackoffMaxMs: 25000,
+            socketKeepaliveEnable: false,
             isDebug: true,
         );
 
@@ -177,6 +231,11 @@ final class ProducerConfigTest extends TestCase
         self::assertSame('51200', $dump['batch.size']);
         self::assertSame('100', $dump['queue.buffering.max.ms']);
         self::assertSame('gzip', $dump['compression.codec']);
+        self::assertSame('false', $dump['enable.idempotence']);
+        self::assertSame('90000', $dump['connections.max.idle.ms']);
+        self::assertSame('250', $dump['reconnect.backoff.ms']);
+        self::assertSame('25000', $dump['reconnect.backoff.max.ms']);
+        self::assertSame('false', $dump['socket.keepalive.enable']);
         // librdkafka разворачивает 'all' в полный список флагов
         self::assertStringContainsString('all', $dump['debug']);
     }
@@ -239,6 +298,85 @@ final class ProducerConfigTest extends TestCase
         $this->expectExceptionMessage('Config parameter "lingerMs" must not be negative, -10 given');
 
         new ProducerConfig(new Brokers('kafka:9092'), lingerMs: -10);
+    }
+
+    public function testZeroMessageTimeoutMsThrows(): void
+    {
+        // 0 для librdkafka значил бы «ретраить вечно» — запрещаем явно.
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "messageTimeoutMs" must be positive, 0 given');
+
+        new ProducerConfig(new Brokers('kafka:9092'), messageTimeoutMs: 0);
+    }
+
+    public function testNegativeConnectionsMaxIdleMsThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "connectionsMaxIdleMs" must not be negative, -1 given');
+
+        new ProducerConfig(new Brokers('kafka:9092'), connectionsMaxIdleMs: -1);
+    }
+
+    public function testNegativeReconnectBackoffMsThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "reconnectBackoffMs" must not be negative, -5 given');
+
+        new ProducerConfig(new Brokers('kafka:9092'), reconnectBackoffMs: -5);
+    }
+
+    public function testNegativeReconnectBackoffMaxThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "reconnectBackoffMaxMs" must not be negative, -50 given');
+
+        new ProducerConfig(new Brokers('kafka:9092'), reconnectBackoffMaxMs: -50);
+    }
+
+    public function testReconnectBackoffMaxLessThanMinThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage(
+            'Config parameter "reconnectBackoffMaxMs" (100) must not be less than "reconnectBackoffMs" (500)',
+        );
+
+        new ProducerConfig(
+            new Brokers('kafka:9092'),
+            reconnectBackoffMs: 500,
+            reconnectBackoffMaxMs: 100,
+        );
+    }
+
+    public function testReconnectBackoffMaxEqualToMinIsValid(): void
+    {
+        $config = new ProducerConfig(
+            new Brokers('kafka:9092'),
+            reconnectBackoffMs: 500,
+            reconnectBackoffMaxMs: 500,
+        );
+
+        self::assertSame(500, $config->reconnectBackoffMaxMs);
+    }
+
+    public function testZeroConnectionsMaxIdleMsIsValid(): void
+    {
+        // connections.max.idle.ms = 0 — валидное значение librdkafka
+        // (не закрывать соединения по простою).
+        $config = new ProducerConfig(new Brokers('kafka:9092'), connectionsMaxIdleMs: 0);
+
+        self::assertSame(0, $config->connectionsMaxIdleMs);
+    }
+
+    public function testZeroReconnectBackoffMsIsValid(): void
+    {
+        $config = new ProducerConfig(
+            new Brokers('kafka:9092'),
+            reconnectBackoffMs: 0,
+            reconnectBackoffMaxMs: 0,
+        );
+
+        self::assertSame(0, $config->reconnectBackoffMs);
+        self::assertSame(0, $config->reconnectBackoffMaxMs);
     }
 
     public function testZeroLingerMsIsValid(): void

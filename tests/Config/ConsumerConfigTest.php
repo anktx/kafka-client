@@ -41,6 +41,12 @@ final class ConsumerConfigTest extends TestCase
         self::assertSame('test-instance', $dump['group.instance.id']);
         self::assertSame('false', $dump['enable.auto.commit']);
         self::assertSame('true', $dump['enable.partition.eof']);
+        self::assertSame('30000', $dump['session.timeout.ms']);
+        self::assertSame('3000', $dump['heartbeat.interval.ms']);
+        self::assertSame('300000', $dump['max.poll.interval.ms']);
+        self::assertSame('540000', $dump['connections.max.idle.ms']);
+        self::assertSame('100', $dump['reconnect.backoff.ms']);
+        self::assertSame('10000', $dump['reconnect.backoff.max.ms']);
         self::assertSame('', $dump['debug']);
     }
 
@@ -67,9 +73,12 @@ final class ConsumerConfigTest extends TestCase
         self::assertFalse($config->isDebug);
         self::assertSame(OffsetReset::Earliest, $config->offsetReset);
         self::assertNull($config->autoCommitMs);
-        self::assertNull($config->sessionTimeoutMs);
-        self::assertNull($config->reconnectBackoffMs);
-        self::assertNull($config->reconnectBackoffMaxMs);
+        self::assertSame(30000, $config->sessionTimeoutMs);
+        self::assertSame(3000, $config->heartbeatIntervalMs);
+        self::assertSame(300000, $config->maxPollIntervalMs);
+        self::assertSame(540000, $config->connectionsMaxIdleMs);
+        self::assertSame(100, $config->reconnectBackoffMs);
+        self::assertSame(10000, $config->reconnectBackoffMaxMs);
         self::assertTrue($config->socketKeepaliveEnable);
     }
 
@@ -149,9 +158,11 @@ final class ConsumerConfigTest extends TestCase
             groupId: 'test-group',
             instanceId: 'test-instance',
             sessionTimeoutMs: 10000,
+            heartbeatIntervalMs: 3000,
         );
 
         self::assertSame(10000, $config->sessionTimeoutMs);
+        self::assertSame(3000, $config->heartbeatIntervalMs);
     }
 
     public function testWithLatestOffsetReset(): void
@@ -190,11 +201,13 @@ final class ConsumerConfigTest extends TestCase
             groupId: 'test-group',
             instanceId: 'test-instance',
             sessionTimeoutMs: 10000,
+            heartbeatIntervalMs: 3000,
         );
 
         $dump = $config->asKafkaConfig()->dump();
 
         self::assertSame('10000', $dump['session.timeout.ms']);
+        self::assertSame('3000', $dump['heartbeat.interval.ms']);
     }
 
     public function testAsKafkaConfigWithDebugEnabled(): void
@@ -235,7 +248,13 @@ final class ConsumerConfigTest extends TestCase
             instanceId: 'test-instance',
             offsetReset: OffsetReset::Latest,
             autoCommitMs: 7000,
-            sessionTimeoutMs: 10000,
+            sessionTimeoutMs: 60000,
+            heartbeatIntervalMs: 20000,
+            maxPollIntervalMs: 600000,
+            connectionsMaxIdleMs: 90000,
+            reconnectBackoffMs: 50,
+            reconnectBackoffMaxMs: 5000,
+            socketKeepaliveEnable: false,
             isDebug: true,
         );
 
@@ -246,7 +265,13 @@ final class ConsumerConfigTest extends TestCase
         self::assertSame('test-instance', $dump['group.instance.id']);
         self::assertSame('true', $dump['enable.auto.commit']);
         self::assertSame('7000', $dump['auto.commit.interval.ms']);
-        self::assertSame('10000', $dump['session.timeout.ms']);
+        self::assertSame('60000', $dump['session.timeout.ms']);
+        self::assertSame('20000', $dump['heartbeat.interval.ms']);
+        self::assertSame('600000', $dump['max.poll.interval.ms']);
+        self::assertSame('90000', $dump['connections.max.idle.ms']);
+        self::assertSame('50', $dump['reconnect.backoff.ms']);
+        self::assertSame('5000', $dump['reconnect.backoff.max.ms']);
+        self::assertSame('false', $dump['socket.keepalive.enable']);
         // librdkafka разворачивает 'all' в полный список флагов
         self::assertStringContainsString('all', $dump['debug']);
     }
@@ -330,6 +355,69 @@ final class ConsumerConfigTest extends TestCase
         new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', sessionTimeoutMs: 0);
     }
 
+    public function testZeroHeartbeatIntervalMsThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "heartbeatIntervalMs" must be positive, 0 given');
+
+        new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', heartbeatIntervalMs: 0);
+    }
+
+    public function testZeroMaxPollIntervalMsThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "maxPollIntervalMs" must be positive, 0 given');
+
+        new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', maxPollIntervalMs: 0);
+    }
+
+    public function testNegativeConnectionsMaxIdleMsThrows(): void
+    {
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage('Config parameter "connectionsMaxIdleMs" must not be negative, -1 given');
+
+        new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', connectionsMaxIdleMs: -1);
+    }
+
+    public function testHeartbeatExceedingThirdOfSessionTimeoutThrows(): void
+    {
+        // 3 * 20000 = 60000 > 50000: правило heartbeat ≈ session/3 нарушено
+        $this->expectException(InvalidConfigException::class);
+        $this->expectExceptionMessage(
+            'Config parameter "heartbeatIntervalMs" (20000) must not exceed one third of "sessionTimeoutMs" (50000)',
+        );
+
+        new ConsumerConfig(
+            brokers: new Brokers('kafka:9092'),
+            groupId: 'g',
+            sessionTimeoutMs: 50000,
+            heartbeatIntervalMs: 20000,
+        );
+    }
+
+    public function testHeartbeatEqualToThirdOfSessionTimeoutIsValid(): void
+    {
+        // 3 * 20000 = 60000 = 60000: граница включительно
+        $config = new ConsumerConfig(
+            brokers: new Brokers('kafka:9092'),
+            groupId: 'g',
+            sessionTimeoutMs: 60000,
+            heartbeatIntervalMs: 20000,
+        );
+
+        self::assertSame(60000, $config->sessionTimeoutMs);
+        self::assertSame(20000, $config->heartbeatIntervalMs);
+    }
+
+    public function testZeroConnectionsMaxIdleMsIsValid(): void
+    {
+        // connections.max.idle.ms = 0 — валидное значение librdkafka
+        // (не закрывать соединения по простою).
+        $config = new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', connectionsMaxIdleMs: 0);
+
+        self::assertSame(0, $config->connectionsMaxIdleMs);
+    }
+
     public function testNegativeReconnectBackoffThrows(): void
     {
         $this->expectException(InvalidConfigException::class);
@@ -348,11 +436,11 @@ final class ConsumerConfigTest extends TestCase
 
     public function testReconnectBackoffMsWithoutMaxIsValid(): void
     {
-        // reconnectBackoffMs задан, reconnectBackoffMaxMs нет: librdkafka
-        // подставит дефолт для max — инверсии диапазона быть не может.
+        // reconnectBackoffMs задан явно, reconnectBackoffMaxMs — дефолт:
+        // 100 <= 10000, инверсии диапазона нет.
         $config = new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', reconnectBackoffMs: 100);
 
-        self::assertNull($config->reconnectBackoffMaxMs);
+        self::assertSame(10000, $config->reconnectBackoffMaxMs);
     }
 
     public function testReconnectBackoffMaxLessThanMinThrows(): void
@@ -387,7 +475,12 @@ final class ConsumerConfigTest extends TestCase
 
     public function testZeroReconnectBackoffMaxIsValid(): void
     {
-        $config = new ConsumerConfig(brokers: new Brokers('kafka:9092'), groupId: 'g', reconnectBackoffMaxMs: 0);
+        $config = new ConsumerConfig(
+            brokers: new Brokers('kafka:9092'),
+            groupId: 'g',
+            reconnectBackoffMs: 0,
+            reconnectBackoffMaxMs: 0,
+        );
 
         self::assertSame(0, $config->reconnectBackoffMaxMs);
     }

@@ -59,7 +59,7 @@ final class KafkaConsumerTest extends TestCase
 
     public function testConstructorWithSessionTimeout(): void
     {
-        $consumer = new KafkaConsumer($this->consumerConfig(sessionTimeoutMs: 10000));
+        $consumer = new KafkaConsumer($this->consumerConfig(sessionTimeoutMs: 10000, heartbeatIntervalMs: 3000));
 
         self::assertInstanceOf(KafkaConsumer::class, $consumer);
         $consumer->close();
@@ -242,7 +242,8 @@ final class KafkaConsumerTest extends TestCase
     private function consumerConfig(
         OffsetReset $offsetReset = OffsetReset::Earliest,
         ?int $autoCommitMs = null,
-        ?int $sessionTimeoutMs = null,
+        int $sessionTimeoutMs = 30000,
+        int $heartbeatIntervalMs = 3000,
         bool $isDebug = false,
     ): ConsumerConfig {
         // Уникальные group.id/instance.id на каждый тест: статические члены
@@ -255,6 +256,7 @@ final class KafkaConsumerTest extends TestCase
             offsetReset: $offsetReset,
             autoCommitMs: $autoCommitMs,
             sessionTimeoutMs: $sessionTimeoutMs,
+            heartbeatIntervalMs: $heartbeatIntervalMs,
             isDebug: $isDebug,
         );
     }
