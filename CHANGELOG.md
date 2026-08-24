@@ -7,6 +7,41 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-24
+
+### Added
+
+- Продуктовые дефолты сокетов и надёжности в конфигах — детект half-open
+  TCP-соединений при «молчаливом» отвале брокера (NAT/conntrack, firewall
+  drop) вместо дефолтов librdkafka «не закрывать никогда, keepalive
+  выключен». Механизмы: TCP keepalive (`socketKeepaliveEnable: true`,
+  рекомендуемые sysctl в README), `sessionTimeoutMs` для группы,
+  `messageTimeoutMs` для доставки; `connectionsMaxIdleMs` — гигиена
+  соединений (consumer 540000 — дефолт Java-клиента, producer 180000 —
+  рекомендация Azure Event Hubs). Rationale всех значений — в README.
+- `ProducerConfig`: `enableIdempotence` (default `true`, KIP-679),
+  `messageTimeoutMs` (default `120000` — `delivery.timeout.ms`
+  Java-клиента), `connectionsMaxIdleMs`, `reconnectBackoffMs`,
+  `reconnectBackoffMaxMs`, `socketKeepaliveEnable`.
+- `ConsumerConfig`: `heartbeatIntervalMs` (default `3000` — дефолт
+  Java-клиента: 10 попыток за сессию), `maxPollIntervalMs`
+  (default `300000`), `connectionsMaxIdleMs`, `socketKeepaliveEnable`.
+- Валидация `3 × heartbeatIntervalMs ≤ sessionTimeoutMs` (правило
+  документации Kafka «heartbeat ≤ session/3») —
+  `InvalidConfigException::heartbeatSessionRange()`.
+
+### Changed
+
+- **BC:** `ConsumerConfig`: `sessionTimeoutMs`, `reconnectBackoffMs`,
+  `reconnectBackoffMaxMs` — `?int` → `int` с продуктовыми дефолтами
+  (`30000`/`100`/`10000`); явный `null` больше не принимается, «не
+  задано» = дефолт.
+- **BC:** `ProducerConfig`/`ConsumerConfig` отвергают неположительные
+  `messageTimeoutMs`, `heartbeatIntervalMs`, `maxPollIntervalMs` и
+  отрицательные `connectionsMaxIdleMs`, `reconnectBackoffMs`,
+  `reconnectBackoffMaxMs` (`InvalidConfigException`); значение 0 для
+  `connectionsMaxIdleMs` и backoff'ов остаётся валидным.
+
 ## [0.12.0] - 2026-08-20
 
 ### Added
