@@ -55,6 +55,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
         // Единственный observable-эффект конструктора — info-лог с конфигурацией.
         $createdRecords = $logger->findByMessage('KafkaConsumer created');
         self::assertCount(1, $createdRecords);
+        self::assertSame('info', $createdRecords[0]['level']);
         self::assertSame([
             'brokers' => 'localhost:1',
             'group_id' => 'contract-test',
@@ -153,6 +154,7 @@ final class KafkaConsumerSubscribeTest extends TestCase
 
         $infoRecords = $logger->findByMessage('Subscribed to topics');
         self::assertCount(1, $infoRecords);
+        self::assertSame('info', $infoRecords[0]['level']);
         self::assertSame(['test-topic'], $infoRecords[0]['context']['topics']);
         self::assertSame(1, $infoRecords[0]['context']['subscriptions_count']);
     }

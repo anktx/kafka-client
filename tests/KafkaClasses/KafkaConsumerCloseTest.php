@@ -37,9 +37,17 @@ final class KafkaConsumerCloseTest extends TestCase
         $consumer->close();
         $consumer->close();
 
-        self::assertCount(1, $logger->findByMessage('Closing KafkaConsumer'));
-        self::assertCount(1, $logger->findByMessage('KafkaConsumer closed'));
-        self::assertCount(1, $logger->findByMessage('KafkaConsumer already closed'));
+        $closingRecords = $logger->findByMessage('Closing KafkaConsumer');
+        self::assertCount(1, $closingRecords);
+        self::assertSame('debug', $closingRecords[0]['level']);
+
+        $closedRecords = $logger->findByMessage('KafkaConsumer closed');
+        self::assertCount(1, $closedRecords);
+        self::assertSame('info', $closedRecords[0]['level']);
+
+        $alreadyClosedRecords = $logger->findByMessage('KafkaConsumer already closed');
+        self::assertCount(1, $alreadyClosedRecords);
+        self::assertSame('debug', $alreadyClosedRecords[0]['level']);
     }
 
     #[AllowMockObjectsWithoutExpectations]

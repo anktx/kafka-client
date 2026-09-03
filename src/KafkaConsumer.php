@@ -200,22 +200,7 @@ final class KafkaConsumer implements KafkaConsumerInterface
             throw InvalidConfigException::nonNegativeInt('timeoutMs', $timeoutMs);
         }
 
-        try {
-            $subscription = $this->consumer->getSubscription();
-        } catch (Exception $e) {
-            $this->logger->error('Failed to get subscription state', [
-                'reason' => $e->getMessage(),
-                'exception' => $e,
-            ]);
-
-            throw KafkaConsumerException::fromKafkaException($e);
-        }
-
-        if ($subscription === []) {
-            $this->logger->warning('Attempted to consume without subscription');
-
-            throw NotSubscribedException::create();
-        }
+        $this->assertSubscribed();
 
         try {
             $message = $this->consumer->consume($timeoutMs);
@@ -335,7 +320,7 @@ final class KafkaConsumer implements KafkaConsumerInterface
             return;
         }
 
-        $this->logger->info('Closing KafkaConsumer');
+        $this->logger->debug('Closing KafkaConsumer');
 
         try {
             $this->consumer->close();
@@ -351,6 +336,36 @@ final class KafkaConsumer implements KafkaConsumerInterface
         $this->closed = true;
 
         $this->logger->info('KafkaConsumer closed');
+    }
+
+    /**
+     * Гарантирует, что консьюмер подписан хотя бы на один топик.
+     *
+     * Состояние подписки спрашивается у самого librdkafka через
+     * getSubscription(): без подписки consume() бесконечно возвращает
+     * таймауты, неотличимые от пустого топика.
+     *
+     * @throws KafkaConsumerException Если не удалось получить состояние подписки
+     * @throws NotSubscribedException Если консьюмер не подписан на топики
+     */
+    private function assertSubscribed(): void
+    {
+        try {
+            $subscription = $this->consumer->getSubscription();
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get subscription state', [
+                'reason' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+
+            throw KafkaConsumerException::fromKafkaException($e);
+        }
+
+        if ($subscription === []) {
+            $this->logger->warning('Attempted to consume without subscription');
+
+            throw NotSubscribedException::create();
+        }
     }
 
     /**
