@@ -20,8 +20,10 @@ use RdKafka\Producer;
  *
  * Wiring attach*-методов проверяется через mock RdKafka\Conf: колбэк
  * захватывается из set*Cb() и вызывается напрямую — живой брокер не нужен.
- * Фиксируют контракт доставки: успех логируется как debug, сбой — как
- * error с кодом ошибки; потеря соединения с брокерами — как warning.
+ * Фиксируют контракт доставки: успех логируется как debug, превышение
+ * message.timeout.ms — как warning, прерывание при shutdown — как info,
+ * прочие сбои — как error с кодом ошибки; потеря соединения с брокерами
+ * в error-callback — как warning.
  */
 final class RdKafkaCallbacksTest extends TestCase
 {
@@ -45,7 +47,7 @@ final class RdKafkaCallbacksTest extends TestCase
 
     #[DataProvider('provideAttachErrorCallbackLogsConnectionErrorsCases')]
     #[AllowMockObjectsWithoutExpectations]
-    public function testAttachErrorCallbackLogsConnectionErrors(int $err): void
+    public function testAttachErrorCallbackLogsConnectionErrors(int $err, string $expectedMessage): void
     {
         $logger = new InMemoryLogger();
         $onBrokerError = $this->captureCallback(
@@ -56,28 +58,29 @@ final class RdKafkaCallbacksTest extends TestCase
 
         $onBrokerError($this->createMock(KafkaConsumer::class), $err, 'connection refused');
 
-        $records = $logger->findByMessage('Kafka broker connection error');
+        $records = $logger->findByMessage($expectedMessage);
         self::assertCount(1, $records);
         self::assertSame(LogLevel::WARNING, $records[0]['level']);
         self::assertSame($err, $records[0]['context']['error_code']);
         self::assertSame('connection refused', $records[0]['context']['reason']);
-        // Ровно одна запись: удаление return из ветки уронило бы код в общий
-        // warning 'Kafka client error' — задвоение записей ловится здесь.
+        // Ровно одна запись: конкретный код должен попадать точно в свой
+        // arm, а не проваливаться в общий warning 'Kafka client error'.
         self::assertCount(1, $logger->records);
     }
 
     /**
-     * @return iterable<string, array{int}>
+     * @return iterable<string, array{int, string}>
      */
     public static function provideAttachErrorCallbackLogsConnectionErrorsCases(): iterable
     {
-        // Все коды из RdKafkaCallbacks::CONNECTION_ERROR_CODES: потеря
-        // соединения проявляется любым из них, ветка — одна на все три.
-        yield 'all brokers down' => [\RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN];
+        // Коды потери соединения с брокерами: каждый — отдельный arm
+        // match'а в onBrokerError со своим сообщением (природа сбоя
+        // разная: все недоступны / обрыв соединения / не резолвится DNS).
+        yield 'all brokers down' => [\RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN, 'All Kafka brokers down'];
 
-        yield 'transport' => [\RD_KAFKA_RESP_ERR__TRANSPORT];
+        yield 'transport' => [\RD_KAFKA_RESP_ERR__TRANSPORT, 'Kafka broker connection error'];
 
-        yield 'resolve' => [\RD_KAFKA_RESP_ERR__RESOLVE];
+        yield 'resolve' => [\RD_KAFKA_RESP_ERR__RESOLVE, 'Kafka broker hostname resolution failed'];
     }
 
     #[AllowMockObjectsWithoutExpectations]
@@ -118,7 +121,7 @@ final class RdKafkaCallbacksTest extends TestCase
         self::assertSame(LogLevel::ERROR, $records[0]['level']);
         self::assertSame(\RD_KAFKA_RESP_ERR__FATAL, $records[0]['context']['error_code']);
         self::assertSame('fatal broker error', $records[0]['context']['reason']);
-        // Ровно одна запись: после fatal-ветки код не должен проваливаться
+        // Ровно одна запись: fatal не должен проваливаться
         // в общий warning 'Kafka client error'.
         self::assertCount(1, $logger->records);
     }
@@ -154,6 +157,38 @@ final class RdKafkaCallbacksTest extends TestCase
     #[AllowMockObjectsWithoutExpectations]
     public function testAttachDeliveryReportCallbackLogsFailureAsError(): void
     {
+        // Broker-семантический код (message size too large) — настоящий сбой
+        // доставки: error. Локальные timeout/shutdown-коды — отдельные тесты ниже.
+        $logger = new InMemoryLogger();
+        $onDeliveryReport = $this->captureCallback(
+            'setDrMsgCb',
+            $logger,
+            static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachDeliveryReportCallback($conf),
+        );
+
+        $onDeliveryReport($this->createMock(Producer::class), RdKafkaMessages::fromValues([
+            'err' => \RD_KAFKA_RESP_ERR_MSG_SIZE_TOO_LARGE,
+            'topic_name' => 'test-topic',
+            'partition' => 1,
+        ]));
+
+        $records = $logger->findByMessage('Message delivery failed');
+        self::assertCount(1, $records);
+        self::assertSame(LogLevel::ERROR, $records[0]['level']);
+        self::assertSame('test-topic', $records[0]['context']['topic']);
+        self::assertSame(1, $records[0]['context']['partition']);
+        self::assertSame(\RD_KAFKA_RESP_ERR_MSG_SIZE_TOO_LARGE, $records[0]['context']['error_code']);
+        self::assertNotSame('', $records[0]['context']['reason']);
+        // Ровно одна запись: ветки timeout/shutdown не должны перехватывать
+        // broker-семантические коды.
+        self::assertCount(1, $logger->records);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testAttachDeliveryReportCallbackLogsMsgTimeoutAsWarning(): void
+    {
+        // Превышение message.timeout.ms — ожидаемое следствие недоступности
+        // брокеров (за один обрыв приходят сотни отчётов), не error-уровень.
         $logger = new InMemoryLogger();
         $onDeliveryReport = $this->captureCallback(
             'setDrMsgCb',
@@ -167,13 +202,46 @@ final class RdKafkaCallbacksTest extends TestCase
             'partition' => 1,
         ]));
 
-        $records = $logger->findByMessage('Message delivery failed');
+        $records = $logger->findByMessage('Message delivery timed out');
         self::assertCount(1, $records);
-        self::assertSame(LogLevel::ERROR, $records[0]['level']);
+        self::assertSame(LogLevel::WARNING, $records[0]['level']);
         self::assertSame('test-topic', $records[0]['context']['topic']);
         self::assertSame(1, $records[0]['context']['partition']);
         self::assertSame(\RD_KAFKA_RESP_ERR__MSG_TIMED_OUT, $records[0]['context']['error_code']);
         self::assertNotSame('', $records[0]['context']['reason']);
+        // Ровно одна запись: без return ветка проваливалась бы в error
+        // 'Message delivery failed'.
+        self::assertCount(1, $logger->records);
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testAttachDeliveryReportCallbackLogsDestroyAsInfo(): void
+    {
+        // Отчёты по сообщениям, оставшимся в очереди при уничтожении
+        // продюсера, — штатное завершение работы, не сбой.
+        $logger = new InMemoryLogger();
+        $onDeliveryReport = $this->captureCallback(
+            'setDrMsgCb',
+            $logger,
+            static fn(RdKafkaCallbacks $callbacks, Conf $conf) => $callbacks->attachDeliveryReportCallback($conf),
+        );
+
+        $onDeliveryReport($this->createMock(Producer::class), RdKafkaMessages::fromValues([
+            'err' => \RD_KAFKA_RESP_ERR__DESTROY,
+            'topic_name' => 'test-topic',
+            'partition' => 1,
+        ]));
+
+        $records = $logger->findByMessage('Message delivery aborted by producer shutdown');
+        self::assertCount(1, $records);
+        self::assertSame(LogLevel::INFO, $records[0]['level']);
+        self::assertSame('test-topic', $records[0]['context']['topic']);
+        self::assertSame(1, $records[0]['context']['partition']);
+        self::assertSame(\RD_KAFKA_RESP_ERR__DESTROY, $records[0]['context']['error_code']);
+        self::assertNotSame('', $records[0]['context']['reason']);
+        // Ровно одна запись: без return ветка проваливалась бы в error
+        // 'Message delivery failed'.
+        self::assertCount(1, $logger->records);
     }
 
     /**

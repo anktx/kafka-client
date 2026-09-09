@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
-use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -26,11 +25,11 @@ use RdKafka\Exception;
 /**
  * Юнит-тесты для {@see KafkaConsumer::consume()} на mock'е RdKafka\KafkaConsumer.
  *
- * Покрывают все ветки match: NO_ERROR, PARTITION_EOF, TIMED_OUT,
- * ALL_BROKERS_DOWN (отдельный результат KafkaBrokersDown) и default
- * (бросает исключение). Регрессионный сценарий самовосстановления:
- * consume() продолжает работать после временной потери связи с брокером
- * без перезапуска процесса.
+ * Покрывают все ветки match: NO_ERROR, PARTITION_EOF, TIMED_OUT и default
+ * (бросает исключение — включая фантомный ALL_BROKERS_DOWN).
+ * Регрессионный сценарий самовосстановления: consume() продолжает работать
+ * после временной потери связи с брокером (серии таймаутов) без
+ * перезапуска процесса.
  */
 final class KafkaConsumerConsumeTest extends TestCase
 {
@@ -241,40 +240,52 @@ final class KafkaConsumerConsumeTest extends TestCase
         self::assertInstanceOf(KafkaConsumeTimeout::class, $result);
     }
 
-    public function testConsumeReturnsBrokersDownForAllBrokersDownAndDoesNotThrow(): void
+    #[AllowMockObjectsWithoutExpectations]
+    public function testConsumeThrowsOnAllBrokersDownAsUnrecognized(): void
     {
-        // При полной потере связи librdkafka возвращает RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN.
-        // Раньше это доходило до default arm match и бросало KafkaConsumerException,
-        // затем маскировалось под таймаут. Теперь — отдельный результат: наблюдаем
-        // для метрик/watchdog'а, но не бросает и позволяет циклу потребления
-        // продолжаться и librdkafka прокачивать rebalance-протокол (JoinGroup/SyncGroup).
+        // ALL_BROKERS_DOWN — фантом для consume(): событие OP_ERR перехватывается
+        // rd_kafka_poll_cb и уходит в error-callback, из consume() не возвращается
+        // (подтверждено исходниками librdkafka и стендовыми экспериментами:
+        // «тихий» drop посредником и активный RST — ноль эмиссий). Типизированной
+        // ветки под него нет: если маршрутизация когда-нибудь изменится, громкое
+        // исключение с кодом -187 — tripwire, а не молчаливый отдельный результат.
+        $logger = new InMemoryLogger();
+
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
-        $rdKafka->expects($this->once())->method('consume')->willReturn(RdKafkaMessages::fromValues([
+        $rdKafka->method('consume')->willReturn(RdKafkaMessages::fromValues([
             'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
             'partition' => -1,
             'offset' => -1,
         ]));
 
-        $consumer = KafkaConsumers::build($rdKafka);
+        $consumer = KafkaConsumers::build($rdKafka, $logger);
         $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
-        $result = $consumer->consume(100);
+        try {
+            $consumer->consume(100);
+            self::fail('Expected KafkaConsumerException');
+        } catch (KafkaConsumerException $e) {
+            self::assertSame(\RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN, $e->getCode());
+        }
 
-        self::assertInstanceOf(KafkaBrokersDown::class, $result);
+        $errorRecords = $logger->findByMessage('Consume failed with unrecognized error');
+        self::assertCount(1, $errorRecords);
+        self::assertSame(\RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN, $errorRecords[0]['context']['error_code']);
     }
 
     #[AllowMockObjectsWithoutExpectations]
     public function testConsumeSelfHealsAfterBrokerRecovery(): void
     {
         // Ключевой сценарий самовосстановления:
-        // 1. Брокер недоступен → consume() возвращает KafkaBrokersDown
+        // 1. Брокер недоступен → из consume() это видно как серия таймаутов
+        //    (ALL_BROKERS_DOWN в consume() не доезжает — см. тест выше)
         // 2. Брокер восстановился → consume() возвращает сообщение
         // Процесс продолжает работать без перезапуска.
-        $allBrokersDownMessage = RdKafkaMessages::fromValues([
-            'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
-            'partition' => -1,
-            'offset' => -1,
+        $outageTimeout = RdKafkaMessages::fromValues([
+            'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
+            'partition' => 0,
+            'offset' => 0,
         ]);
         $recoveredMessage = RdKafkaMessages::fromValues([
             'err' => \RD_KAFKA_RESP_ERR_NO_ERROR,
@@ -290,15 +301,15 @@ final class KafkaConsumerConsumeTest extends TestCase
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
         $rdKafka->method('consume')
-            ->willReturnOnConsecutiveCalls($allBrokersDownMessage, $recoveredMessage)
+            ->willReturnOnConsecutiveCalls($outageTimeout, $recoveredMessage)
         ;
 
         $consumer = KafkaConsumers::build($rdKafka);
         $consumer->subscribe(TopicList::create(new Topic('test-topic')));
 
-        // Первая итерация: брокер недоступен — consume() работает, не бросает.
+        // Первая итерация: брокер недоступен — consume() отрабатывает таймаутом, не бросает.
         $result1 = $consumer->consume(100);
-        self::assertInstanceOf(KafkaBrokersDown::class, $result1);
+        self::assertInstanceOf(KafkaConsumeTimeout::class, $result1);
 
         // Вторая итерация: брокер восстановился — сообщение получено.
         $result2 = $consumer->consume(100);

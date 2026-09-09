@@ -7,6 +7,42 @@
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-09
+
+### Removed
+
+- **BC:** результат `consume()` `KafkaBrokersDown`: событие
+  `RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN` никогда не доезжает из consume() —
+  внутренние события OP_ERR перехватываются poll-циклом librdkafka
+  (`rd_kafka_poll_cb`) и маршрутизируются в error-callback, поэтому любой
+  обрыв из consume() виден только как серия таймаутов. Подтверждено
+  исходниками librdkafka/ext-rdkafka и стендовыми экспериментами
+  («молчаливый» drop NAT/firewall и активный RST — по нулю эмиссий за
+  6–7,5 минут обрыва). Код -187 попадает в default-ветку и бросает
+  `KafkaConsumerException` — громкий tripwire вместо молчаливого
+  отдельного результата на случай изменения маршрутизации.
+- **BC:** хук `StreamObserver::onBrokersDown()` — реакция на фантомный
+  сигнал, вызванным быть не мог.
+- **BC:** `BrokersDownBudgetStreamObserver` и `KafkaBrokersDownException` —
+  бюджет строился на никогда не прибывающем `KafkaBrokersDown`;
+  silence-watchdog собирается на `onTimeout`/`onMessage` на стороне
+  приложения (порог — продуктовое решение: потеря брокеров из consume()
+  неотличима от тишины в топике).
+
+### Changed
+
+- Error-callback: потеря соединения с брокерами логируется отдельными
+  сообщениями по коду — «All Kafka brokers down» (-187),
+  «Kafka broker connection error» (-195, прежнее общее сообщение),
+  «Kafka broker hostname resolution failed» (-196) — вместо общего
+  «Kafka broker connection error» на все три; уровень warning и контекст
+  `error_code`/`reason` без изменений.
+- Классификация delivery reports в PSR-3 логе: превышение
+  `message.timeout.ms` (`-192`) — warning (ожидаемое следствие
+  недоступности брокеров: за один обрыв приходят сотни отчётов),
+  прерывание доставки при уничтожении клиента (`-197`) — info (штатный
+  shutdown); остальные коды — error, как раньше.
+
 ## [0.13.0] - 2026-08-24
 
 ### Added

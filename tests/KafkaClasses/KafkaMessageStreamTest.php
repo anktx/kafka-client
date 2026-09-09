@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client\Tests\KafkaClasses;
 
 use Anktx\Kafka\Client\ConsumeResult\ConsumeResult;
-use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -29,8 +28,8 @@ use RdKafka\Exception;
  * RdKafka\KafkaConsumer — ровно та цепочка stream() → consume(), что раньше
  * была закрыта только integration-тестами.
  *
- * Фиксируется контракт: с молчаливым наблюдателем по умолчанию таймауты,
- * потеря брокеров и EOF не выдаются наружу (poll продолжается), сообщения
+ * Фиксируется контракт: с молчаливым наблюдателем по умолчанию таймауты
+ * и EOF не выдаются наружу (poll продолжается), сообщения
  * yield'ятся с последовательными int-ключами, таймаут опроса
  * пробрасывается в consume(), исключения консьюмера пробрасываются из
  * генератора при первой итерации, закрытый консьюмер отвергается
@@ -87,25 +86,20 @@ final class KafkaMessageStreamTest extends TestCase
         }
     }
 
-    public function testStreamYieldsOnlyMessagesSkippingTimeoutBrokersDownAndEof(): void
+    public function testStreamYieldsOnlyMessagesSkippingTimeoutAndEof(): void
     {
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
-        // 3 служебных результата (timeout, ALL_BROKERS_DOWN, EOF) между
-        // сообщениями: poll продолжается, и на два выданных сообщения
-        // приходится 5 consume(). Потеря брокеров фильтруется как таймаут.
-        $rdKafka->expects($this->exactly(5))
+        // 2 служебных результата (timeout, EOF) между сообщениями: poll
+        // продолжается, и на два выданных сообщения приходится 4 consume().
+        // Потеря брокеров из consume() видна только как серия таймаутов.
+        $rdKafka->expects($this->exactly(4))
             ->method('consume')
             ->willReturnOnConsecutiveCalls(
                 RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
                     'partition' => 0,
                     'offset' => 0,
-                ]),
-                RdKafkaMessages::fromValues([
-                    'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
-                    'partition' => -1,
-                    'offset' => -1,
                 ]),
                 RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,
@@ -227,18 +221,13 @@ final class KafkaMessageStreamTest extends TestCase
         // выданы генератором. Порядок хуков — до yield.
         $rdKafka = $this->createMock(\RdKafka\KafkaConsumer::class);
         $rdKafka->method('getSubscription')->willReturn(['test-topic']);
-        $rdKafka->expects($this->exactly(5))
+        $rdKafka->expects($this->exactly(4))
             ->method('consume')
             ->willReturnOnConsecutiveCalls(
                 RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
                     'partition' => 0,
                     'offset' => 0,
-                ]),
-                RdKafkaMessages::fromValues([
-                    'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
-                    'partition' => -1,
-                    'offset' => -1,
                 ]),
                 RdKafkaMessages::fromValues([
                     'err' => \RD_KAFKA_RESP_ERR__PARTITION_EOF,
@@ -281,8 +270,6 @@ final class KafkaMessageStreamTest extends TestCase
         self::assertSame($second, $spy->messages[1]);
         self::assertCount(1, $spy->timeouts);
         self::assertInstanceOf(KafkaConsumeTimeout::class, $spy->timeouts[0]);
-        self::assertCount(1, $spy->brokersDown);
-        self::assertInstanceOf(KafkaBrokersDown::class, $spy->brokersDown[0]);
         self::assertCount(1, $spy->eofs);
         self::assertInstanceOf(KafkaPartitionEof::class, $spy->eofs[0]);
     }
@@ -296,23 +283,21 @@ final class KafkaMessageStreamTest extends TestCase
         $rdKafka->expects($this->once())
             ->method('consume')
             ->willReturn(RdKafkaMessages::fromValues([
-                'err' => \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
-                'partition' => -1,
-                'offset' => -1,
+                'err' => \RD_KAFKA_RESP_ERR__TIMED_OUT,
+                'partition' => 0,
+                'offset' => 0,
             ]))
         ;
 
         $observer = new class implements StreamObserver {
             public function onMessage(KafkaConsumerMessage $message): void {}
 
-            public function onTimeout(KafkaConsumeTimeout $timeout): void {}
-
-            public function onEof(KafkaPartitionEof $eof): void {}
-
-            public function onBrokersDown(KafkaBrokersDown $brokersDown): void
+            public function onTimeout(KafkaConsumeTimeout $timeout): void
             {
                 throw new \RuntimeException('observer decided to stop');
             }
+
+            public function onEof(KafkaPartitionEof $eof): void {}
         };
 
         $generator = (new KafkaMessageStream(KafkaConsumers::build($rdKafka), 100, $observer))->stream();

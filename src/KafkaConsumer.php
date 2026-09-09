@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Anktx\Kafka\Client;
 
 use Anktx\Kafka\Client\Config\ConsumerConfig;
-use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -15,7 +14,6 @@ use Anktx\Kafka\Client\Exception\Logic\InvalidConfigException;
 use Anktx\Kafka\Client\Exception\Logic\NotSubscribedException;
 use Anktx\Kafka\Client\KafkaMessage\KafkaConsumerMessage;
 use Anktx\Kafka\Client\Log\RdKafkaCallbacks;
-use Anktx\Kafka\Client\StreamObserver\BrokersDownBudgetStreamObserver;
 use Anktx\Kafka\Client\Topic\Topic;
 use Anktx\Kafka\Client\Topic\TopicList;
 use Psr\Log\LoggerInterface;
@@ -170,12 +168,17 @@ final class KafkaConsumer implements KafkaConsumerInterface
      * - {@see KafkaConsumerMessage} - сообщение;
      * - {@see KafkaConsumeTimeout} - таймаут (за окно опроса не пришло
      *   сообщений);
-     * - {@see KafkaBrokersDown} - полная потеря соединения со всеми
-     *   брокерами (ALL_BROKERS_DOWN): не ошибка, переподключение librdkafka
-     *   продолжает в фоновых потоках; «вечная» ли потеря — изнутри клиента
-     *   неопределимо, порог ожидания определяет вызывающий код (см.
-     *   {@see BrokersDownBudgetStreamObserver});
      * - {@see KafkaPartitionEof} - достигнут конец партиции.
+     *
+     * Недоступность брокеров не образует отдельного результата: внутреннее
+     * событие librdkafka ALL_BROKERS_DOWN перехватывается циклом опроса и
+     * уходит в error-callback, поэтому из consume() любой обрыв выглядит
+     * как серия таймаутов. Быстрый сигнал активного обрыва (connection
+     * reset) — error-callback в логах (RD_KAFKA_RESP_ERR__TRANSPORT),
+     * «тихого» (drop посредником) — логи librdkafka (FAIL/REQTMOUT,
+     * ~2 минуты после обрыва). Остальные коды RD_KAFKA_RESP_ERR__*
+     * (фатальные ошибки, превышение max.poll.interval.ms, fetch-ошибки)
+     * попадают в ветку default и бросают исключение.
      *
      * Чтение всегда делегируется librdkafka: через consume() также доставляются
      * rebalance-события группы, поэтому предварительных проверок доступности
@@ -185,14 +188,14 @@ final class KafkaConsumer implements KafkaConsumerInterface
      *
      * @param int $timeoutMs Таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
      *
-     * @return KafkaBrokersDown|KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат чтения
+     * @return KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат чтения
      *
      * @throws ClientClosedException  Если консьюмер закрыт через close()
      * @throws InvalidConfigException Если таймаут отрицательный
      * @throws NotSubscribedException Если консьюмер не подписан на топики
      * @throws KafkaConsumerException Если чтение завершилось ошибкой
      */
-    public function consume(int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS): KafkaBrokersDown|KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
+    public function consume(int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof
     {
         $this->assertNotClosed(__METHOD__);
 
@@ -243,8 +246,6 @@ final class KafkaConsumer implements KafkaConsumerInterface
             ),
 
             \RD_KAFKA_RESP_ERR__TIMED_OUT => new KafkaConsumeTimeout(),
-
-            \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN => new KafkaBrokersDown(),
 
             default => $this->throwOnUnrecognizedConsumeError($message),
         };
@@ -370,6 +371,13 @@ final class KafkaConsumer implements KafkaConsumerInterface
 
     /**
      * Логирует и бросает исключение для кода ошибки, не имеющего типизированной ветки в consume().
+     *
+     * Сюда реально доезжают фатальные ошибки и прочие OP_CONSUMER_ERR
+     * (превышение max.poll.interval.ms), fetch-ошибки партиций
+     * (OFFSET_OUT_OF_RANGE, auth-коды) — всё это невосстановимо для
+     * приложения, — и фантомный ALL_BROKERS_DOWN (см. consume()):
+     * отдельных веток под него нет, громкий исключение с кодом —
+     * tripwire на случай изменения маршрутизации librdkafka.
      *
      * Позиция (топик/партиция/смещение) переносится и в лог, и в исключение:
      * код ошибки без позиции не привязать к партиции при разборе инцидента.

@@ -6,6 +6,7 @@ namespace Anktx\Kafka\Client\Log;
 
 use Anktx\Kafka\Client\PollStrategy\TimeoutPollStrategy;
 use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 use Psr\Log\NullLogger;
 use RdKafka\Conf;
 use RdKafka\KafkaConsumer;
@@ -25,17 +26,6 @@ use RdKafka\Producer;
  */
 final readonly class RdKafkaCallbacks
 {
-    /**
-     * Коды ошибок librdkafka, означающие потерю соединения с брокерами.
-     *
-     * @var list<int>
-     */
-    private const array CONNECTION_ERROR_CODES = [
-        \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN,
-        \RD_KAFKA_RESP_ERR__TRANSPORT,
-        \RD_KAFKA_RESP_ERR__RESOLVE,
-    ];
-
     /**
      * @param LoggerInterface $logger PSR-3 логгер (по умолчанию NullLogger)
      */
@@ -84,8 +74,10 @@ final readonly class RdKafkaCallbacks
     /**
      * Error-callback librdkafka: логирует все ошибки клиента.
      *
-     * Потеря соединения с брокерами — warning (переподключением librdkafka
-     * занимается сам), фатальные ошибки — error (клиент после них неработоспособен),
+     * Потеря соединения с брокерами — warning с конкретизацией по коду
+     * (переподключением librdkafka занимается сам): все брокеры
+     * недоступны, обрыв соединения, имя брокера не резолвится;
+     * фатальные ошибки — error (клиент после них неработоспособен),
      * прочие (аутентификация, SASL и т.п.) — warning: раньше они глотались
      * молча и, например, неверные креды были видны только в debug-логе.
      *
@@ -103,24 +95,26 @@ final readonly class RdKafkaCallbacks
             'reason' => $reason,
         ];
 
-        if (\in_array($err, self::CONNECTION_ERROR_CODES, true)) {
-            $this->logger->warning('Kafka broker connection error', $context);
+        [$level, $logMessage] = match ($err) {
+            \RD_KAFKA_RESP_ERR__ALL_BROKERS_DOWN => [LogLevel::WARNING, 'All Kafka brokers down'],
+            \RD_KAFKA_RESP_ERR__TRANSPORT => [LogLevel::WARNING, 'Kafka broker connection error'],
+            \RD_KAFKA_RESP_ERR__RESOLVE => [LogLevel::WARNING, 'Kafka broker hostname resolution failed'],
+            \RD_KAFKA_RESP_ERR__FATAL => [LogLevel::ERROR, 'Kafka fatal error, client is unusable'],
+            default => [LogLevel::WARNING, 'Kafka client error'],
+        };
 
-            return;
-        }
-
-        if ($err === \RD_KAFKA_RESP_ERR__FATAL) {
-            $this->logger->error('Kafka fatal error, client is unusable', $context);
-
-            return;
-        }
-
-        $this->logger->warning('Kafka client error', $context);
+        $this->logger->log($level, $logMessage, $context);
     }
 
     /**
      * Delivery-report callback librdkafka: сообщает итог доставки каждого
      * отправленного сообщения.
+     *
+     * Классификация уровней: успешная доставка — debug; превышение
+     * message.timeout.ms — warning (ожидаемое следствие недоступности
+     * брокеров, за один обрыв приходят сотни отчётов — error-уровень
+     * утопит алерты); прерывание доставки при уничтожении клиента — info
+     * (штатное завершение работы); остальные коды — error.
      *
      * Выполняется синхронно в C-коде ext-rdkafka при poll()/flush(), поэтому
      * бросать исключения отсюда нельзя — ошибка доставки только логируется.
@@ -143,11 +137,19 @@ final readonly class RdKafkaCallbacks
             return;
         }
 
-        $this->logger->error('Message delivery failed', [
+        $context = [
             'topic' => $message->topic_name,
             'partition' => $message->partition,
             'error_code' => $message->err,
             'reason' => $message->errstr(),
-        ]);
+        ];
+
+        [$level, $logMessage] = match ($message->err) {
+            \RD_KAFKA_RESP_ERR__MSG_TIMED_OUT => [LogLevel::WARNING, 'Message delivery timed out'],
+            \RD_KAFKA_RESP_ERR__DESTROY => [LogLevel::INFO, 'Message delivery aborted by producer shutdown'],
+            default => [LogLevel::ERROR, 'Message delivery failed'],
+        };
+
+        $this->logger->log($level, $logMessage, $context);
     }
 }

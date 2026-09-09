@@ -96,33 +96,22 @@ foreach ($stream->stream() as $message) {
 }
 ```
 
-По умолчанию поток переживает полную потерю брокеров (librdkafka
-переподключается в фоне). Реакция на нештатные ситуации — инжектируемый
-наблюдатель `StreamObserver`: каждый результат `consume()` (сообщение,
-таймаут, потеря всех брокеров, EOF) передаётся его хукам
-`onMessage`/`onTimeout`/`onBrokersDown`/`onEof` до выдачи сообщения
+По умолчанию поток переживает недоступность брокеров (librdkafka
+переподключается в фоне): из consume() любой обрыв виден только как серия
+таймаутов. Реакция на нештатные ситуации — инжектируемый наблюдатель
+`StreamObserver`: каждый результат `consume()` (сообщение, таймаут, EOF)
+передаётся его хукам `onMessage`/`onTimeout`/`onEof` до выдачи сообщения
 наружу, исключение из хука прерывает генератор. Дефолт
 `SilentStreamObserver` поглощает всё — прежнее поведение.
 
-Готовая fail-fast реализация — `BrokersDownBudgetStreamObserver`: если
-брокеры недоступны непрерывно дольше `maxBrokersDownMs` (wall-clock,
-источник времени — PSR-20 `Psr\Clock\ClockInterface`, по умолчанию
-системные часы), генератор выбрасывает `KafkaBrokersDownException` —
-воркер падает, супервизор пересоздаёт процесс (restart-политика Docker,
-restartPolicy Kubernetes):
-
-```php
-use Anktx\Kafka\Client\StreamObserver\BrokersDownBudgetStreamObserver;
-
-$stream = new KafkaMessageStream(
-    $consumer,
-    new BrokersDownBudgetStreamObserver(maxBrokersDownMs: 30_000),
-);
-```
-
-Сообщение и EOF доказывают живое соединение и сбрасывают бюджет;
-таймаут — нет (не отличает тишину в топике от сетевой проблемы).
-Свои сценарии реакции — реализуйте интерфейс `StreamObserver`.
+Типовой fail-fast watchdog — бюджет тишины: если сообщения непрерывно
+отсутствуют дольше порога (наращивается в `onTimeout`, сбрасывается в
+`onMessage`), генератор прерывается исключением из хука, воркер падает,
+супервизор пересоздаёт процесс (restart-политика Docker, restartPolicy
+Kubernetes). Порог — продуктовое решение приложения: потеря брокеров из
+consume() неотличима от тишины в топике, поэтому готового класса в
+библиотеке нет. Свои сценарии — реализуйте интерфейс `StreamObserver`
+или наследуйте `SilentStreamObserver`, переопределяя только нужные хуки.
 
 ## Стратегии опроса (Poll Strategies)
 
@@ -152,9 +141,12 @@ $producer = new KafkaProducer(
 - `TimeoutPollStrategy` — вызывать `poll()` с фиксированным интервалом в миллисекундах (источник времени — PSR-20 `Psr\Clock\ClockInterface`, по умолчанию системные часы)
 - `ProbabilityPollStrategy` — вызывать `poll()` с вероятностью N (например, 10% вызовов)
 
-Ошибки доставки сообщений (delivery reports) продюсер логирует через PSR-3
-на уровне error. Отчёты доставляются callback'ам только при вызове `poll()`:
-со стратегиями опроса — в фоне, с `NeverPollStrategy` — только в момент `flush()`.
+Ошибки доставки сообщений (delivery reports) продюсер логирует через PSR-3:
+успешная доставка — debug, превышение `message.timeout.ms` — warning
+(ожидаемое следствие недоступности брокеров), прерывание доставки при
+остановке продюсера — info, прочие сбои — error. Отчёты доставляются
+callback'ам только при вызове `poll()`: со стратегиями опроса — в фоне,
+с `NeverPollStrategy` — только в момент `flush()`.
 
 ## Конфигурация
 
@@ -316,10 +308,16 @@ $consumer = new KafkaConsumer($config, logger: $logger);
 `ConsumeResult`):
 - `KafkaConsumerMessage` — успешно полученное сообщение
 - `KafkaConsumeTimeout` — таймаут (нет новых сообщений)
-- `KafkaBrokersDown` — полная потеря соединения со всеми брокерами
-  (ALL_BROKERS_DOWN): не ошибка — librdkafka переподключается в фоновых
-  потоках; отдельный результат для метрик и watchdog'ов
 - `KafkaPartitionEof` — достигнут конец партиции
+
+Недоступность брокеров отдельного результата не образует: событие
+ALL_BROKERS_DOWN перехватывается librdkafka и уходит в error-callback,
+поэтому из consume() любой обрыв выглядит как серия таймаутов (быстрый
+сигнал активного обрыва — warning в error-callback,
+`RD_KAFKA_RESP_ERR__TRANSPORT`; «молчаливый» обрыв — только в логах
+librdkafka через ~2 минуты). Прочие коды ошибок `RD_KAFKA_RESP_ERR__*`
+(фатальные, превышение max.poll.interval.ms, fetch-ошибки) бросают
+`KafkaConsumerException`.
 
 Пример обработки — `match` по классу даёт исчерпывающую диспетчеризацию
 (при появлении нового варианта union будет `UnhandledMatchError`, а не
@@ -331,7 +329,6 @@ $result = $consumer->consume(1000);
 match ($result::class) {
     KafkaConsumerMessage::class => $consumer->commit($result),
     KafkaConsumeTimeout::class => null, // нет сообщений, можно продолжить работу
-    KafkaBrokersDown::class => null,    // все брокеры недоступны, librdkafka переподключается
     KafkaPartitionEof::class => null,   // достигнут конец партиции
 };
 ```
@@ -356,7 +353,6 @@ src/
 │       └── OffsetReset.php          # Стратегия сброса оффсета (earliest, latest, error)
 │
 ├── ConsumeResult/                   # Результаты консьюминга
-│   ├── KafkaBrokersDown.php        # Полная потеря всех брокеров (ALL_BROKERS_DOWN)
 │   ├── KafkaConsumeTimeout.php      # Таймаут (нет сообщений)
 │   └── KafkaPartitionEof.php        # Достигнут конец партиции
 │
@@ -380,9 +376,8 @@ src/
 │   └── TimeoutPollStrategy.php      # Вызывать с фиксированным интервалом (мс)
 │
 ├── StreamObserver/                  # Реакция на результаты consume() в потоке сообщений
-│   ├── StreamObserver.php           # Интерфейс наблюдателя (onMessage/onTimeout/onBrokersDown/onEof)
-│   ├── SilentStreamObserver.php     # Молчаливая реакция (по умолчанию)
-│   └── BrokersDownBudgetStreamObserver.php # Fail-fast: брокеры недоступны дольше maxBrokersDownMs
+│   ├── StreamObserver.php           # Интерфейс наблюдателя (onMessage/onTimeout/onEof)
+│   └── SilentStreamObserver.php     # Молчаливая реакция (по умолчанию, расширяемая база)
 │
 ├── Topic/                           # Топики
 │   ├── Topic.php                    # Имя топика (VO: непустая строка)
@@ -400,7 +395,6 @@ src/
 ```
 KafkaClientException                 # Маркер: всё, что кидает библиотека (interface, extends \Throwable)
 ├── KafkaException                   # Сбои Kafka/окружения (наследует RdKafka\Exception)
-│   ├── KafkaBrokersDownException    # Брокеры недоступны дольше maxBrokersDownMs (BrokersDownBudgetStreamObserver)
 │   ├── KafkaConsumerException        # Ошибка консьюмера
 │   ├── KafkaFlushTimeoutException    # Таймаут flush: очередь не отправлена за $timeoutMs
 │   └── KafkaProducerException        # Ошибка продюсера

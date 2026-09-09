@@ -32,7 +32,9 @@ PHPStan level 9 + strict-rules, PHP-CS-Fixer, Infection
    - Метод `produce()` для отправки сообщения в топик
    - Метод `flush()` для принудительной отправки
    - Delivery reports через `setDrMsgCb`: успешная доставка — debug-лог,
-     сбой — error-лог (отчёты доезжают только при poll()/flush())
+     превышение `message.timeout.ms` — warning (ожидаемое следствие
+     недоступности брокеров), прерывание при shutdown — info, прочие
+     сбои — error (отчёты доезжают только при poll()/flush())
 
 3. **Консьюмер** (`src/KafkaConsumer.php`)
    - `KafkaConsumerInterface` — контракт публичного API консьюмера
@@ -43,10 +45,13 @@ PHPStan level 9 + strict-rules, PHP-CS-Fixer, Infection
    - Подписка на топики через `TopicList` (список `Topic`)
    - Чтение сообщений через `consume()` с таймаутом
    - Ручной коммит обработанных сообщений через `commit()`
-   - Возврат union-типа `KafkaConsumerMessage|KafkaConsumeTimeout|KafkaBrokersDown|KafkaPartitionEof`
-     (`KafkaBrokersDown` — полная потеря брокеров, различима с таймаутом
-     для метрик/watchdog'а; реакция на неё в `KafkaMessageStream` —
-     инжектируемый `StreamObserver`)
+   - Возврат union-типа `KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof`:
+      недоступность брокеров отдельного результата не образует — событие
+      ALL_BROKERS_DOWN перехватывается poll-циклом librdkafka и уходит
+      в error-callback, из consume() любой обрыв виден только как серия
+      таймаутов; прочие коды `RD_KAFKA_RESP_ERR__*` — default-ветка
+      и `KafkaConsumerException`; реакция на результаты в
+      `KafkaMessageStream` — инжектируемый `StreamObserver`
 
 4. **PollStrategy** (`src/PollStrategy/`)
    - Стратегии опроса очереди для оптимизации производительности
@@ -91,16 +96,17 @@ PHPStan level 9 + strict-rules, PHP-CS-Fixer, Infection
 
 8. **StreamObserver** (`src/StreamObserver/`)
    - Реакция на результаты consume() в потоке сообщений
-      (`KafkaMessageStream`): хуки `onMessage`/`onTimeout`/`onBrokersDown`/
-      `onEof` вызываются по каждому результату до yield; исключение
+      (`KafkaMessageStream`): хуки `onMessage`/`onTimeout`/`onEof`
+      вызываются по каждому результату до yield; исключение
       из хука прерывает генератор
-   - `SilentStreamObserver` — null-object, поглощает всё (дефолт,
-     полная BC со старым поведением стрима)
-   - `BrokersDownBudgetStreamObserver` — fail-fast бюджет
-     `maxBrokersDownMs` непрерывной потери всех брокеров: wall-clock
-     (PSR-20 clock, сбрасывается сообщением/EOF, не таймаутом), по
-     исчерпании — `KafkaBrokersDownException` (воркер падает, супервизор
-     пересоздаёт процесс)
+    - `SilentStreamObserver` — null-object, поглощает всё (дефолт,
+      полная BC со старым поведением стрима); намеренно не final —
+      расширяемая база для Null Object-наблюдателей
+    - Watchdog-политики (бюджет тишины, метрики) строятся поверх
+      `onTimeout`/`onMessage` на стороне приложения: потеря брокеров
+      из consume() неотличима от тишины в топике (серия таймаутов),
+      поэтому порог silence-бюджета — продуктовое решение, готового
+      fail-fast класса в библиотеке нет
 
 ## Ключевые паттерны проектирования
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Anktx\Kafka\Client;
 
-use Anktx\Kafka\Client\ConsumeResult\KafkaBrokersDown;
 use Anktx\Kafka\Client\ConsumeResult\KafkaConsumeTimeout;
 use Anktx\Kafka\Client\ConsumeResult\KafkaPartitionEof;
 use Anktx\Kafka\Client\Exception\Kafka\KafkaConsumerException;
@@ -62,20 +61,21 @@ interface KafkaConsumerInterface
      * - {@see KafkaConsumerMessage} - сообщение;
      * - {@see KafkaConsumeTimeout} - таймаут (за окно опроса не пришло
      *   сообщений);
-     * - {@see KafkaBrokersDown} - полная потеря соединения со всеми
-     *   брокерами: не ошибка, переподключение продолжается в фоне;
      * - {@see KafkaPartitionEof} - достигнут конец партиции.
+     *
+     * Недоступность брокеров отдельного результата не образует: из consume()
+     * любой обрыв виден как серия таймаутов (подробнее — {@see KafkaConsumer::consume()}).
      *
      * @param int $timeoutMs Таймаут ожидания в миллисекундах (по умолчанию 1000 мс)
      *
-     * @return KafkaBrokersDown|KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат чтения
+     * @return KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof Результат чтения
      *
      * @throws ClientClosedException  Если консьюмер закрыт через close()
      * @throws InvalidConfigException Если таймаут отрицательный
      * @throws NotSubscribedException Если консьюмер не подписан на топики
      * @throws KafkaConsumerException Если чтение завершилось ошибкой
      */
-    public function consume(int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS): KafkaBrokersDown|KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof;
+    public function consume(int $timeoutMs = self::DEFAULT_CONSUME_TIMEOUT_MS): KafkaConsumerMessage|KafkaConsumeTimeout|KafkaPartitionEof;
 
     /**
      * Коммитит смещение обработанного сообщения.

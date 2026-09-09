@@ -8,8 +8,8 @@ namespace Anktx\Kafka\Client\Clock;
  * Конвертация PSR-20 времени в unix-миллисекунды.
  *
  * Единая точка формата 'Uv' для всех потребителей ClockInterface:
- * TimeoutPollStrategy и BrokersDownBudgetStreamObserver считают
- * интервалы в одних и тех же единицах.
+ * TimeoutPollStrategy и стрим-наблюдатели считают интервалы
+ * в одних и тех же единицах.
  */
 final class UnixMilliseconds
 {
